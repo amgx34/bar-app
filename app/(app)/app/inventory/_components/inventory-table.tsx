@@ -1,128 +1,189 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useTransition } from 'react';
-import { Plus, Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { useState } from 'react';
+import { MoreHorizontal, Package, AlertTriangle } from 'lucide-react';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { canEditInventory, canManageCategories, type Role } from '@/lib/permissions';
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  canEditInventory,
+  canDeleteInventory,
+  canAdjustStock,
+  type Role,
+} from '@/lib/permissions';
 import { ItemFormDialog } from './item-form-dialog';
-import { CategoriesDialog } from './categories-dialog';
+import { StockAdjustDialog } from './stock-adjust-dialog';
+import { DeactivateDialog } from './deactivate-dialog';
 
-type Props = {
-  role: Role;
-  categories: { id: string; name: string }[];
-  currentQ: string;
-  currentCategory: string;
-  includeInactive: boolean;
+export type ItemRow = {
+  id: string;
+  name: string;
+  sku: string | null;
+  unit: string;
+  par_level: number | null;
+  cost_price: number | null;
+  sale_price: number | null;
+  current_stock: number;
+  is_active: boolean;
+  category_id: string | null;
+  inventory_categories: { id: string; name: string } | null;
 };
 
-export function InventoryHeader({
-  role, categories, currentQ, currentCategory, includeInactive,
-}: Props) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
-  const [q, setQ] = useState(currentQ);
-  const [addOpen, setAddOpen] = useState(false);
-  const [categoriesOpen, setCategoriesOpen] = useState(false);
+type Props = {
+  items: ItemRow[];
+  categories: { id: string; name: string }[];
+  role: Role;
+};
 
-  function updateParams(updates: Record<string, string | null>) {
-    const next = new URLSearchParams(searchParams);
-    for (const [key, value] of Object.entries(updates)) {
-      if (value === null || value === '') next.delete(key);
-      else next.set(key, value);
-    }
-    startTransition(() => {
-      router.push(`/app/inventory?${next.toString()}`);
-    });
+function formatMoney(n: number | null): string {
+  if (n === null || n === undefined) return '—';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency', currency: 'USD',
+  }).format(n);
+}
+
+export function InventoryTable({ items, categories, role }: Props) {
+  const [editing, setEditing] = useState<ItemRow | null>(null);
+  const [adjusting, setAdjusting] = useState<ItemRow | null>(null);
+  const [deactivating, setDeactivating] = useState<ItemRow | null>(null);
+
+  if (items.length === 0) {
+    return (
+      <div className="border rounded-lg p-12 text-center space-y-2">
+        <Package className="h-8 w-8 mx-auto text-muted-foreground" />
+        <h3 className="font-medium">No items yet</h3>
+        <p className="text-sm text-muted-foreground">
+          {canEditInventory(role)
+            ? 'Click "Add item" to create your first inventory item.'
+            : 'Ask an owner or manager to add items to your inventory.'}
+        </p>
+      </div>
+    );
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold">Inventory</h1>
-          <p className="text-sm text-muted-foreground">
-            Bottles, cans, kegs, and everything else behind the bar.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {canManageCategories(role) && (
-            <Button variant="outline" onClick={() => setCategoriesOpen(true)}>
-              Categories
-            </Button>
-          )}
-          {canEditInventory(role) && (
-            <Button onClick={() => setAddOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" /> Add item
-            </Button>
-          )}
-        </div>
+    <>
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Unit</TableHead>
+              <TableHead className="text-right">Stock</TableHead>
+              <TableHead className="text-right">Par</TableHead>
+              <TableHead className="text-right">Cost</TableHead>
+              <TableHead className="text-right">Price</TableHead>
+              <TableHead className="w-10"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((item) => {
+              const belowPar =
+                item.par_level !== null && item.current_stock < item.par_level;
+              return (
+                <TableRow key={item.id} className={!item.is_active ? 'opacity-50' : ''}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      {item.name}
+                      {!item.is_active && (
+                        <Badge variant="outline" className="text-xs">Inactive</Badge>
+                      )}
+                    </div>
+                    {item.sku && (
+                      <div className="text-xs text-muted-foreground">{item.sku}</div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {item.inventory_categories?.name ?? '—'}
+                  </TableCell>
+                  <TableCell className="text-sm">{item.unit}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    <div className="flex items-center justify-end gap-1.5">
+                      {belowPar && (
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                      )}
+                      {item.current_stock}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                    {item.par_level ?? '—'}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                    {formatMoney(item.cost_price)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatMoney(item.sale_price)}
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 w-9" aria-label="Actions">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {canAdjustStock(role) && item.is_active && (
+                          <DropdownMenuItem onClick={() => setAdjusting(item)}>
+                            Adjust stock
+                          </DropdownMenuItem>
+                        )}
+                        {canEditInventory(role) && (
+                          <DropdownMenuItem onClick={() => setEditing(item)}>
+                            Edit
+                          </DropdownMenuItem>
+                        )}
+                        {canDeleteInventory(role) && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => setDeactivating(item)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              {item.is_active ? 'Deactivate' : 'Reactivate'}
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
 
-      <div className="flex gap-3 flex-wrap items-end">
-        <div className="flex-1 min-w-[200px] space-y-1">
-          <Label htmlFor="search" className="sr-only">Search</Label>
-          <div className="relative">
-            <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-muted-foreground" />
-            <Input
-              id="search"
-              placeholder="Search by name…"
-              className="pl-8"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') updateParams({ q: q || null });
-              }}
-              onBlur={() => {
-                if (q !== currentQ) updateParams({ q: q || null });
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="w-[180px] space-y-1">
-          <Label className="sr-only">Category</Label>
-          <Select
-            value={currentCategory}
-            onValueChange={(v) => updateParams({ category: v === 'all' ? null : v })}
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All categories</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => updateParams({ include_inactive: includeInactive ? null : '1' })}
-          disabled={isPending}
-        >
-          {includeInactive ? 'Hide inactive' : 'Show inactive'}
-        </Button>
-      </div>
-
-      <ItemFormDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        categories={categories}
-        mode="create"
-      />
-      <CategoriesDialog
-        open={categoriesOpen}
-        onOpenChange={setCategoriesOpen}
-        categories={categories}
-      />
-    </div>
+      {editing && (
+        <ItemFormDialog
+          open={!!editing}
+          onOpenChange={(open) => !open && setEditing(null)}
+          categories={categories}
+          mode="edit"
+          item={editing}
+        />
+      )}
+      {adjusting && (
+        <StockAdjustDialog
+          open={!!adjusting}
+          onOpenChange={(open) => !open && setAdjusting(null)}
+          item={adjusting}
+        />
+      )}
+      {deactivating && (
+        <DeactivateDialog
+          open={!!deactivating}
+          onOpenChange={(open) => !open && setDeactivating(null)}
+          item={deactivating}
+        />
+      )}
+    </>
   );
 }

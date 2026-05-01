@@ -100,7 +100,7 @@ export function StockAdjustDialog({ open, onOpenChange, item }: Props) {
             <Input
               id="quantity" type="number" step="0.01"
               placeholder={mode === 'delta' ? 'e.g. 12 or -2' : 'e.g. 48'}
-              {...register('quantity')}
+              {...register('quantity', { valueAsNumber: true })}
             />
             {errors.quantity && (
               <p className="text-xs text-destructive">{errors.quantity.message}</p>

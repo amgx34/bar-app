@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
@@ -108,7 +108,7 @@ export function ItemFormDialog({ open, onOpenChange, categories, mode, item }: P
               <Label>Unit *</Label>
               <Select
                 value={currentUnit}
-                onValueChange={(v) => setValue('unit', v)}
+                onValueChange={(v) => v !== null && setValue('unit', v)}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -130,14 +130,14 @@ export function ItemFormDialog({ open, onOpenChange, categories, mode, item }: P
               <Label htmlFor="cost_price">Cost price</Label>
               <Input
                 id="cost_price" type="number" step="0.01" min="0"
-                {...register('cost_price')}
+                {...register('cost_price', { setValueAs: (v) => v === '' ? null : parseFloat(v) })}
               />
             </div>
             <div className="space-y-1">
               <Label htmlFor="sale_price">Sale price</Label>
               <Input
                 id="sale_price" type="number" step="0.01" min="0"
-                {...register('sale_price')}
+                {...register('sale_price', { setValueAs: (v) => v === '' ? null : parseFloat(v) })}
               />
             </div>
           </div>
@@ -148,7 +148,7 @@ export function ItemFormDialog({ open, onOpenChange, categories, mode, item }: P
               <Input
                 id="par_level" type="number" step="0.01" min="0"
                 placeholder="Target stock"
-                {...register('par_level')}
+                {...register('par_level', { setValueAs: (v) => v === '' ? null : parseFloat(v) })}
               />
             </div>
             <div className="space-y-1">
@@ -158,7 +158,7 @@ export function ItemFormDialog({ open, onOpenChange, categories, mode, item }: P
               <Input
                 id="current_stock" type="number" step="0.01" min="0"
                 disabled={mode === 'edit'}
-                {...register('current_stock')}
+                {...register('current_stock', { valueAsNumber: true })}
               />
               {mode === 'edit' && (
                 <p className="text-xs text-muted-foreground">

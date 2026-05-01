@@ -1,6 +1,6 @@
 import { getCurrentOrg } from '@/lib/org';
-import { createClient } from '@/lib/supabase/server';
-import { InventoryTable } from './_components/inventory-table';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { InventoryTable, type ItemRow } from './_components/inventory-table';
 import { InventoryHeader } from './_components/inventory-header';
 
 export const revalidate = 0; // always fresh
@@ -16,9 +16,9 @@ export default async function InventoryPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const { role } = await getCurrentOrg();
+  const { org, role } = await getCurrentOrg();
   const { q, category, include_inactive } = await searchParams;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   // Build query
   let query = supabase
@@ -28,6 +28,7 @@ export default async function InventoryPage({
       current_stock, is_active, category_id,
       inventory_categories ( id, name )
     `)
+    .eq('organization_id', org.id)
     .order('name');
 
   if (!include_inactive) query = query.eq('is_active', true);
@@ -36,7 +37,7 @@ export default async function InventoryPage({
 
   const [{ data: items, error }, { data: categories }] = await Promise.all([
     query,
-    supabase.from('inventory_categories').select('id, name').order('name'),
+    supabase.from('inventory_categories').select('id, name').eq('organization_id', org.id).order('name'),
   ]);
 
   if (error) {
@@ -53,7 +54,7 @@ export default async function InventoryPage({
         includeInactive={include_inactive === '1'}
       />
       <InventoryTable
-        items={items ?? []}
+        items={(items ?? []) as unknown as ItemRow[]}
         categories={categories ?? []}
         role={role}
       />
