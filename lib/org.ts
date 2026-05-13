@@ -4,11 +4,40 @@ import { createClient } from '@/lib/supabase/server';
 
 export const CURRENT_ORG_COOKIE = 'current_org_id';
 
+export type HourlyRates = {
+  bartender?: number;
+  barback?:   number;
+  manager?:   number;
+  server?:    number;
+  security?:  number;
+  other?:     number;
+};
+
 export type BarSettings = {
+  // ── Existing ──────────────────────────────────────────────────────────
   tip_split_percent:   number;
   default_hourly_rate: number;
   auto_reorder_enabled?: boolean;
   admin_phone?:          string;
+
+  // ── Tip configuration ─────────────────────────────────────────────────
+  barback_tip_pct?:     number;              // % of nightly tip pool to barbacks (default 15)
+  opener_bonus_type?:   'none' | 'fixed' | 'percentage';
+  opener_bonus_value?:  number;              // dollars (fixed) or % (percentage)
+
+  // ── Per-role hourly rates ─────────────────────────────────────────────
+  hourly_rates?: HourlyRates;
+
+  // ── Inventory / pour defaults ─────────────────────────────────────────
+  default_pour_oz?: number;                  // default spirit pour size in oz (e.g. 1.5)
+  bottle_sizes_ml?: number[];               // sizes to offer in item form
+
+  // ── Bar identity ──────────────────────────────────────────────────────
+  bar_type?:    string;                      // bar | nightclub | restaurant | brewery | etc.
+  bar_address?: string;
+  bar_city?:    string;
+  bar_state?:   string;
+  bar_phone?:   string;
 };
 
 export type OrgMembership = {

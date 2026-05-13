@@ -36,15 +36,19 @@ export type ItemRow = {
   is_active: boolean;
   category_id: string | null;
   rep_id: string | null;
+  bottle_size_ml: number | null;
+  pour_size_oz: number | null;
   inventory_categories: { id: string; name: string } | null;
   reps: { id: string; name: string } | null;
 };
 
 type Props = {
-  items: ItemRow[];
-  categories: { id: string; name: string }[];
-  reps:       { id: string; name: string }[];
-  role: Role;
+  items:          ItemRow[];
+  categories:     { id: string; name: string }[];
+  reps:           { id: string; name: string }[];
+  role:           Role;
+  defaultPourOz?: number;
+  bottleSizesMl?: number[];
 };
 
 function formatMoney(n: number | null): string {
@@ -54,7 +58,7 @@ function formatMoney(n: number | null): string {
   }).format(n);
 }
 
-export function InventoryTable({ items, categories, reps, role }: Props) {
+export function InventoryTable({ items, categories, reps, role, defaultPourOz, bottleSizesMl }: Props) {
   const [editing, setEditing] = useState<ItemRow | null>(null);
   const [adjusting, setAdjusting] = useState<ItemRow | null>(null);
   const [deactivating, setDeactivating] = useState<ItemRow | null>(null);
@@ -173,6 +177,8 @@ export function InventoryTable({ items, categories, reps, role }: Props) {
           onOpenChange={(open) => !open && setEditing(null)}
           categories={categories}
           reps={reps}
+          defaultPourOz={defaultPourOz}
+          bottleSizesMl={bottleSizesMl}
           mode="edit"
           item={editing}
         />

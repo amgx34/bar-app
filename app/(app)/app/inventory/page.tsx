@@ -67,6 +67,8 @@ export default async function InventoryPage({
         currentQ={q ?? ''}
         currentCategory={category ?? 'all'}
         includeInactive={include_inactive === '1'}
+        defaultPourOz={org.bar_settings?.default_pour_oz ?? 1.5}
+        bottleSizesMl={org.bar_settings?.bottle_sizes_ml ?? [375, 750, 1000, 1750]}
       />
       <InventoryNav />
       <InventoryTable
@@ -74,6 +76,8 @@ export default async function InventoryPage({
         categories={categories ?? []}
         reps={reps ?? []}
         role={role}
+        defaultPourOz={org.bar_settings?.default_pour_oz ?? 1.5}
+        bottleSizesMl={org.bar_settings?.bottle_sizes_ml ?? [375, 750, 1000, 1750]}
       />
     </main>
   );

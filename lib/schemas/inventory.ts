@@ -1,15 +1,18 @@
 import { z } from 'zod';
 
 export const inventoryItemSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(200),
-  category_id: z.string().uuid().nullable().optional(),
-  rep_id: z.string().uuid().nullable().optional(),
-  sku: z.string().max(64).optional().or(z.literal('')),
-  unit: z.string().min(1).max(32),
-  par_level: z.number().nonnegative().nullable().optional(),
-  cost_price: z.number().nonnegative().nullable().optional(),
-  sale_price: z.number().nonnegative().nullable().optional(),
-  current_stock: z.number().nonnegative(),
+  name:           z.string().min(1, 'Name is required').max(200),
+  category_id:    z.string().uuid().nullable().optional(),
+  rep_id:         z.string().uuid().nullable().optional(),
+  sku:            z.string().max(64).optional().or(z.literal('')),
+  unit:           z.string().min(1).max(32),
+  par_level:      z.number().nonnegative().nullable().optional(),
+  cost_price:     z.number().nonnegative().nullable().optional(),
+  sale_price:     z.number().nonnegative().nullable().optional(),
+  current_stock:  z.number().nonnegative(),
+  // Liquor / bottle tracking
+  bottle_size_ml: z.number().int().positive().nullable().optional(),
+  pour_size_oz:   z.number().positive().nullable().optional(),
 });
 export type InventoryItemInput = z.infer<typeof inventoryItemSchema>;
 

@@ -59,15 +59,17 @@ export async function createItem(raw: unknown) {
 
   const { error } = await supabase.from('inventory_items').insert({
     organization_id: org.id,
-    name:          input.name,
-    category_id:   input.category_id || null,
-    rep_id:        input.rep_id       || null,
-    sku:           input.sku          || null,
-    unit:          input.unit,
-    par_level:     input.par_level    ?? null,
-    cost_price:    input.cost_price   ?? null,
-    sale_price:    input.sale_price   ?? null,
-    current_stock: input.current_stock ?? 0,
+    name:           input.name,
+    category_id:    input.category_id  || null,
+    rep_id:         input.rep_id       || null,
+    sku:            input.sku          || null,
+    unit:           input.unit,
+    par_level:      input.par_level    ?? null,
+    cost_price:     input.cost_price   ?? null,
+    sale_price:     input.sale_price   ?? null,
+    current_stock:  input.current_stock ?? 0,
+    bottle_size_ml: input.bottle_size_ml ?? null,
+    pour_size_oz:   input.pour_size_oz   ?? null,
   });
 
   if (error) throw new Error(error.message);
@@ -87,14 +89,16 @@ export async function updateItem(itemId: string, raw: unknown) {
   const { error } = await supabase
     .from('inventory_items')
     .update({
-      name:        input.name,
-      category_id: input.category_id || null,
-      rep_id:      input.rep_id       || null,
-      sku:         input.sku          || null,
-      unit:        input.unit,
-      par_level:   input.par_level    ?? null,
-      cost_price:  input.cost_price   ?? null,
-      sale_price:  input.sale_price   ?? null,
+      name:           input.name,
+      category_id:    input.category_id  || null,
+      rep_id:         input.rep_id       || null,
+      sku:            input.sku          || null,
+      unit:           input.unit,
+      par_level:      input.par_level    ?? null,
+      cost_price:     input.cost_price   ?? null,
+      sale_price:     input.sale_price   ?? null,
+      bottle_size_ml: input.bottle_size_ml ?? null,
+      pour_size_oz:   input.pour_size_oz   ?? null,
     })
     .eq('id', itemId)
     .eq('organization_id', org.id);

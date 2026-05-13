@@ -16,11 +16,13 @@ import { InventoryImportDialog } from './inventory-import-dialog';
 
 type Props = {
   role: Role;
-  categories: { id: string; name: string }[];
-  reps:       { id: string; name: string }[];
-  currentQ: string;
+  categories:    { id: string; name: string }[];
+  reps:          { id: string; name: string }[];
+  currentQ:      string;
   currentCategory: string;
   includeInactive: boolean;
+  defaultPourOz?:  number;
+  bottleSizesMl?:  number[];
 };
 
 const STOCK_FILTERS = [
@@ -31,6 +33,7 @@ const STOCK_FILTERS = [
 
 export function InventoryHeader({
   role, categories, reps, currentQ, currentCategory, includeInactive,
+  defaultPourOz, bottleSizesMl,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -185,6 +188,8 @@ export function InventoryHeader({
         categories={categories}
         reps={reps}
         mode="create"
+        defaultPourOz={defaultPourOz}
+        bottleSizesMl={bottleSizesMl}
       />
       <CategoriesDialog
         open={categoriesOpen}
