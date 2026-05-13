@@ -6,7 +6,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Bar Inventory',
+  title: 'Rail',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

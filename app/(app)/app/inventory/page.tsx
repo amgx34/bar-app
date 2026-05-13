@@ -27,8 +27,9 @@ export default async function InventoryPage({
     .from('inventory_items')
     .select(`
       id, name, sku, unit, par_level, cost_price, sale_price,
-      current_stock, is_active, category_id,
-      inventory_categories ( id, name )
+      current_stock, is_active, category_id, rep_id,
+      inventory_categories ( id, name ),
+      reps ( id, name )
     `)
     .eq('organization_id', org.id)
     .order('name');
@@ -37,9 +38,10 @@ export default async function InventoryPage({
   if (q) query = query.ilike('name', `%${q}%`);
   if (category && category !== 'all') query = query.eq('category_id', category);
 
-  const [{ data: items, error }, { data: categories }, { data: usageLogs }] = await Promise.all([
+  const [{ data: items, error }, { data: categories }, { data: reps }, { data: usageLogs }] = await Promise.all([
     query,
     supabase.from('inventory_categories').select('id, name').eq('organization_id', org.id).order('name'),
+    supabase.from('reps').select('id, name').eq('organization_id', org.id).eq('is_active', true).order('name'),
     supabase
       .from('usage_logs')
       .select('item_id, quantity, reason, note, created_at, inventory_items(name)')
@@ -61,6 +63,7 @@ export default async function InventoryPage({
       <InventoryHeader
         role={role}
         categories={categories ?? []}
+        reps={reps ?? []}
         currentQ={q ?? ''}
         currentCategory={category ?? 'all'}
         includeInactive={include_inactive === '1'}
@@ -69,6 +72,7 @@ export default async function InventoryPage({
       <InventoryTable
         items={(items ?? []) as unknown as ItemRow[]}
         categories={categories ?? []}
+        reps={reps ?? []}
         role={role}
       />
     </main>

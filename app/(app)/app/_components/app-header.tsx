@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { User } from 'lucide-react';
 import { signOut } from '../actions';
 import { cn } from '@/lib/utils';
@@ -26,7 +25,7 @@ export function AppHeader({ email }: Props) {  // remove unused props if not nee
     <header className="sticky top-0 z-50 flex h-14 items-center border-b border-border/60 bg-card/95 backdrop-blur-sm px-6 gap-4">
       <SidebarTrigger />
       <div className="font-bold text-lg tracking-[0.2em] text-primary uppercase">
-        Pour
+        Rail
       </div>
       <div className="flex-1" />
 

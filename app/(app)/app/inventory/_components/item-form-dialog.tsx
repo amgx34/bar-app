@@ -18,16 +18,17 @@ import { createItem, updateItem } from '../actions';
 import type { ItemRow } from './inventory-table';
 
 type Props = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  categories: { id: string; name: string }[];
-  mode: 'create' | 'edit';
-  item?: ItemRow;
+  open:          boolean;
+  onOpenChange:  (open: boolean) => void;
+  categories:    { id: string; name: string }[];
+  reps:          { id: string; name: string }[];
+  mode:          'create' | 'edit';
+  item?:         ItemRow;
 };
 
 const UNITS = ['bottle', 'can', 'keg', 'oz', 'liter', 'case', 'each'];
 
-export function ItemFormDialog({ open, onOpenChange, categories, mode, item }: Props) {
+export function ItemFormDialog({ open, onOpenChange, categories, reps, mode, item }: Props) {
   const [isPending, startTransition] = useTransition();
 
   const {
@@ -35,19 +36,21 @@ export function ItemFormDialog({ open, onOpenChange, categories, mode, item }: P
   } = useForm<InventoryItemInput>({
     resolver: zodResolver(inventoryItemSchema),
     defaultValues: {
-      name: item?.name ?? '',
-      category_id: item?.category_id ?? null,
-      sku: item?.sku ?? '',
-      unit: item?.unit ?? 'bottle',
-      par_level: item?.par_level ?? null,
-      cost_price: item?.cost_price ?? null,
-      sale_price: item?.sale_price ?? null,
+      name:          item?.name          ?? '',
+      category_id:   item?.category_id   ?? null,
+      rep_id:        item?.rep_id        ?? null,
+      sku:           item?.sku           ?? '',
+      unit:          item?.unit          ?? 'bottle',
+      par_level:     item?.par_level     ?? null,
+      cost_price:    item?.cost_price    ?? null,
+      sale_price:    item?.sale_price    ?? null,
       current_stock: item?.current_stock ?? 0,
     },
   });
 
   const currentCategory = watch('category_id');
-  const currentUnit = watch('unit');
+  const currentUnit     = watch('unit');
+  const currentRep      = watch('rep_id');
 
   function onSubmit(values: InventoryItemInput) {
     startTransition(async () => {
@@ -80,9 +83,7 @@ export function ItemFormDialog({ open, onOpenChange, categories, mode, item }: P
           <div className="space-y-1">
             <Label htmlFor="name">Name *</Label>
             <Input id="name" {...register('name')} />
-            {errors.name && (
-              <p className="text-xs text-destructive">{errors.name.message}</p>
-            )}
+            {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -90,9 +91,7 @@ export function ItemFormDialog({ open, onOpenChange, categories, mode, item }: P
               <Label>Category</Label>
               <Select
                 value={currentCategory ?? 'none'}
-                onValueChange={(v) =>
-                  setValue('category_id', v === 'none' ? null : v)
-                }
+                onValueChange={(v) => setValue('category_id', v === 'none' ? null : v)}
               >
                 <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                 <SelectContent>
@@ -119,6 +118,31 @@ export function ItemFormDialog({ open, onOpenChange, categories, mode, item }: P
               </Select>
             </div>
           </div>
+
+          {/* Rep / Supplier */}
+          {reps.length > 0 && (
+            <div className="space-y-1">
+              <Label>Rep / Supplier</Label>
+              <Select
+                value={currentRep ?? 'none'}
+                onValueChange={(v) => setValue('rep_id', v === 'none' ? null : v)}
+              >
+                <SelectTrigger>
+                  <span className="truncate text-sm">
+                    {currentRep && currentRep !== 'none'
+                      ? (reps.find((r) => r.id === currentRep)?.name ?? 'Select rep')
+                      : 'None'}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {reps.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-1">
             <Label htmlFor="sku">SKU</Label>
@@ -161,24 +185,17 @@ export function ItemFormDialog({ open, onOpenChange, categories, mode, item }: P
                 {...register('current_stock', { valueAsNumber: true })}
               />
               {mode === 'edit' && (
-                <p className="text-xs text-muted-foreground">
-                  Use &quot;Adjust stock&quot; to change this.
-                </p>
+                <p className="text-xs text-muted-foreground">Use &quot;Adjust stock&quot; to change this.</p>
               )}
             </div>
           </div>
 
           <DialogFooter>
-            <Button
-              type="button" variant="outline"
-              onClick={() => onOpenChange(false)} disabled={isPending}
-            >
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
               Cancel
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending
-                ? 'Saving…'
-                : mode === 'create' ? 'Add item' : 'Save changes'}
+              {isPending ? 'Saving…' : mode === 'create' ? 'Add item' : 'Save changes'}
             </Button>
           </DialogFooter>
         </form>

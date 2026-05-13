@@ -59,13 +59,14 @@ export async function createItem(raw: unknown) {
 
   const { error } = await supabase.from('inventory_items').insert({
     organization_id: org.id,
-    name: input.name,
-    category_id: input.category_id || null,
-    sku: input.sku || null,
-    unit: input.unit,
-    par_level: input.par_level ?? null,
-    cost_price: input.cost_price ?? null,
-    sale_price: input.sale_price ?? null,
+    name:          input.name,
+    category_id:   input.category_id || null,
+    rep_id:        input.rep_id       || null,
+    sku:           input.sku          || null,
+    unit:          input.unit,
+    par_level:     input.par_level    ?? null,
+    cost_price:    input.cost_price   ?? null,
+    sale_price:    input.sale_price   ?? null,
     current_stock: input.current_stock ?? 0,
   });
 
@@ -86,13 +87,14 @@ export async function updateItem(itemId: string, raw: unknown) {
   const { error } = await supabase
     .from('inventory_items')
     .update({
-      name: input.name,
+      name:        input.name,
       category_id: input.category_id || null,
-      sku: input.sku || null,
-      unit: input.unit,
-      par_level: input.par_level ?? null,
-      cost_price: input.cost_price ?? null,
-      sale_price: input.sale_price ?? null,
+      rep_id:      input.rep_id       || null,
+      sku:         input.sku          || null,
+      unit:        input.unit,
+      par_level:   input.par_level    ?? null,
+      cost_price:  input.cost_price   ?? null,
+      sale_price:  input.sale_price   ?? null,
     })
     .eq('id', itemId)
     .eq('organization_id', org.id);

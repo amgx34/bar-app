@@ -13,3 +13,6 @@ export const canAdjustStock = (role: Role) =>
 
 export const canManageCategories = (role: Role) =>
   role === 'owner' || role === 'manager';
+
+export const canManageReps = (role: Role) =>
+  role === 'owner' || role === 'manager';

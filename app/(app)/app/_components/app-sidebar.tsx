@@ -15,15 +15,18 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar';
-import { Home, Package, CircleDollarSign, User, Receipt } from 'lucide-react'; // add more icons as needed
-import { OrgSwitcher } from './org-switcher'; // your existing component
+import { Home, Package, CircleDollarSign, User, Receipt, Settings, FileText, Users } from 'lucide-react';
+import { OrgSwitcher } from './org-switcher';
 
 const NAV = [
-  { label: 'Dashboard', href: '/app/dashboard', icon: Home },
-  { label: 'Inventory', href: '/app/inventory', icon: Package },
-  { label: 'Payroll', href: '/app/payroll', icon: CircleDollarSign },
-  { label: 'Employees', href: '/app/employees', icon: User },
-  { label: 'Tips', href: '/app/tips', icon: Receipt },
+  { label: 'Dashboard',  href: '/app/dashboard',  icon: Home },
+  { label: 'Inventory',  href: '/app/inventory',  icon: Package },
+  { label: 'Payroll',    href: '/app/payroll',    icon: CircleDollarSign },
+  { label: 'Employees',  href: '/app/employees',  icon: User },
+  { label: 'Tips',       href: '/app/tips',       icon: Receipt },
+  { label: 'Reps',       href: '/app/reps',       icon: Users },
+  { label: 'Tax',        href: '/app/tax',        icon: FileText },
+  { label: 'Settings',   href: '/app/settings',   icon: Settings },
 ];
 
 export function AppSidebar() {

@@ -6,6 +6,8 @@ import PayrollTab from './_components/payroll-tab';
 import ImportTab from './_components/import-tab';
 import EmployeesTab from './_components/employees-tab';
 import DaySplitTab from './_components/day-split-tab';
+import DirectDepositTab from './_components/direct-deposit-tab';
+import { getAllDirectDepositAccounts } from './direct-deposit-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,11 +62,15 @@ export default async function PayrollPage({
     .eq('organization_id', org?.id)
     .order('name');
 
-  // Fetch payroll data
-  const payrollEntries = await computePayroll(startDate, endDate);
+  // Fetch payroll data + direct deposit accounts in parallel
+  const [payrollEntries, ddAccounts] = await Promise.all([
+    computePayroll(startDate, endDate),
+    tab === 'direct-deposit' ? getAllDirectDepositAccounts() : Promise.resolve({}),
+  ]);
+  const adminPhone = ((org.bar_settings ?? {}) as Record<string, unknown>).admin_phone as string | null ?? null;
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Payroll</h1>
         <p className="text-muted-foreground">
@@ -94,6 +100,11 @@ export default async function PayrollPage({
             href="/app/payroll?tab=split"
             active={tab === 'split'}
             label="Day Split"
+          />
+          <TabLink
+            href="/app/payroll?tab=direct-deposit"
+            active={tab === 'direct-deposit'}
+            label="Direct Deposit"
           />
         </div>
       </div>
@@ -127,6 +138,16 @@ export default async function PayrollPage({
         {tab === 'split' && (
           <Suspense fallback={<div>Loading...</div>}>
             <DaySplitTab />
+          </Suspense>
+        )}
+
+        {tab === 'direct-deposit' && (
+          <Suspense fallback={<div>Loading...</div>}>
+            <DirectDepositTab
+              employees={employees || []}
+              accountsByEmployee={ddAccounts}
+              adminPhone={adminPhone}
+            />
           </Suspense>
         )}
       </div>

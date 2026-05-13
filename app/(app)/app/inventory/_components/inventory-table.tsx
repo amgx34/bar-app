@@ -35,12 +35,15 @@ export type ItemRow = {
   current_stock: number;
   is_active: boolean;
   category_id: string | null;
+  rep_id: string | null;
   inventory_categories: { id: string; name: string } | null;
+  reps: { id: string; name: string } | null;
 };
 
 type Props = {
   items: ItemRow[];
   categories: { id: string; name: string }[];
+  reps:       { id: string; name: string }[];
   role: Role;
 };
 
@@ -51,7 +54,7 @@ function formatMoney(n: number | null): string {
   }).format(n);
 }
 
-export function InventoryTable({ items, categories, role }: Props) {
+export function InventoryTable({ items, categories, reps, role }: Props) {
   const [editing, setEditing] = useState<ItemRow | null>(null);
   const [adjusting, setAdjusting] = useState<ItemRow | null>(null);
   const [deactivating, setDeactivating] = useState<ItemRow | null>(null);
@@ -101,6 +104,9 @@ export function InventoryTable({ items, categories, role }: Props) {
                     </div>
                     {item.sku && (
                       <div className="text-xs text-muted-foreground">{item.sku}</div>
+                    )}
+                    {item.reps && (
+                      <div className="text-xs text-muted-foreground/60">{item.reps.name}</div>
                     )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
@@ -166,6 +172,7 @@ export function InventoryTable({ items, categories, role }: Props) {
           open={!!editing}
           onOpenChange={(open) => !open && setEditing(null)}
           categories={categories}
+          reps={reps}
           mode="edit"
           item={editing}
         />

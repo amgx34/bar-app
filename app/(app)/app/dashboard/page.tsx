@@ -86,7 +86,7 @@ export default async function DashboardPage() {
       .eq('organization_id', orgId),
     supabase
       .from('inventory_items')
-      .select('id, name, unit, current_stock, par_level, inventory_categories(name)')
+      .select('id, name, unit, current_stock, par_level, rep_id, inventory_categories(name), reps(id, name)')
       .eq('organization_id', orgId)
       .eq('is_active', true)
       .order('name'),
@@ -151,6 +151,20 @@ export default async function DashboardPage() {
     if (item.par_level !== null && item.current_stock < item.par_level) entry.low++;
   }
   const categoryRows = [...categoryMap.entries()].sort((a, b) => b[1].total - a[1].total);
+
+  // Reorder suggestions: low-stock items that have a rep linked
+  const autoReorderEnabled = org.bar_settings?.auto_reorder_enabled ?? false;
+  const reorderItems = items.filter(
+    (i) => i.par_level !== null && i.current_stock < i.par_level && i.rep_id
+  );
+  const reorderByRep = new Map<string, { rep: { id: string; name: string }; items: typeof reorderItems }>();
+  for (const item of reorderItems) {
+    const repData = (item.reps as unknown as { id: string; name: string } | null);
+    if (!repData) continue;
+    if (!reorderByRep.has(repData.id)) reorderByRep.set(repData.id, { rep: repData, items: [] });
+    reorderByRep.get(repData.id)!.items.push(item);
+  }
+  const reorderGroups = [...reorderByRep.values()];
 
   const hasAlerts = flaggedCount > 0 || unconfiguredEmployees.length > 0 || lowStockItems.length > 0;
 
@@ -271,6 +285,45 @@ export default async function DashboardPage() {
           <QuickLink href="/app/tips?tab=well" icon={<Gauge className="h-5 w-5" />} label="Well Performance" color="text-rose-400 bg-rose-400/10" />
         </div>
       </div>
+
+      {/* ── Reorder Suggestions ────────────────────────────────────────────── */}
+      {autoReorderEnabled && reorderGroups.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
+            Reorder Suggestions
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {reorderGroups.map(({ rep, items: repItems }) => (
+              <div key={rep.id} className="rounded-xl border bg-card overflow-hidden">
+                <div className="px-5 py-3 border-b flex items-center justify-between">
+                  <p className="text-sm font-semibold truncate">{rep.name}</p>
+                  <Link
+                    href={`/app/reps?order=${rep.id}`}
+                    className="text-xs text-primary hover:underline flex items-center gap-1 shrink-0 ml-2"
+                  >
+                    Order <ArrowUpRight className="h-3 w-3" />
+                  </Link>
+                </div>
+                <div className="divide-y">
+                  {repItems.slice(0, 4).map((item) => (
+                    <div key={item.id} className="px-5 py-2.5 flex items-center justify-between gap-3">
+                      <span className="text-sm truncate">{item.name}</span>
+                      <span className={`text-xs tabular-nums shrink-0 ${item.current_stock === 0 ? 'text-red-400 font-semibold' : 'text-amber-400'}`}>
+                        {item.current_stock === 0 ? 'OUT' : `${item.current_stock} / ${item.par_level}`}
+                      </span>
+                    </div>
+                  ))}
+                  {repItems.length > 4 && (
+                    <div className="px-5 py-2 text-xs text-muted-foreground">
+                      +{repItems.length - 4} more items
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Inventory Snapshot ─────────────────────────────────────────────── */}
       {items.length > 0 && (

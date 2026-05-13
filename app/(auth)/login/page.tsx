@@ -14,7 +14,7 @@ export default function LoginPage() {
       <div className="absolute inset-0 bg-gray-900/65" />
       <div className="relative z-10 w-full flex flex-col items-center gap-6">
         <p className="text-white/40 text-xs font-medium tracking-widest uppercase select-none">
-          Bar Management
+          Rail
         </p>
         <Suspense>
           <LoginForm />

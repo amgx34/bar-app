@@ -6,7 +6,7 @@ import { Search, Plus, ChevronDown, Settings2, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { canEditInventory, canManageCategories, type Role } from '@/lib/permissions';
@@ -17,6 +17,7 @@ import { InventoryImportDialog } from './inventory-import-dialog';
 type Props = {
   role: Role;
   categories: { id: string; name: string }[];
+  reps:       { id: string; name: string }[];
   currentQ: string;
   currentCategory: string;
   includeInactive: boolean;
@@ -29,7 +30,7 @@ const STOCK_FILTERS = [
 ];
 
 export function InventoryHeader({
-  role, categories, currentQ, currentCategory, includeInactive,
+  role, categories, reps, currentQ, currentCategory, includeInactive,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -80,11 +81,15 @@ export function InventoryHeader({
 
           {/* Category filter */}
           <Select
-            value={currentCategory}
+            value={currentCategory || 'all'}
             onValueChange={(v) => updateParams({ category: v === 'all' ? null : v })}
           >
             <SelectTrigger className="w-[160px] h-9 bg-card border-border/60">
-              <SelectValue />
+              <span className="truncate text-sm">
+                {!currentCategory || currentCategory === 'all'
+                  ? 'All categories'
+                  : (categories.find((c) => c.id === currentCategory)?.name ?? 'All categories')}
+              </span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All categories</SelectItem>
@@ -178,6 +183,7 @@ export function InventoryHeader({
         open={addOpen}
         onOpenChange={setAddOpen}
         categories={categories}
+        reps={reps}
         mode="create"
       />
       <CategoriesDialog

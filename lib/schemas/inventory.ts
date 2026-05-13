@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const inventoryItemSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200),
   category_id: z.string().uuid().nullable().optional(),
+  rep_id: z.string().uuid().nullable().optional(),
   sku: z.string().max(64).optional().or(z.literal('')),
   unit: z.string().min(1).max(32),
   par_level: z.number().nonnegative().nullable().optional(),
