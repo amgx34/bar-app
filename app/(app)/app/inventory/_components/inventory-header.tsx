@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import { Search, Plus, ChevronDown, Settings2 } from 'lucide-react';
+import { Search, Plus, ChevronDown, Settings2, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { canEditInventory, canManageCategories, type Role } from '@/lib/permissions';
 import { ItemFormDialog } from './item-form-dialog';
 import { CategoriesDialog } from './categories-dialog';
+import { InventoryImportDialog } from './inventory-import-dialog';
 
 type Props = {
   role: Role;
@@ -37,6 +38,7 @@ export function InventoryHeader({
   const [q, setQ] = useState(currentQ);
   const [addOpen, setAddOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const currentStock = searchParams.get('stock') ?? 'all';
 
@@ -124,14 +126,25 @@ export function InventoryHeader({
               </Button>
             )}
             {canEditInventory(role) && (
-              <Button
-                size="sm"
-                onClick={() => setAddOpen(true)}
-                className="h-9"
-              >
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
-                Add item
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setImportOpen(true)}
+                  className="h-9 border-border/60 text-primary hover:text-primary"
+                >
+                  <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                  AI Import
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setAddOpen(true)}
+                  className="h-9"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Add item
+                </Button>
+              </>
             )}
             <Button
               variant="ghost"
@@ -171,6 +184,10 @@ export function InventoryHeader({
         open={categoriesOpen}
         onOpenChange={setCategoriesOpen}
         categories={categories}
+      />
+      <InventoryImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
       />
     </div>
   );

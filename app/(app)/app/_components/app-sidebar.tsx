@@ -32,12 +32,6 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" variant="inset"> {/* "icon" = collapses to icons only */}
       <SidebarHeader className="border-b border-border">
-        <div className="flex items-center gap-2 px-3 py-2">
-          <div className="font-bold text-lg tracking-[0.2em] text-primary uppercase">
-            Pour
-          </div>
-          {/* Optional: put OrgSwitcher here if you want it in sidebar */}
-        </div>
       </SidebarHeader>
 
       <SidebarContent>

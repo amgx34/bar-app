@@ -14,6 +14,38 @@ import {
   stockAdjustmentSchema,
   categorySchema,
 } from '@/lib/schemas/inventory';
+import { parseInventoryWithAI } from '@/lib/ai-parsers/parse-inventory-with-ai';
+
+// ── Import types ──────────────────────────────────────────────────────────────
+
+export type ReviewItem = {
+  tempId: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  cost_price: number | null;
+  category: string | null;
+  sku: string | null;
+  existingId: string | null;
+  existingName: string | null;
+  existingStock: number | null;
+};
+
+export type CommitItem = {
+  name: string;
+  quantity: number;
+  unit: string;
+  cost_price: number | null;
+  category: string | null;
+  sku: string | null;
+  existingId: string | null;
+};
+
+export type ImportResult = {
+  created: number;
+  updated: number;
+  errors: string[];
+};
 
 // =====================================================
 // Create item
@@ -182,4 +214,152 @@ export async function deleteCategory(categoryId: string) {
 
   if (error) throw new Error(error.message);
   revalidatePath('/app/inventory');
+}
+
+// =====================================================
+// AI Import — parse
+// =====================================================
+export async function parseInventoryForImport(text: string): Promise<ReviewItem[]> {
+  const { org, role } = await getCurrentOrg();
+  if (!canEditInventory(role)) throw new Error('Not authorized');
+
+  const supabase = createAdminClient();
+
+  // Run AI parse and existing-item fetch in parallel
+  const [aiItems, { data: existingItems }] = await Promise.all([
+    parseInventoryWithAI(text),
+    supabase
+      .from('inventory_items')
+      .select('id, name, current_stock')
+      .eq('organization_id', org.id)
+      .eq('is_active', true),
+  ]);
+
+  // Build lookup map: lowercased name → existing item
+  const existingMap = new Map<string, { id: string; name: string; current_stock: number }>();
+  for (const item of existingItems ?? []) {
+    existingMap.set(item.name.toLowerCase(), {
+      id: item.id,
+      name: item.name,
+      current_stock: Number(item.current_stock),
+    });
+  }
+
+  return aiItems.map((item, i) => {
+    const match = existingMap.get(item.name.toLowerCase());
+    return {
+      tempId: `import-${i}`,
+      name: item.name,
+      quantity: item.quantity,
+      unit: item.unit,
+      cost_price: item.cost_price,
+      category: item.category,
+      sku: item.sku,
+      existingId: match?.id ?? null,
+      existingName: match?.name ?? null,
+      existingStock: match?.current_stock ?? null,
+    };
+  });
+}
+
+// =====================================================
+// AI Import — commit
+// =====================================================
+export async function importInventoryItems(
+  items: CommitItem[],
+  stockMode: 'set' | 'add',
+): Promise<ImportResult> {
+  const { org, role } = await getCurrentOrg();
+  if (!canEditInventory(role)) throw new Error('Not authorized');
+
+  const supabase = createAdminClient();
+  const result: ImportResult = { created: 0, updated: 0, errors: [] };
+
+  // Build category name → id map (case-insensitive, creates missing ones)
+  const { data: existingCats } = await supabase
+    .from('inventory_categories')
+    .select('id, name')
+    .eq('organization_id', org.id);
+
+  const catMap = new Map<string, string>();
+  for (const c of existingCats ?? []) catMap.set(c.name.toLowerCase(), c.id);
+
+  async function resolveCategoryId(name: string | null): Promise<string | null> {
+    if (!name) return null;
+    const key = name.toLowerCase();
+    if (catMap.has(key)) return catMap.get(key)!;
+    const { data, error } = await supabase
+      .from('inventory_categories')
+      .insert({ organization_id: org.id, name })
+      .select('id')
+      .single();
+    if (error || !data) return null;
+    catMap.set(key, data.id);
+    return data.id;
+  }
+
+  for (const item of items) {
+    try {
+      if (item.existingId) {
+        // Update existing item
+        const { data: current } = await supabase
+          .from('inventory_items')
+          .select('current_stock')
+          .eq('id', item.existingId)
+          .eq('organization_id', org.id)
+          .single();
+
+        const currentStock = Number(current?.current_stock ?? 0);
+        const newStock = stockMode === 'set' ? item.quantity : currentStock + item.quantity;
+
+        const update: Record<string, unknown> = { current_stock: newStock };
+        if (item.cost_price !== null) update.cost_price = item.cost_price;
+
+        const { error } = await supabase
+          .from('inventory_items')
+          .update(update)
+          .eq('id', item.existingId)
+          .eq('organization_id', org.id);
+
+        if (error) throw new Error(error.message);
+
+        // Log the stock change
+        const delta = newStock - currentStock;
+        if (delta !== 0) {
+          await supabase.from('usage_logs').insert({
+            organization_id: org.id,
+            item_id: item.existingId,
+            quantity: Math.abs(delta),
+            reason: 'delivery',
+            note: `Imported — ${stockMode === 'set' ? `count set to ${newStock}` : `+${delta}`}`,
+          });
+        }
+
+        result.updated++;
+      } else {
+        // Create new item
+        const categoryId = await resolveCategoryId(item.category);
+
+        const { error } = await supabase.from('inventory_items').insert({
+          organization_id: org.id,
+          name: item.name,
+          unit: item.unit || 'each',
+          category_id: categoryId,
+          sku: item.sku || null,
+          cost_price: item.cost_price ?? null,
+          current_stock: item.quantity,
+          par_level: null,
+          sale_price: null,
+        });
+
+        if (error) throw new Error(error.message);
+        result.created++;
+      }
+    } catch (err) {
+      result.errors.push(`${item.name}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  }
+
+  revalidatePath('/app/inventory');
+  return result;
 }

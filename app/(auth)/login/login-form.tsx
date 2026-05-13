@@ -59,43 +59,46 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-sm">
+    <Card className="w-full max-w-sm bg-white/10 backdrop-blur-xl border-white/15 shadow-2xl">
       <CardHeader>
-        <CardTitle>Log in</CardTitle>
-        <CardDescription>Access your bar&apos;s dashboard</CardDescription>
+        <CardTitle className="text-white">Log in</CardTitle>
+        <CardDescription className="text-white/60">Access your bar&apos;s dashboard</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <form onSubmit={handlePasswordLogin} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" className="text-white/80">Email</Label>
             <Input
               id="email" type="email" autoComplete="email" required
               value={email} onChange={(e) => setEmail(e.target.value)}
+              className="bg-white/10 border-white/20 text-white placeholder:text-white/30 focus-visible:ring-white/30"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password" className="text-white/80">Password</Label>
             <Input
               id="password" type="password" autoComplete="current-password" required
               value={password} onChange={(e) => setPassword(e.target.value)}
+              className="bg-white/10 border-white/20 text-white placeholder:text-white/30 focus-visible:ring-white/30"
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full bg-white text-gray-900 hover:bg-white/90" disabled={loading}>
             {loading ? 'Logging in…' : 'Log in'}
           </Button>
         </form>
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
+            <span className="w-full border-t border-white/20" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">or</span>
+            <span className="bg-transparent px-2 text-white/40">or</span>
           </div>
         </div>
 
         <Button
-          variant="outline" className="w-full"
+          variant="outline"
+          className="w-full border-white/20 text-white/80 bg-white/5 hover:bg-white/15 hover:text-white"
           onClick={handleMagicLink} disabled={magicLoading}
         >
           {magicLoading ? 'Sending…' : 'Email me a magic link'}

@@ -3,6 +3,7 @@ import { User } from 'lucide-react';
 import { signOut } from '../actions';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,8 +23,11 @@ type Props = {
 
 export function AppHeader({ email }: Props) {  // remove unused props if not needed here
   return (
-    <header className="sticky top-0 z-50 flex h-14 items-center border-b border-border/60 bg-card/95 backdrop-blur-sm px-6">
-      {/* You can keep OrgSwitcher here if you prefer it in the header instead of sidebar */}
+    <header className="sticky top-0 z-50 flex h-14 items-center border-b border-border/60 bg-card/95 backdrop-blur-sm px-6 gap-4">
+      <SidebarTrigger />
+      <div className="font-bold text-lg tracking-[0.2em] text-primary uppercase">
+        Pour
+      </div>
       <div className="flex-1" />
 
       <DropdownMenu>
