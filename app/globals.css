@@ -208,4 +208,56 @@
   /* Amber accent text / bg */
   .text-amber-accent { color: oklch(0.760 0.170 68); }
   .bg-amber-accent   { background-color: oklch(0.760 0.170 68 / 0.12); }
+
+  /* Safe-area helpers for iOS notch / home indicator */
+  .safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 4px);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* ── Mobile touch & interaction improvements ─────────────────────────────────── */
+@layer base {
+  /* Remove 300ms tap delay on mobile */
+  html {
+    touch-action: manipulation;
+  }
+
+  /* Remove tap highlight on iOS */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Smooth momentum scrolling on iOS */
+  .overflow-y-auto,
+  .overflow-y-scroll,
+  [data-radix-scroll-area-viewport] {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent text size adjustment on orientation change */
+  body {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* Larger tap targets for interactive elements on mobile */
+  @media (max-width: 768px) {
+    button, [role="button"], a {
+      min-height: 40px;
+      min-width: 40px;
+    }
+
+    input, select, textarea {
+      font-size: 16px; /* Prevents iOS zoom on focus */
+    }
+
+    /* Card tables → better touch spacing */
+    td, th {
+      padding-top: 0.625rem;
+      padding-bottom: 0.625rem;
+    }
+  }
 }

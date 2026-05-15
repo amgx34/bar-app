@@ -1,36 +1,60 @@
 import Link from 'next/link';
 import dynamicImport from 'next/dynamic';
 import {
-  Upload, CircleDollarSign, TrendingUp, Calculator,
-  Users, Gauge, AlertTriangle, CheckCircle, ArrowUpRight,
-  Banknote, BarChart2, Clock, Package,
+  Package, AlertTriangle, TrendingUp, BarChart2, Banknote,
+  Users, FlaskConical, Plus, ArrowUpRight, Zap,
+  CheckCircle, ShoppingCart, Activity, RefreshCw,
+  Clock, Scale,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-const DashboardRevenueChart = dynamicImport(() => import('./_components/DashBoardRevenueChart'));
+const RevenueChart = dynamicImport(() => import('./_components/DashBoardRevenueChart'));
 
 export const dynamic = 'force-dynamic';
 
-// helper functions
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-function toLocalDateStr(d: Date) {
-  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
-}
+function pad(n: number) { return String(n).padStart(2, '0'); }
+function toDate(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 
 function getWeekStart() {
   const t = new Date();
   const d = t.getDay();
   const m = new Date(t);
   m.setDate(t.getDate() - (d === 0 ? 6 : d - 1));
-  return toLocalDateStr(m);
+  return toDate(m);
 }
 
 function fmtDate(iso: string) {
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const d = new Date(iso + 'T00:00:00');
-  return `${days[d.getDay()]} ${months[d.getMonth()]} ${d.getDate()}`;
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function fmtMoney(n: number, compact = false) {
+  if (compact && n >= 1000) return `$${(n / 1000).toFixed(1)}k`;
+  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+}
+
+function timeAgo(isoStr: string) {
+  const secs = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+  if (secs < 60)   return 'just now';
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+  return `${Math.floor(secs / 86400)}d ago`;
+}
+
+function getItemName(raw: unknown): string {
+  if (!raw) return 'Unknown item';
+  const obj = Array.isArray(raw) ? raw[0] : raw;
+  return (obj as { name?: string })?.name ?? 'Unknown item';
+}
+
+function getCatName(raw: unknown): string {
+  if (!raw) return 'Uncategorized';
+  const obj = Array.isArray(raw) ? raw[0] : raw;
+  return (obj as { name?: string })?.name ?? 'Uncategorized';
 }
 
 function greeting() {
@@ -40,567 +64,546 @@ function greeting() {
   return 'Good evening';
 }
 
-function stdDev(arr: number[]) {
-  if (arr.length < 2) return 0;
-  const mean = arr.reduce((s, v) => s + v, 0) / arr.length;
-  return Math.sqrt(arr.reduce((s, v) => s + (v - mean) ** 2, 0) / arr.length);
-}
+const REASON_LABEL: Record<string, string> = {
+  spillage:    'Spillage',
+  comp:        'Comped',
+  staff_drink: 'Staff drink',
+  recount:     'Recount adj.',
+  delivery:    'Delivery received',
+};
 
-// ── Page ───────────────────────────────────────────────────────────────────────
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage() {
   const { org } = await getCurrentOrg();
   const supabase = await createClient();
-  const orgId = org.id;
-
+  const orgId    = org.id;
+  const today    = toDate(new Date());
   const weekStart = getWeekStart();
-  const today = toLocalDateStr(new Date());
 
-  // Parallel data fetching
   const [
     { data: recentNights },
     { data: weekDays },
-    { data: allServerTips },
     { data: employees },
     { data: inventoryItems },
+    { data: recentActivity },
+    { data: recentOrders },
+    { data: weekUsage },
+    { data: pendingOrdersData },
   ] = await Promise.all([
-    supabase
-      .from('z_report_days')
-      .select('report_date, total_sales, cash_tips, cc_tips')
-      .eq('organization_id', orgId)
-      .order('report_date', { ascending: false })
-      .limit(7),
-    supabase
-      .from('z_report_days')
-      .select('total_sales, cash_tips, cc_tips')
-      .eq('organization_id', orgId)
-      .gte('report_date', weekStart)
-      .lte('report_date', today),
-    supabase
-      .from('z_report_server_tips')
-      .select('employee_name, total_sales, tips_paid_out')
-      .eq('organization_id', orgId),
-    supabase
-      .from('employees')
-      .select('id, name, role, hourly_rate')
-      .eq('organization_id', orgId),
-    supabase
-      .from('inventory_items')
-      .select('id, name, unit, current_stock, par_level, rep_id, inventory_categories(name), reps(id, name)')
-      .eq('organization_id', orgId)
-      .eq('is_active', true)
-      .order('name'),
+    supabase.from('z_report_days').select('report_date, total_sales, cash_tips, cc_tips').eq('organization_id', orgId).order('report_date', { ascending: false }).limit(7),
+    supabase.from('z_report_days').select('total_sales, cash_tips, cc_tips').eq('organization_id', orgId).gte('report_date', weekStart).lte('report_date', today),
+    supabase.from('employees').select('id, name, role, hourly_rate').eq('organization_id', orgId),
+    supabase.from('inventory_items').select('id, name, unit, current_stock, par_level, cost_price, rep_id, inventory_categories(name), reps(id, name)').eq('organization_id', orgId).eq('is_active', true).order('name'),
+    supabase.from('usage_logs').select('item_id, quantity, reason, created_at, inventory_items(name)').eq('organization_id', orgId).neq('reason', 'delivery').order('created_at', { ascending: false }).limit(8),
+    supabase.from('rep_orders').select('id, status, created_at, reps(name)').eq('organization_id', orgId).order('created_at', { ascending: false }).limit(4),
+    supabase.from('usage_logs').select('item_id, quantity, inventory_items(name)').eq('organization_id', orgId).neq('reason', 'delivery').gte('created_at', weekStart + 'T00:00:00Z').limit(150),
+    supabase.from('rep_orders').select('id').eq('organization_id', orgId).in('status', ['sent', 'confirmed']),
   ]);
 
-  // ── Metric calculations ────────────────────────────────────────────────────
+  // ── Metrics ───────────────────────────────────────────────────────────────
 
-  const lastNight = recentNights?.[0] ?? null;
+  const lastNight      = recentNights?.[0] ?? null;
   const lastNightSales = lastNight?.total_sales ?? 0;
-  const lastNightTips = ((lastNight?.cash_tips ?? 0) + (lastNight?.cc_tips ?? 0));
+  const lastNightTips  = (lastNight?.cash_tips ?? 0) + (lastNight?.cc_tips ?? 0);
   const lastNightTipPct = lastNightSales > 0 ? (lastNightTips / lastNightSales) * 100 : 0;
 
   const weekSales = (weekDays ?? []).reduce((s, d) => s + (d.total_sales ?? 0), 0);
-  const weekTips = (weekDays ?? []).reduce((s, d) => s + (d.cash_tips ?? 0) + (d.cc_tips ?? 0), 0);
-  const validWeekDays = (weekDays ?? []).filter((d) => d.total_sales > 0);
-  const weekAvgTipPct = validWeekDays.length > 0
-    ? validWeekDays.reduce((s, d) => s + (d.cash_tips + d.cc_tips) / d.total_sales, 0) / validWeekDays.length * 100
-    : 0;
+  const weekTips  = (weekDays ?? []).reduce((s, d) => s + (d.cash_tips ?? 0) + (d.cc_tips ?? 0), 0);
 
-  // Flagged bartenders (>2σ above mean tip%)
-  const serverRows = (allServerTips ?? []).filter((r) => r.total_sales > 0);
-  const allTipPcts = serverRows.map((r) => r.tips_paid_out / r.total_sales);
-  const popMean = allTipPcts.length > 0 ? allTipPcts.reduce((s, v) => s + v, 0) / allTipPcts.length : 0;
-  const popStd = stdDev(allTipPcts);
-  const flagThreshold = popMean + 2 * popStd;
+  const items = inventoryItems ?? [];
 
-  const byServer = new Map<string, number[]>();
-  for (const r of serverRows) {
-    if (!byServer.has(r.employee_name)) byServer.set(r.employee_name, []);
-    byServer.get(r.employee_name)!.push(r.tips_paid_out / r.total_sales);
-  }
-  const flaggedCount = [...byServer.entries()].filter(
-    ([, pcts]) => pcts.reduce((s, v) => s + v, 0) / pcts.length > flagThreshold
-  ).length;
+  const inventoryValue = items.reduce(
+    (s, i) => s + (i.current_stock ?? 0) * ((i as unknown as { cost_price?: number }).cost_price ?? 0), 0,
+  );
+
+  const itemsWithPar  = items.filter((i) => i.par_level !== null && i.par_level > 0);
+  const lowStockItems = itemsWithPar
+    .filter((i) => i.current_stock < i.par_level!)
+    .sort((a, b) => (a.current_stock / (a.par_level ?? 1)) - (b.current_stock / (b.par_level ?? 1)));
+  const parCompliancePct = itemsWithPar.length > 0
+    ? ((itemsWithPar.length - lowStockItems.length) / itemsWithPar.length) * 100
+    : 100;
+
+  const pendingOrders = (pendingOrdersData ?? []).length;
 
   const EXCLUDED = new Set(['front door']);
   const unconfiguredEmployees = (employees ?? []).filter(
-    (e) => !EXCLUDED.has(e.name.toLowerCase()) && (!e.role || e.hourly_rate === null)
+    (e) => !EXCLUDED.has(e.name.toLowerCase()) && (!e.role || e.hourly_rate === null),
   );
 
-  const nightsData = (recentNights ?? []).map((d) => ({
-    nightDate: d.report_date as string,
-    totalSales: d.total_sales as number,
-    totalTips: ((d.cash_tips as number) + (d.cc_tips as number)),
-    tipPercent: d.total_sales > 0 ? ((d.cash_tips + d.cc_tips) / d.total_sales) * 100 : 0,
-  }));
-
-  const maxSales = nightsData.length > 0 ? Math.max(...nightsData.map((n) => n.totalSales)) : 1;
-
-  // Inventory snapshot
-  const items = inventoryItems ?? [];
-  const lowStockItems = items
-    .filter((i) => i.par_level !== null && i.current_stock < i.par_level)
-    .sort((a, b) => (a.current_stock / (a.par_level ?? 1)) - (b.current_stock / (b.par_level ?? 1)));
-
-  const categoryMap = new Map<string, { total: number; low: number }>();
-  for (const item of items) {
-    const cat = (item.inventory_categories as unknown as { name: string } | null)?.name ?? 'Uncategorized';
-    if (!categoryMap.has(cat)) categoryMap.set(cat, { total: 0, low: 0 });
-    const entry = categoryMap.get(cat)!;
-    entry.total++;
-    if (item.par_level !== null && item.current_stock < item.par_level) entry.low++;
+  // Fast movers this week (group by item)
+  const fastMoverMap = new Map<string, { name: string; qty: number }>();
+  for (const log of weekUsage ?? []) {
+    const name = getItemName(log.inventory_items);
+    const prev = fastMoverMap.get(log.item_id) ?? { name, qty: 0 };
+    fastMoverMap.set(log.item_id, { name, qty: prev.qty + (log.quantity ?? 0) });
   }
-  const categoryRows = [...categoryMap.entries()].sort((a, b) => b[1].total - a[1].total);
+  const fastMovers = [...fastMoverMap.values()].sort((a, b) => b.qty - a.qty).slice(0, 5);
 
-  // Reorder suggestions: low-stock items that have a rep linked
-  const autoReorderEnabled = org.bar_settings?.auto_reorder_enabled ?? false;
-  const reorderItems = items.filter(
-    (i) => i.par_level !== null && i.current_stock < i.par_level && i.rep_id
-  );
+  // Reorder suggestions
+  const reorderItems = items.filter((i) => i.par_level !== null && i.current_stock < i.par_level && i.rep_id);
   const reorderByRep = new Map<string, { rep: { id: string; name: string }; items: typeof reorderItems }>();
   for (const item of reorderItems) {
-    const repData = (item.reps as unknown as { id: string; name: string } | null);
-    if (!repData) continue;
-    if (!reorderByRep.has(repData.id)) reorderByRep.set(repData.id, { rep: repData, items: [] });
-    reorderByRep.get(repData.id)!.items.push(item);
+    const rep = item.reps as unknown as { id: string; name: string } | null;
+    if (!rep) continue;
+    if (!reorderByRep.has(rep.id)) reorderByRep.set(rep.id, { rep, items: [] });
+    reorderByRep.get(rep.id)!.items.push(item);
   }
   const reorderGroups = [...reorderByRep.values()];
 
-  const hasAlerts = flaggedCount > 0 || unconfiguredEmployees.length > 0 || lowStockItems.length > 0;
+  const nightsData = (recentNights ?? []).map((d) => ({
+    nightDate:  d.report_date as string,
+    totalSales: d.total_sales as number,
+    totalTips:  (d.cash_tips as number) + (d.cc_tips as number),
+    tipPercent: d.total_sales > 0 ? ((d.cash_tips + d.cc_tips) / d.total_sales) * 100 : 0,
+  }));
+
+  const hasAlerts = unconfiguredEmployees.length > 0 || reorderGroups.length > 0;
+
+  const parColor = parCompliancePct >= 85
+    ? 'bg-emerald-500' : parCompliancePct >= 60 ? 'bg-amber-400' : 'bg-red-500';
+  const parText  = parCompliancePct >= 85
+    ? 'text-emerald-600' : parCompliancePct >= 60 ? 'text-amber-600' : 'text-destructive';
+
+  // ── JSX ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 space-y-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-end justify-between">
+      {/* ── 1. Header ──────────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm text-muted-foreground">{greeting()}</p>
-          <h1 className="text-3xl font-bold tracking-tight mt-0.5">{org.name}</h1>
-        </div>
-        <p className="text-sm text-muted-foreground hidden sm:block">
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-        </p>
-      </div>
-
-      {/* ── Alerts strip ──────────────────────────────────────────────────── */}
-      {hasAlerts && (
-        <div className="flex flex-wrap gap-3">
-          {unconfiguredEmployees.length > 0 && (
-            <Link href="/app/payroll?tab=employees" className="flex items-center gap-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-4 py-2.5 text-sm text-yellow-400 hover:bg-yellow-500/15 transition-colors">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              {unconfiguredEmployees.length} employee{unconfiguredEmployees.length > 1 ? 's' : ''} need configuration
-              <ArrowUpRight className="h-3.5 w-3.5 ml-1" />
-            </Link>
-          )}
-          {flaggedCount > 0 && (
-            <Link href="/app/tips?tab=flags" className="flex items-center gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/15 transition-colors">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              {flaggedCount} bartender{flaggedCount > 1 ? 's' : ''} flagged for unusual tip %
-              <ArrowUpRight className="h-3.5 w-3.5 ml-1" />
-            </Link>
-          )}
-          {lowStockItems.length > 0 && (
-            <Link href="/app/inventory" className="flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-400 hover:bg-amber-500/15 transition-colors">
-              <Package className="h-4 w-4 shrink-0" />
-              {lowStockItems.length} item{lowStockItems.length > 1 ? 's' : ''} running low on stock
-              <ArrowUpRight className="h-3.5 w-3.5 ml-1" />
-            </Link>
-          )}
-        </div>
-      )}
-
-      {/* ── Key metrics ────────────────────────────────────────────────────── */}
-      <div className="space-y-3">
-        {/* Last night */}
-        {lastNight && (
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
-            Last Night · {fmtDate(lastNight.report_date as string)}
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{org.name}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
+        </div>
+        {org.pos_provider && (
+          <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 shrink-0">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            </span>
+            {org.pos_provider} connected
+          </div>
         )}
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard
-            label="Sales"
-            value={`$${lastNightSales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            icon={<BarChart2 className="h-4 w-4" />}
-            accent="emerald"
-            empty={!lastNight}
-          />
-          <StatCard
-            label="Tips"
-            value={`$${lastNightTips.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            icon={<Banknote className="h-4 w-4" />}
-            accent="cyan"
-            empty={!lastNight}
-          />
-          <StatCard
-            label="Tip %"
-            value={`${lastNightTipPct.toFixed(1)}%`}
-            icon={<TrendingUp className="h-4 w-4" />}
-            accent="primary"
-            empty={!lastNight}
-          />
-        </div>
+      </div>
 
-        {/* This week */}
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest pt-2">
-          This Week
-        </p>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard
-            label="Week Sales"
-            value={`$${weekSales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            icon={<BarChart2 className="h-4 w-4" />}
-            accent="emerald"
-            muted
-            empty={weekDays?.length === 0}
-          />
-          <StatCard
-            label="Week Tips"
-            value={`$${weekTips.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            icon={<Banknote className="h-4 w-4" />}
-            accent="cyan"
-            muted
-            empty={weekDays?.length === 0}
-          />
-          <StatCard
-            label="Avg Tip %"
-            value={`${weekAvgTipPct.toFixed(1)}%`}
-            icon={<TrendingUp className="h-4 w-4" />}
-            accent="primary"
-            muted
-            empty={weekDays?.length === 0}
-          />
+      {/* ── 2. Hero KPIs ───────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiCard
+          icon={Package} label="Inventory Value" value={fmtMoney(inventoryValue, true)}
+          sub={`${items.length} items tracked`} status="info"
+        />
+        <KpiCard
+          icon={AlertTriangle} label="Low Stock" value={String(lowStockItems.length)}
+          sub={`${parCompliancePct.toFixed(0)}% par compliance`}
+          status={lowStockItems.length === 0 ? 'good' : lowStockItems.length <= 3 ? 'warn' : 'critical'}
+        />
+        <KpiCard
+          icon={BarChart2} label="Last Night" value={lastNight ? fmtMoney(lastNightSales, true) : '—'}
+          sub={lastNight ? `${fmtMoney(lastNightTips, true)} tips` : 'No data imported'}
+          status={lastNightSales > 0 ? 'good' : 'info'}
+        />
+        <KpiCard
+          icon={TrendingUp} label="Tip Rate" value={lastNight ? `${lastNightTipPct.toFixed(1)}%` : '—'}
+          sub={lastNight ? `Last night · ${fmtDate(lastNight.report_date as string)}` : 'Import Z reports'}
+          status={lastNightTipPct >= 15 ? 'good' : lastNightTipPct >= 12 ? 'warn' : lastNightSales > 0 ? 'critical' : 'info'}
+        />
+      </div>
+
+      {/* ── 3. Quick Actions ───────────────────────────────────────────────── */}
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Quick Actions</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <QuickAction icon={Package}     label="Adjust Stock"    sub="Update levels"       href="/app/inventory"                color="primary"  />
+          <QuickAction icon={Users}       label="New Rep Order"   sub="Place with supplier" href="/app/reps"                      color="amber"    />
+          <QuickAction icon={FlaskConical} label="Pour Report"    sub="Weigh bottles"       href="/app/inventory/weigh"           color="violet"   />
+          <QuickAction icon={Plus}        label="Add Item"        sub="New inventory SKU"   href="/app/inventory"                color="emerald"  />
         </div>
       </div>
 
-      {/* ── Quick access ───────────────────────────────────────────────────── */}
-      <div className="space-y-3">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Quick Access</p>
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-          <QuickLink href="/app/payroll?tab=import" icon={<Upload className="h-5 w-5" />} label="Import Data" color="text-primary bg-primary/10" />
-          <QuickLink href="/app/payroll" icon={<CircleDollarSign className="h-5 w-5" />} label="Payroll" color="text-emerald-400 bg-emerald-400/10" />
-          <QuickLink href="/app/payroll?tab=split" icon={<Calculator className="h-5 w-5" />} label="Day Split" color="text-amber-400 bg-amber-400/10" />
-          <QuickLink href="/app/tips" icon={<TrendingUp className="h-5 w-5" />} label="Tip Analytics" color="text-cyan-400 bg-cyan-400/10" />
-          <QuickLink href="/app/payroll?tab=employees" icon={<Users className="h-5 w-5" />} label="Staff" color="text-violet-400 bg-violet-400/10" />
-          <QuickLink href="/app/tips?tab=well" icon={<Gauge className="h-5 w-5" />} label="Well Performance" color="text-rose-400 bg-rose-400/10" />
-        </div>
-      </div>
+      {/* ── 4. Main grid ───────────────────────────────────────────────────── */}
+      <div className="grid lg:grid-cols-5 gap-5">
 
-      {/* ── Reorder Suggestions ────────────────────────────────────────────── */}
-      {autoReorderEnabled && reorderGroups.length > 0 && (
-        <div className="space-y-3">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
-            Reorder Suggestions
-          </p>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {reorderGroups.map(({ rep, items: repItems }) => (
-              <div key={rep.id} className="rounded-xl border bg-card overflow-hidden">
-                <div className="px-5 py-3 border-b flex items-center justify-between">
-                  <p className="text-sm font-semibold truncate">{rep.name}</p>
-                  <Link
-                    href={`/app/reps?order=${rep.id}`}
-                    className="text-xs text-primary hover:underline flex items-center gap-1 shrink-0 ml-2"
-                  >
-                    Order <ArrowUpRight className="h-3 w-3" />
-                  </Link>
+        {/* Left: Inventory Health (3/5) */}
+        <div className="lg:col-span-3 space-y-5">
+
+          {/* Par compliance + Low stock */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Scale className="h-4 w-4 text-muted-foreground" /> Inventory Health
+                </CardTitle>
+                <Link href="/app/inventory/analytics" className="text-xs text-primary hover:underline flex items-center gap-1">
+                  Analytics <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Par compliance gauge */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium">Par Compliance</span>
+                  <span className={`font-bold tabular-nums ${parText}`}>{parCompliancePct.toFixed(0)}%</span>
                 </div>
+                <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                  <div className={`h-full ${parColor} rounded-full transition-all duration-500`} style={{ width: `${parCompliancePct}%` }} />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {itemsWithPar.length - lowStockItems.length} of {itemsWithPar.length} items at or above par
+                  {lowStockItems.length > 0 && ` · ${items.filter((i) => i.current_stock === 0).length} out of stock`}
+                </p>
+              </div>
+
+              {/* Low stock list */}
+              {lowStockItems.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">Needs Attention</p>
+                  <div className="space-y-1">
+                    {lowStockItems.slice(0, 5).map((item) => {
+                      const pct      = item.par_level! > 0 ? (item.current_stock / item.par_level!) * 100 : 0;
+                      const critical = item.current_stock === 0;
+                      const cat      = getCatName(item.inventory_categories);
+                      return (
+                        <div key={item.id} className="flex items-center gap-3 py-1.5">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate leading-none">{item.name}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{cat}</p>
+                          </div>
+                          <div className="w-24 shrink-0">
+                            <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-1">
+                              <div className={`h-full rounded-full ${critical ? 'bg-red-500' : 'bg-amber-400'}`} style={{ width: `${Math.max(pct, critical ? 0 : 3)}%` }} />
+                            </div>
+                            <p className={`text-xs tabular-nums text-right ${critical ? 'text-red-500 font-semibold' : 'text-amber-600'}`}>
+                              {critical ? 'OUT' : `${item.current_stock} / ${item.par_level}`}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {lowStockItems.length > 5 && (
+                      <Link href="/app/inventory" className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 pt-1">
+                        +{lowStockItems.length - 5} more low-stock items <ArrowUpRight className="h-3 w-3" />
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {lowStockItems.length === 0 && (
+                <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2.5">
+                  <CheckCircle className="h-4 w-4 shrink-0" />
+                  <span className="text-sm font-medium">All items stocked above par</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Fast movers */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-amber-500" /> Fastest Moving This Week
+                </CardTitle>
+                <Link href="/app/inventory/analytics" className="text-xs text-primary hover:underline flex items-center gap-1">
+                  Full analytics <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {fastMovers.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  No usage data this week. Log stock adjustments to see movers.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {fastMovers.map((item, i) => {
+                    const max = fastMovers[0]?.qty ?? 1;
+                    const pct = (item.qty / max) * 100;
+                    return (
+                      <div key={i} className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-muted-foreground w-4 shrink-0">#{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate leading-none">{item.name}</p>
+                          <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-1.5">
+                            <div className="h-full bg-primary/70 rounded-full" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                        <span className="text-sm tabular-nums font-semibold text-primary shrink-0">
+                          {item.qty.toFixed(1)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right: Activity + Last Night (2/5) */}
+        <div className="lg:col-span-2 space-y-5">
+
+          {/* Recent Activity */}
+          <Card className="flex flex-col">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Activity className="h-4 w-4 text-muted-foreground" /> Recent Activity
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 flex-1">
+              {((recentActivity ?? []).length === 0 && (recentOrders ?? []).length === 0) ? (
+                <p className="text-sm text-muted-foreground text-center py-8 px-4">No recent activity recorded</p>
+              ) : (
                 <div className="divide-y">
-                  {repItems.slice(0, 4).map((item) => (
-                    <div key={item.id} className="px-5 py-2.5 flex items-center justify-between gap-3">
-                      <span className="text-sm truncate">{item.name}</span>
-                      <span className={`text-xs tabular-nums shrink-0 ${item.current_stock === 0 ? 'text-red-400 font-semibold' : 'text-amber-400'}`}>
-                        {item.current_stock === 0 ? 'OUT' : `${item.current_stock} / ${item.par_level}`}
+                  {(recentActivity ?? []).slice(0, 5).map((log, i) => {
+                    const name   = getItemName(log.inventory_items);
+                    const label  = REASON_LABEL[log.reason] ?? log.reason;
+                    const isWarn = ['spillage', 'comp', 'recount'].includes(log.reason);
+                    return (
+                      <div key={i} className="flex items-start gap-3 px-4 py-3">
+                        <div className={`mt-0.5 p-1.5 rounded-lg shrink-0 ${isWarn ? 'bg-amber-100 text-amber-600' : 'bg-muted text-muted-foreground'}`}>
+                          <Package className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate leading-snug">{name}</p>
+                          <p className="text-xs text-muted-foreground">{label} · {log.quantity} units</p>
+                        </div>
+                        <span className="text-xs text-muted-foreground shrink-0 mt-0.5 whitespace-nowrap">
+                          {timeAgo(log.created_at as string)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {(recentOrders ?? []).slice(0, 3).map((order) => {
+                    const repName = getItemName(order.reps);
+                    return (
+                      <div key={order.id} className="flex items-start gap-3 px-4 py-3">
+                        <div className="mt-0.5 p-1.5 rounded-lg bg-violet-100 text-violet-600 shrink-0">
+                          <ShoppingCart className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate leading-snug">Order to {repName}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{order.status}</p>
+                        </div>
+                        <span className="text-xs text-muted-foreground shrink-0 mt-0.5 whitespace-nowrap">
+                          {timeAgo(order.created_at as string)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Last night stats card */}
+          {lastNight && (
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" /> Last Night
+                  </CardTitle>
+                  <span className="text-xs text-muted-foreground">{fmtDate(lastNight.report_date as string)}</span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                      <BarChart2 className="h-3.5 w-3.5" /> Sales
+                    </span>
+                    <span className="text-sm font-bold tabular-nums">{fmtMoney(lastNightSales)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                      <Banknote className="h-3.5 w-3.5" /> Tips
+                    </span>
+                    <span className="text-sm font-bold tabular-nums text-cyan-600">{fmtMoney(lastNightTips)}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-t pt-3">
+                    <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                      <TrendingUp className="h-3.5 w-3.5" /> Tip Rate
+                    </span>
+                    <span className={`text-sm font-bold tabular-nums ${lastNightTipPct >= 15 ? 'text-emerald-600' : lastNightTipPct >= 12 ? 'text-amber-600' : 'text-destructive'}`}>
+                      {lastNightTipPct.toFixed(1)}%
+                    </span>
+                  </div>
+                  {weekSales > 0 && (
+                    <div className="flex items-center justify-between border-t pt-3">
+                      <span className="text-xs text-muted-foreground">Week so far</span>
+                      <span className="text-xs font-semibold tabular-nums">
+                        {fmtMoney(weekSales, true)} sales · {fmtMoney(weekTips, true)} tips
                       </span>
-                    </div>
-                  ))}
-                  {repItems.length > 4 && (
-                    <div className="px-5 py-2 text-xs text-muted-foreground">
-                      +{repItems.length - 4} more items
                     </div>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Pending orders badge */}
+          {pendingOrders > 0 && (
+            <Link href="/app/reps" className="block">
+              <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 flex items-center justify-between hover:bg-violet-100 transition-colors">
+                <div className="flex items-center gap-2.5">
+                  <ShoppingCart className="h-4 w-4 text-violet-600" />
+                  <div>
+                    <p className="text-sm font-semibold text-violet-800">{pendingOrders} pending order{pendingOrders > 1 ? 's' : ''}</p>
+                    <p className="text-xs text-violet-600">Awaiting delivery confirmation</p>
+                  </div>
+                </div>
+                <ArrowUpRight className="h-4 w-4 text-violet-500" />
               </div>
+            </Link>
+          )}
+        </div>
+      </div>
+
+      {/* ── 5. Revenue chart ───────────────────────────────────────────────── */}
+      {nightsData.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold">Revenue Trend — Last {nightsData.length} Nights</CardTitle>
+              <span className="text-xs text-muted-foreground">Sales · Tips · Tip %</span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <RevenueChart data={nightsData} />
+            {/* Mini table */}
+            <div className="mt-4 divide-y">
+              {nightsData.map((n) => (
+                <div key={n.nightDate} className="flex items-center gap-3 py-2 text-sm">
+                  <span className="text-muted-foreground w-32 shrink-0 text-xs">{fmtDate(n.nightDate)}</span>
+                  <span className="font-medium tabular-nums w-24 text-right shrink-0">{fmtMoney(n.totalSales)}</span>
+                  <span className="text-cyan-600 tabular-nums w-20 text-right shrink-0">{fmtMoney(n.totalTips)}</span>
+                  <span className={`text-xs tabular-nums font-medium w-12 text-right shrink-0 ${n.tipPercent >= 15 ? 'text-emerald-600' : n.tipPercent >= 12 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                    {n.tipPercent.toFixed(1)}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {nightsData.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <BarChart2 className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm font-medium">No sales data yet</p>
+            <p className="text-xs text-muted-foreground mt-1 mb-4">Import Z Reports to see revenue trends</p>
+            <Link href="/app/payroll?tab=import" className="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors">
+              Import Z Reports
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── 6. Alerts ──────────────────────────────────────────────────────── */}
+      {hasAlerts && (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Alerts &amp; Actions</p>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            {unconfiguredEmployees.length > 0 && (
+              <Link href="/app/payroll?tab=employees">
+                <div className="rounded-xl border border-yellow-300/60 bg-yellow-50 px-4 py-3.5 hover:bg-yellow-100 transition-colors">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Users className="h-4 w-4 text-yellow-700" />
+                    <span className="text-sm font-semibold text-yellow-800">Staff Setup Needed</span>
+                  </div>
+                  <p className="text-xs text-yellow-700">
+                    {unconfiguredEmployees.length} employee{unconfiguredEmployees.length > 1 ? 's' : ''} missing role or hourly rate
+                  </p>
+                </div>
+              </Link>
+            )}
+
+            {reorderGroups.map(({ rep, items: repItems }) => (
+              <Link key={rep.id} href={`/app/reps?order=${rep.id}`}>
+                <div className="rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3.5 hover:bg-amber-100 transition-colors">
+                  <div className="flex items-center gap-2 mb-1">
+                    <RefreshCw className="h-4 w-4 text-amber-700" />
+                    <span className="text-sm font-semibold text-amber-800">Reorder from {rep.name}</span>
+                  </div>
+                  <p className="text-xs text-amber-700">
+                    {repItems.slice(0, 2).map((i) => i.name).join(', ')}
+                    {repItems.length > 2 ? ` + ${repItems.length - 2} more` : ''}
+                  </p>
+                </div>
+              </Link>
             ))}
           </div>
         </div>
       )}
 
-      {/* ── Inventory Snapshot ─────────────────────────────────────────────── */}
-      {items.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Inventory Snapshot</p>
-            <Link href="/app/inventory" className="text-xs text-primary hover:underline flex items-center gap-1">
-              View all <ArrowUpRight className="h-3 w-3" />
-            </Link>
-          </div>
-          <div className="grid gap-6 lg:grid-cols-2">
-
-            {/* Category breakdown */}
-            <div className="rounded-xl border bg-card overflow-hidden">
-              <div className="px-5 py-4 border-b flex items-center justify-between">
-                <h2 className="text-sm font-semibold flex items-center gap-2">
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                  By Category
-                </h2>
-                <span className="text-xs text-muted-foreground">{items.length} total items</span>
-              </div>
-              <div className="divide-y">
-                {categoryRows.map(([cat, { total, low }]) => {
-                  const healthPct = total > 0 ? ((total - low) / total) * 100 : 100;
-                  return (
-                    <div key={cat} className="flex items-center gap-4 px-5 py-3">
-                      <span className="text-sm text-muted-foreground w-32 shrink-0 truncate">{cat}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${low > 0 ? 'bg-amber-400' : 'bg-emerald-500'}`}
-                            style={{ width: `${healthPct}%` }}
-                          />
-                        </div>
-                      </div>
-                      <span className="text-sm tabular-nums font-medium w-8 text-right shrink-0">{total}</span>
-                      {low > 0 && (
-                        <span className="text-xs tabular-nums text-amber-400 w-16 text-right shrink-0">
-                          {low} low
-                        </span>
-                      )}
-                      {low === 0 && (
-                        <span className="text-xs text-muted-foreground w-16 text-right shrink-0">all good</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Low stock list */}
-            <div className="rounded-xl border bg-card overflow-hidden">
-              <div className="px-5 py-4 border-b flex items-center justify-between">
-                <h2 className="text-sm font-semibold flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-400" />
-                  Running Low
-                </h2>
-                <span className="text-xs text-muted-foreground">
-                  {lowStockItems.length === 0 ? 'All stocked' : `${lowStockItems.length} item${lowStockItems.length > 1 ? 's' : ''}`}
-                </span>
-              </div>
-              {lowStockItems.length === 0 ? (
-                <div className="px-5 py-10 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
-                  <CheckCircle className="h-6 w-6 text-emerald-500" />
-                  Everything is stocked above par
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {lowStockItems.slice(0, 8).map((item) => {
-                    const pct = item.par_level! > 0 ? (item.current_stock / item.par_level!) * 100 : 0;
-                    const critical = item.current_stock === 0;
-                    return (
-                      <div key={item.id} className="flex items-center gap-4 px-5 py-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{item.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {item.current_stock} / {item.par_level} {item.unit}
-                          </p>
-                        </div>
-                        <div className="w-20 shrink-0">
-                          <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-1">
-                            <div
-                              className={`h-full rounded-full ${critical ? 'bg-red-500' : 'bg-amber-400'}`}
-                              style={{ width: `${Math.max(pct, critical ? 0 : 4)}%` }}
-                            />
-                          </div>
-                          <p className={`text-xs tabular-nums text-right ${critical ? 'text-red-400 font-semibold' : 'text-amber-400'}`}>
-                            {critical ? 'OUT' : `${Math.round(pct)}%`}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {lowStockItems.length > 8 && (
-                    <Link href="/app/inventory" className="flex items-center justify-center px-5 py-3 text-xs text-muted-foreground hover:text-primary transition-colors">
-                      +{lowStockItems.length - 8} more · View all
-                    </Link>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Bottom section ─────────────────────────────────────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-5">
-
-        {/* Recent nights — wider (NOW WITH CHART) */}
-        <div className="lg:col-span-3 rounded-xl border bg-card overflow-hidden">
-          <div className="px-5 py-4 border-b flex items-center justify-between">
-            <h2 className="text-sm font-semibold flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              Recent Nights
-            </h2>
-            <span className="text-xs text-muted-foreground">Last 7 nights</span>
-          </div>
-
-          {nightsData.length === 0 ? (
-            <div className="px-5 py-10 text-center text-sm text-muted-foreground">
-              No Z reports imported yet
-            </div>
-          ) : (
-            <>
-              {/* ← NEW CHART */}
-              <div className="px-5 pt-6 pb-2">
-                <DashboardRevenueChart data={nightsData} />
-              </div>
-
-                            {/* Keep your original detailed rows below the chart */}
-              <div className="divide-y px-5">
-                {nightsData.map((n) => (
-                  <div key={n.nightDate} className="flex items-center gap-4 py-3">
-                    <span className="text-sm text-muted-foreground w-28 shrink-0">{fmtDate(n.nightDate)}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-emerald-500"
-                          style={{ width: `${maxSales > 0 ? (n.totalSales / maxSales) * 100 : 0}%` }}
-                        />
-                      </div>
-                    </div>
-                    <span className="text-sm tabular-nums font-medium w-24 text-right shrink-0">
-                      ${n.totalSales.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                    </span>
-                    <span className="text-sm tabular-nums text-cyan-400 w-20 text-right shrink-0">
-                      ${n.totalTips.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                    </span>
-                    <span className={`text-xs tabular-nums font-medium w-12 text-right shrink-0 ${
-                      n.tipPercent >= 15 ? 'text-primary' : n.tipPercent >= 12 ? 'text-amber-400' : 'text-muted-foreground'
-                    }`}>
-                      {n.tipPercent.toFixed(1)}%
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Status panel — narrower (unchanged) */}
-        <div className="lg:col-span-2 space-y-4">
-
-          {/* Staff status */}
-          <div className="rounded-xl border bg-card overflow-hidden">
-            <div className="px-5 py-4 border-b">
-              <h2 className="text-sm font-semibold flex items-center gap-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                Staff Status
-              </h2>
-            </div>
-            <div className="divide-y">
-              <StatusRow
-                href="/app/payroll?tab=employees"
-                label="Total staff"
-                value={(employees ?? []).filter((e) => !EXCLUDED.has(e.name.toLowerCase())).length.toString()}
-              />
-              <StatusRow
-                href="/app/payroll?tab=employees"
-                label="Configured"
-                value={(employees ?? []).filter((e) => !EXCLUDED.has(e.name.toLowerCase()) && e.role && e.hourly_rate !== null).length.toString()}
-                ok
-              />
-              {unconfiguredEmployees.length > 0 && (
-                <StatusRow
-                  href="/app/payroll?tab=employees"
-                  label="Need setup"
-                  value={unconfiguredEmployees.length.toString()}
-                  warn
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Tip health */}
-          <div className="rounded-xl border bg-card overflow-hidden">
-            <div className="px-5 py-4 border-b">
-              <h2 className="text-sm font-semibold flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                Tip Health
-              </h2>
-            </div>
-            <div className="divide-y">
-              <StatusRow
-                href="/app/tips"
-                label="Avg tip %"
-                value={allTipPcts.length > 0 ? `${(popMean * 100).toFixed(1)}%` : '—'}
-              />
-              <StatusRow
-                href="/app/tips?tab=flags"
-                label="Flagged servers"
-                value={flaggedCount.toString()}
-                warn={flaggedCount > 0}
-                ok={flaggedCount === 0}
-              />
-              <StatusRow
-                href="/app/tips?tab=totals"
-                label="Nights tracked"
-                value={(recentNights ? [...new Set(recentNights.map((r) => r.report_date))].length : 0).toString()}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
 
-// ── Sub-components (unchanged) ───────────────────────────────────────────────
+// ── Sub-components ────────────────────────────────────────────────────────────
 
-function StatCard({
-  label, value, icon, accent, muted, empty,
-}: {
-  label: string; value: string; icon: React.ReactNode;
-  accent: 'emerald' | 'cyan' | 'primary'; muted?: boolean; empty?: boolean;
+type KpiStatus = 'good' | 'warn' | 'critical' | 'info';
+
+const STATUS_ICON_BG: Record<KpiStatus, string> = {
+  good:     'bg-emerald-100 text-emerald-600',
+  warn:     'bg-amber-100 text-amber-600',
+  critical: 'bg-red-100 text-red-600',
+  info:     'bg-primary/10 text-primary',
+};
+const STATUS_VALUE: Record<KpiStatus, string> = {
+  good:     'text-emerald-700',
+  warn:     'text-amber-700',
+  critical: 'text-red-700',
+  info:     'text-foreground',
+};
+
+function KpiCard({ label, value, sub, icon: Icon, status }: {
+  label: string; value: string; sub: string;
+  icon: React.ComponentType<{ className?: string }>; status: KpiStatus;
 }) {
-  const borderColor = { emerald: 'border-l-emerald-400', cyan: 'border-l-cyan-400', primary: 'border-l-primary' }[accent];
-  const textColor = { emerald: 'text-emerald-400', cyan: 'text-cyan-400', primary: 'text-primary' }[accent];
-  const iconColor = { emerald: 'text-emerald-400', cyan: 'text-cyan-400', primary: 'text-primary' }[accent];
-
   return (
-    <div className={`rounded-xl border border-l-4 ${borderColor} bg-card px-5 py-4 ${muted ? 'opacity-80' : ''}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
-        <span className={iconColor}>{icon}</span>
+    <Card>
+      <CardContent className="p-4 sm:p-5">
+        <div className={`inline-flex p-2 rounded-xl mb-3 ${STATUS_ICON_BG[status]}`}>
+          <Icon className="h-4 w-4" />
+        </div>
+        <p className={`text-2xl sm:text-3xl font-bold tabular-nums leading-none ${STATUS_VALUE[status]}`}>{value}</p>
+        <p className="text-xs font-medium text-muted-foreground mt-2">{label}</p>
+        <p className="text-xs text-muted-foreground/70 mt-0.5 truncate">{sub}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+const ACTION_STYLES: Record<string, { icon: string; border: string; label: string }> = {
+  primary: { icon: 'bg-primary/10 text-primary group-hover:bg-primary/15',       border: 'hover:border-primary/30',   label: 'text-foreground' },
+  amber:   { icon: 'bg-amber-100 text-amber-600 group-hover:bg-amber-200',       border: 'hover:border-amber-300/60', label: 'text-foreground' },
+  violet:  { icon: 'bg-violet-100 text-violet-600 group-hover:bg-violet-200',    border: 'hover:border-violet-300/60',label: 'text-foreground' },
+  emerald: { icon: 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-200', border: 'hover:border-emerald-300/60',label: 'text-foreground' },
+};
+
+function QuickAction({ label, sub, icon: Icon, href, color }: {
+  label: string; sub: string; icon: React.ComponentType<{ className?: string }>;
+  href: string; color: keyof typeof ACTION_STYLES;
+}) {
+  const s = ACTION_STYLES[color];
+  return (
+    <Link href={href} className={`group rounded-xl border bg-card p-4 flex flex-col gap-3 transition-all duration-150 active:scale-[0.98] ${s.border}`}>
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${s.icon}`}>
+        <Icon className="h-5 w-5" />
       </div>
-      <p className={`text-2xl font-bold tabular-nums ${empty ? 'text-muted-foreground' : textColor}`}>
-        {empty ? '—' : value}
-      </p>
-    </div>
-  );
-}
-
-function QuickLink({ href, icon, label, color }: { href: string; icon: React.ReactNode; label: string; color: string }) {
-  return (
-    <Link
-      href={href}
-      className="group flex flex-col items-center gap-2.5 rounded-xl border bg-card px-3 py-5 text-center hover:bg-muted/50 transition-colors"
-    >
-      <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${color} transition-transform group-hover:scale-110`}>
-        {icon}
-      </span>
-      <span className="text-xs font-medium leading-tight">{label}</span>
-    </Link>
-  );
-}
-
-function StatusRow({ href, label, value, ok, warn }: { href: string; label: string; value: string; ok?: boolean; warn?: boolean }) {
-  return (
-    <Link href={href} className="flex items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <div className="flex items-center gap-2">
-        <span className={`text-sm font-semibold tabular-nums ${warn ? 'text-yellow-400' : ok ? 'text-primary' : ''}`}>
-          {value}
-        </span>
-        {ok && <CheckCircle className="h-3.5 w-3.5 text-primary" />}
-        {warn && <AlertTriangle className="h-3.5 w-3.5 text-yellow-400" />}
+      <div>
+        <p className={`text-sm font-semibold leading-tight ${s.label}`}>{label}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
       </div>
     </Link>
   );

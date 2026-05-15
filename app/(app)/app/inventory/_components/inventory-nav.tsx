@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, AlertTriangle, BarChart3 } from 'lucide-react';
+import { Home, Scale, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 
 const NAV_ITEMS = [
-  { label: 'Home', href: '/app/inventory', icon: Home },
-  { label: 'Loss', href: '/app/inventory/loss', icon: AlertTriangle },
-  { label: 'Analytics', href: '/app/inventory/analytics', icon: BarChart3 },
+  { label: 'Items',     href: '/app/inventory',                  icon: Home },
+  { label: 'Weigh',     href: '/app/inventory/weigh',            icon: Scale },
+  { label: 'Analytics', href: '/app/inventory/analytics',        icon: TrendingUp },
 ];
 
 export function InventoryNav() {
