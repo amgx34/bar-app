@@ -75,8 +75,14 @@ export function OrderDialog({ open, onOpenChange, rep, prefillItems, onSent }: P
 
   async function onSubmit(values: OrderInput) {
     try {
-      await sendRepOrder(rep.id, values);
-      toast.success(`Order sent to ${rep.name}`);
+      const result = await sendRepOrder(rep.id, values);
+      if (result.emailWarning) {
+        // Order saved — email just didn't send
+        toast.success(`Order recorded for ${rep.name}`);
+        toast.warning(`Email not sent: ${result.emailWarning}. Check GMAIL_APP_PASSWORD in settings.`, { duration: 8000 });
+      } else {
+        toast.success(`Order sent to ${rep.name}`);
+      }
       onSent();
       onOpenChange(false);
     } catch (err) {
@@ -218,9 +224,9 @@ export function OrderDialog({ open, onOpenChange, rep, prefillItems, onSent }: P
 
           <DialogFooter className="px-6 py-4 border-t shrink-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
-            <Button type="submit" disabled={isSubmitting || (!sendEmail && !sendSms)} className="gap-2">
+            <Button type="submit" disabled={isSubmitting} className="gap-2">
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              {isSubmitting ? 'Sending…' : `Send Order`}
+              {isSubmitting ? 'Saving…' : (!sendEmail && !sendSms ? 'Record Order' : 'Send Order')}
             </Button>
           </DialogFooter>
         </form>

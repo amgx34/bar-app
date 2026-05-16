@@ -3,8 +3,10 @@ import { z } from 'zod';
 export const repSchema = z.object({
   name:    z.string().min(1, 'Name is required').max(120),
   company: z.string().max(120).optional().or(z.literal('')),
+  // phone is optional — email-only accounts are fully supported
   phone:   z.string().max(30).optional().or(z.literal('')),
-  email:   z.union([z.string().email('Invalid email'), z.literal('')]).optional(),
+  // email required so order notifications can always be delivered
+  email:   z.string().email('A valid email is required for order notifications'),
   notes:   z.string().max(2000).optional().or(z.literal('')),
 });
 export type RepInput = z.infer<typeof repSchema>;
@@ -22,11 +24,9 @@ export const orderSchema = z.object({
   po_number:     z.string().max(64).optional().or(z.literal('')),
   delivery_date: z.string().optional(),
   notes:         z.string().max(2000).optional().or(z.literal('')),
+  // Both optional — order can be recorded without sending a notification
   send_email:    z.boolean(),
   send_sms:      z.boolean(),
   items:         z.array(orderItemSchema).min(1, 'Add at least one item'),
-}).refine((d) => d.send_email || d.send_sms, {
-  message: 'Choose at least one send method',
-  path: ['send_email'],
 });
 export type OrderInput = z.infer<typeof orderSchema>;

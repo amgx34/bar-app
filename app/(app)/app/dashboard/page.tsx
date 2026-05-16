@@ -45,18 +45,6 @@ function timeAgo(isoStr: string) {
   return `${Math.floor(secs / 86400)}d ago`;
 }
 
-function getItemName(raw: unknown): string {
-  if (!raw) return 'Unknown item';
-  const obj = Array.isArray(raw) ? raw[0] : raw;
-  return (obj as { name?: string })?.name ?? 'Unknown item';
-}
-
-function getCatName(raw: unknown): string {
-  if (!raw) return 'Uncategorized';
-  const obj = Array.isArray(raw) ? raw[0] : raw;
-  return (obj as { name?: string })?.name ?? 'Uncategorized';
-}
-
 function greeting() {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
@@ -81,46 +69,97 @@ export default async function DashboardPage() {
   const today    = toDate(new Date());
   const weekStart = getWeekStart();
 
+  // 30-day window for usage (seed logs all have created_at = seed time, not per-day)
+  const d30ago = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  // ── Flat queries — NO embedded joins (joins fail silently when FK isn't detected)
   const [
     { data: recentNights },
-    { data: weekDays },
     { data: employees },
     { data: inventoryItems },
+    { data: allCategories },
+    { data: allReps },
     { data: recentActivity },
     { data: recentOrders },
-    { data: weekUsage },
+    { data: recentUsage },
     { data: pendingOrdersData },
   ] = await Promise.all([
-    supabase.from('z_report_days').select('report_date, total_sales, cash_tips, cc_tips').eq('organization_id', orgId).order('report_date', { ascending: false }).limit(7),
-    supabase.from('z_report_days').select('total_sales, cash_tips, cc_tips').eq('organization_id', orgId).gte('report_date', weekStart).lte('report_date', today),
-    supabase.from('employees').select('id, name, role, hourly_rate').eq('organization_id', orgId),
-    supabase.from('inventory_items').select('id, name, unit, current_stock, par_level, cost_price, rep_id, inventory_categories(name), reps(id, name)').eq('organization_id', orgId).eq('is_active', true).order('name'),
-    supabase.from('usage_logs').select('item_id, quantity, reason, created_at, inventory_items(name)').eq('organization_id', orgId).neq('reason', 'delivery').order('created_at', { ascending: false }).limit(8),
-    supabase.from('rep_orders').select('id, status, created_at, reps(name)').eq('organization_id', orgId).order('created_at', { ascending: false }).limit(4),
-    supabase.from('usage_logs').select('item_id, quantity, inventory_items(name)').eq('organization_id', orgId).neq('reason', 'delivery').gte('created_at', weekStart + 'T00:00:00Z').limit(150),
-    supabase.from('rep_orders').select('id').eq('organization_id', orgId).in('status', ['sent', 'confirmed']),
+    supabase.from('z_report_days')
+      .select('report_date, total_sales, cash_tips, cc_tips')
+      .eq('organization_id', orgId).order('report_date', { ascending: false }).limit(14),
+    supabase.from('employees')
+      .select('id, name, role, hourly_rate')
+      .eq('organization_id', orgId),
+    // No joins — cost_price, par_level, rep_id, category_id fetched as plain columns
+    supabase.from('inventory_items')
+      .select('id, name, unit, current_stock, par_level, cost_price, rep_id, category_id')
+      .eq('organization_id', orgId).eq('is_active', true).order('name'),
+    supabase.from('inventory_categories')
+      .select('id, name')
+      .eq('organization_id', orgId),
+    supabase.from('reps')
+      .select('id, name')
+      .eq('organization_id', orgId).eq('is_active', true),
+    // No join — item_id used to look up name from items array below
+    supabase.from('usage_logs')
+      .select('item_id, quantity, reason, created_at')
+      .eq('organization_id', orgId).neq('reason', 'delivery')
+      .order('created_at', { ascending: false }).limit(8),
+    // No join — rep_id used for lookup
+    supabase.from('rep_orders')
+      .select('id, status, created_at, rep_id')
+      .eq('organization_id', orgId).order('created_at', { ascending: false }).limit(4),
+    supabase.from('usage_logs')
+      .select('item_id, quantity')
+      .eq('organization_id', orgId).neq('reason', 'delivery')
+      .gte('created_at', d30ago).limit(200),
+    supabase.from('rep_orders')
+      .select('id')
+      .eq('organization_id', orgId).in('status', ['sent', 'confirmed']),
   ]);
 
   // ── Metrics ───────────────────────────────────────────────────────────────
 
-  const lastNight      = recentNights?.[0] ?? null;
-  const lastNightSales = lastNight?.total_sales ?? 0;
-  const lastNightTips  = (lastNight?.cash_tips ?? 0) + (lastNight?.cc_tips ?? 0);
+  const nights = recentNights ?? [];
+  const lastNight       = nights[0] ?? null;
+  const lastNightSales  = lastNight?.total_sales ?? 0;
+  const lastNightTips   = (lastNight?.cash_tips ?? 0) + (lastNight?.cc_tips ?? 0);
   const lastNightTipPct = lastNightSales > 0 ? (lastNightTips / lastNightSales) * 100 : 0;
 
-  const weekSales = (weekDays ?? []).reduce((s, d) => s + (d.total_sales ?? 0), 0);
-  const weekTips  = (weekDays ?? []).reduce((s, d) => s + (d.cash_tips ?? 0) + (d.cc_tips ?? 0), 0);
+  // Period totals from the last 14 nights (excludes the most recent night itself)
+  const periodNights = nights.slice(1);
+  const periodSales  = periodNights.reduce((s, d) => s + (d.total_sales ?? 0), 0);
+  const periodTips   = periodNights.reduce((s, d) => s + ((d.cash_tips ?? 0) + (d.cc_tips ?? 0)), 0);
 
   const items = inventoryItems ?? [];
 
-  const inventoryValue = items.reduce(
-    (s, i) => s + (i.current_stock ?? 0) * ((i as unknown as { cost_price?: number }).cost_price ?? 0), 0,
-  );
+  // ── Lookup maps (replaces join-based data access) ─────────────────────────
+  type RawItem = typeof items[0] & { cost_price?: number | null; rep_id?: string | null; category_id?: string | null };
+  const itemNameMap = new Map(items.map((i) => [i.id, i.name]));
+  const catNameMap  = new Map((allCategories ?? []).map((c) => [c.id, c.name]));
+  const repNameMap  = new Map((allReps ?? []).map((r) => [r.id, r.name]));
 
-  const itemsWithPar  = items.filter((i) => i.par_level !== null && i.par_level > 0);
+  // cost_price lives on the raw row; TypeScript may not type it — read via cast
+  const inventoryValue = items.reduce((s, i) => {
+    const row  = i as RawItem;
+    const cost = Number(row.cost_price ?? 0);
+    return s + (i.current_stock ?? 0) * cost;
+  }, 0);
+
+  const itemsWithPar  = items.filter((i) => {
+    const par = Number((i as RawItem).par_level ?? null);
+    return par !== null && !isNaN(par) && par > 0;
+  });
   const lowStockItems = itemsWithPar
-    .filter((i) => i.current_stock < i.par_level!)
-    .sort((a, b) => (a.current_stock / (a.par_level ?? 1)) - (b.current_stock / (b.par_level ?? 1)));
+    .filter((i) => {
+      const par = Number((i as RawItem).par_level ?? 0);
+      return i.current_stock < par;
+    })
+    .sort((a, b) => {
+      const pa = Number((a as RawItem).par_level ?? 1);
+      const pb = Number((b as RawItem).par_level ?? 1);
+      return (a.current_stock / pa) - (b.current_stock / pb);
+    });
   const parCompliancePct = itemsWithPar.length > 0
     ? ((itemsWithPar.length - lowStockItems.length) / itemsWithPar.length) * 100
     : 100;
@@ -132,27 +171,33 @@ export default async function DashboardPage() {
     (e) => !EXCLUDED.has(e.name.toLowerCase()) && (!e.role || e.hourly_rate === null),
   );
 
-  // Fast movers this week (group by item)
+  // Fast movers — last 30 days, names from lookup map
   const fastMoverMap = new Map<string, { name: string; qty: number }>();
-  for (const log of weekUsage ?? []) {
-    const name = getItemName(log.inventory_items);
+  for (const log of recentUsage ?? []) {
+    const name = itemNameMap.get(log.item_id) ?? 'Unknown item';
     const prev = fastMoverMap.get(log.item_id) ?? { name, qty: 0 };
     fastMoverMap.set(log.item_id, { name, qty: prev.qty + (log.quantity ?? 0) });
   }
   const fastMovers = [...fastMoverMap.values()].sort((a, b) => b.qty - a.qty).slice(0, 5);
 
-  // Reorder suggestions
-  const reorderItems = items.filter((i) => i.par_level !== null && i.current_stock < i.par_level && i.rep_id);
+  // Reorder suggestions — use repNameMap instead of join
+  const reorderItems = items.filter((i) => {
+    const row = i as RawItem;
+    const par = Number(row.par_level ?? 0);
+    return par > 0 && i.current_stock < par && row.rep_id;
+  });
   const reorderByRep = new Map<string, { rep: { id: string; name: string }; items: typeof reorderItems }>();
   for (const item of reorderItems) {
-    const rep = item.reps as unknown as { id: string; name: string } | null;
-    if (!rep) continue;
-    if (!reorderByRep.has(rep.id)) reorderByRep.set(rep.id, { rep, items: [] });
-    reorderByRep.get(rep.id)!.items.push(item);
+    const repId   = (item as RawItem).rep_id;
+    const repName = repId ? repNameMap.get(repId) : undefined;
+    if (!repId || !repName) continue;
+    const rep = { id: repId, name: repName };
+    if (!reorderByRep.has(repId)) reorderByRep.set(repId, { rep, items: [] });
+    reorderByRep.get(repId)!.items.push(item);
   }
   const reorderGroups = [...reorderByRep.values()];
 
-  const nightsData = (recentNights ?? []).map((d) => ({
+  const nightsData = nights.map((d) => ({
     nightDate:  d.report_date as string,
     totalSales: d.total_sales as number,
     totalTips:  (d.cash_tips as number) + (d.cc_tips as number),
@@ -265,9 +310,11 @@ export default async function DashboardPage() {
                   <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">Needs Attention</p>
                   <div className="space-y-1">
                     {lowStockItems.slice(0, 5).map((item) => {
-                      const pct      = item.par_level! > 0 ? (item.current_stock / item.par_level!) * 100 : 0;
+                      const par      = Number((item as RawItem).par_level ?? 0);
+                      const pct      = par > 0 ? (item.current_stock / par) * 100 : 0;
                       const critical = item.current_stock === 0;
-                      const cat      = getCatName(item.inventory_categories);
+                      const catId    = (item as RawItem).category_id;
+                      const cat      = (catId ? catNameMap.get(catId) : undefined) ?? 'Uncategorized';
                       return (
                         <div key={item.id} className="flex items-center gap-3 py-1.5">
                           <div className="flex-1 min-w-0">
@@ -279,7 +326,7 @@ export default async function DashboardPage() {
                               <div className={`h-full rounded-full ${critical ? 'bg-red-500' : 'bg-amber-400'}`} style={{ width: `${Math.max(pct, critical ? 0 : 3)}%` }} />
                             </div>
                             <p className={`text-xs tabular-nums text-right ${critical ? 'text-red-500 font-semibold' : 'text-amber-600'}`}>
-                              {critical ? 'OUT' : `${item.current_stock} / ${item.par_level}`}
+                              {critical ? 'OUT' : `${item.current_stock} / ${par}`}
                             </p>
                           </div>
                         </div>
@@ -308,7 +355,7 @@ export default async function DashboardPage() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Zap className="h-4 w-4 text-amber-500" /> Fastest Moving This Week
+                  <Zap className="h-4 w-4 text-amber-500" /> Top Movers (30 Days)
                 </CardTitle>
                 <Link href="/app/inventory/analytics" className="text-xs text-primary hover:underline flex items-center gap-1">
                   Full analytics <ArrowUpRight className="h-3 w-3" />
@@ -318,7 +365,7 @@ export default async function DashboardPage() {
             <CardContent>
               {fastMovers.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-6">
-                  No usage data this week. Log stock adjustments to see movers.
+                  No usage data in the last 30 days. Log stock adjustments to see movers.
                 </p>
               ) : (
                 <div className="space-y-3">
@@ -362,7 +409,7 @@ export default async function DashboardPage() {
               ) : (
                 <div className="divide-y">
                   {(recentActivity ?? []).slice(0, 5).map((log, i) => {
-                    const name   = getItemName(log.inventory_items);
+                    const name   = itemNameMap.get(log.item_id) ?? 'Unknown item';
                     const label  = REASON_LABEL[log.reason] ?? log.reason;
                     const isWarn = ['spillage', 'comp', 'recount'].includes(log.reason);
                     return (
@@ -381,7 +428,7 @@ export default async function DashboardPage() {
                     );
                   })}
                   {(recentOrders ?? []).slice(0, 3).map((order) => {
-                    const repName = getItemName(order.reps);
+                    const repName = repNameMap.get((order as Record<string, unknown>).rep_id as string) ?? 'Rep';
                     return (
                       <div key={order.id} className="flex items-start gap-3 px-4 py-3">
                         <div className="mt-0.5 p-1.5 rounded-lg bg-violet-100 text-violet-600 shrink-0">
@@ -435,11 +482,11 @@ export default async function DashboardPage() {
                       {lastNightTipPct.toFixed(1)}%
                     </span>
                   </div>
-                  {weekSales > 0 && (
+                  {periodSales > 0 && (
                     <div className="flex items-center justify-between border-t pt-3">
-                      <span className="text-xs text-muted-foreground">Week so far</span>
+                      <span className="text-xs text-muted-foreground">Prior {periodNights.length} nights</span>
                       <span className="text-xs font-semibold tabular-nums">
-                        {fmtMoney(weekSales, true)} sales · {fmtMoney(weekTips, true)} tips
+                        {fmtMoney(periodSales, true)} sales · {fmtMoney(periodTips, true)} tips
                       </span>
                     </div>
                   )}

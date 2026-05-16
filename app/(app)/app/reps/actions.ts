@@ -102,7 +102,7 @@ export async function deleteRep(repId: string): Promise<void> {
 
 // ── Orders ────────────────────────────────────────────────────────────────────
 
-export async function sendRepOrder(repId: string, raw: unknown): Promise<{ orderId: string }> {
+export async function sendRepOrder(repId: string, raw: unknown): Promise<{ orderId: string; emailWarning?: string }> {
   const { org, role } = await getCurrentOrg();
   if (!canManageReps(role)) throw new Error('Not authorized');
 
@@ -125,28 +125,7 @@ export async function sendRepOrder(repId: string, raw: unknown): Promise<{ order
   const poNumber    = input.po_number     || `RO-${Date.now().toString(36).toUpperCase()}`;
   const deliveryFmt = input.delivery_date ? new Date(input.delivery_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
 
-  // Send email
-  if (input.send_email && rep.email) {
-    const html = buildOrderEmail({
-      orgName:      org.name,
-      repName:      rep.name,
-      repEmail:     rep.email,
-      poNumber,
-      deliveryDate: deliveryFmt,
-      notes:        input.notes || '',
-      items:        input.items,
-    });
-    await sendEmail(rep.email, `Order from ${org.name} — PO ${poNumber}`, html);
-  }
-
-  // Send SMS
-  if (input.send_sms && rep.phone) {
-    const itemList = input.items.map((i) => `${i.name} ×${i.quantity}`).join(', ');
-    const msg = `${org.name} Order — PO: ${poNumber}${deliveryFmt ? ` | Deliver by: ${deliveryFmt}` : ''} | ${itemList}${input.notes ? ` | Note: ${input.notes}` : ''}`;
-    await sendOrderSms(rep.phone, msg);
-  }
-
-  // Record in DB
+  // ── 1. Save order to DB first — always succeeds regardless of email/SMS ──────
   const { data: order, error: orderErr } = await admin
     .from('rep_orders')
     .insert({
@@ -164,7 +143,39 @@ export async function sendRepOrder(repId: string, raw: unknown): Promise<{ order
     .single();
   if (orderErr || !order) throw new Error(orderErr?.message ?? 'Failed to record order');
 
-  // Confirmation email to org owner (best-effort)
+  // ── 2. Send notifications (best-effort — never block or lose the order) ──────
+  const emailErrors: string[] = [];
+
+  if (input.send_email && rep.email) {
+    const html = buildOrderEmail({
+      orgName:      org.name,
+      repName:      rep.name,
+      repEmail:     rep.email,
+      poNumber,
+      deliveryDate: deliveryFmt,
+      notes:        input.notes || '',
+      items:        input.items,
+    });
+    try {
+      await sendEmail(rep.email, `Order from ${org.name} — PO ${poNumber}`, html);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      emailErrors.push(`Email to rep failed: ${msg}`);
+      console.error('[sendRepOrder] email to rep failed:', msg);
+    }
+  }
+
+  if (input.send_sms && rep.phone) {
+    const itemList = input.items.map((i) => `${i.name} ×${i.quantity}`).join(', ');
+    const msg = `${org.name} Order — PO: ${poNumber}${deliveryFmt ? ` | Deliver by: ${deliveryFmt}` : ''} | ${itemList}${input.notes ? ` | Note: ${input.notes}` : ''}`;
+    try {
+      await sendOrderSms(rep.phone, msg);
+    } catch (err) {
+      console.error('[sendRepOrder] SMS to rep failed:', err);
+    }
+  }
+
+  // Confirmation email to org owner (always best-effort)
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (user?.email) {
@@ -179,7 +190,12 @@ export async function sendRepOrder(repId: string, raw: unknown): Promise<{ order
   }
 
   revalidatePath('/app/reps');
-  return { orderId: order.id };
+
+  // Return the order ID plus any non-fatal email warnings so the UI can surface them
+  return {
+    orderId:      order.id,
+    emailWarning: emailErrors.length > 0 ? emailErrors[0] : undefined,
+  };
 }
 
 export async function getRepOrders(repId: string): Promise<RepOrder[]> {

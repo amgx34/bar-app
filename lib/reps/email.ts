@@ -22,20 +22,22 @@ function getTransporter(): nodemailer.Transporter {
   if (_transporter) return _transporter;
 
   const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD;
+  // Strip spaces — Google displays app passwords as "abcd efgh ijkl mnop"
+  const pass = (process.env.GMAIL_APP_PASSWORD ?? '').replace(/\s+/g, '');
 
   if (!user || !pass) {
     throw new Error(
-      'GMAIL_USER and GMAIL_APP_PASSWORD must be set in .env.local.\n' +
-      'Generate an app password at https://myaccount.google.com/apppasswords'
+      'Email not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD in .env.local.\n' +
+      'Generate a 16-char app password at https://myaccount.google.com/apppasswords',
     );
   }
 
   _transporter = nodemailer.createTransport({
     host:   'smtp.gmail.com',
     port:   587,
-    secure: false,          // STARTTLS on port 587
-    auth: { user, pass },
+    secure: false,
+    auth:   { user, pass },
+    tls:    { rejectUnauthorized: false },
   });
 
   return _transporter;
@@ -43,9 +45,20 @@ function getTransporter(): nodemailer.Transporter {
 
 // ── Public send function ──────────────────────────────────────────────────────
 
-export async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+export async function sendEmail(
+  to: string,
+  subject: string,
+  html: string,
+  replyTo?: string,
+): Promise<void> {
   const from = `"Rail Orders" <${process.env.GMAIL_USER}>`;
-  await getTransporter().sendMail({ from, to, subject, html });
+  await getTransporter().sendMail({
+    from,
+    to,
+    subject,
+    html,
+    replyTo: replyTo ?? from,
+  });
 }
 
 // ── HTML templates ────────────────────────────────────────────────────────────

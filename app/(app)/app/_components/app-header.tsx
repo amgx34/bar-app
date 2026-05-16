@@ -4,14 +4,11 @@ import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
+  DropdownMenu, DropdownMenuContent, DropdownMenuGroup,
+  DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { NotificationBell } from './notification-bell';
 
 const POS_LABELS: Record<string, string> = {
   clover:  'Clover',
@@ -20,25 +17,23 @@ const POS_LABELS: Record<string, string> = {
 };
 
 type Props = {
-  email:      string;
+  email:       string;
   posProvider?: string | null;
-  orgName?:   string;
+  orgName?:    string;
+  orgSlug:     string;
 };
 
-export function AppHeader({ email, posProvider, orgName }: Props) {
+export function AppHeader({ email, posProvider, orgName, orgSlug }: Props) {
   const hasPOS = !!posProvider;
 
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center border-b border-border/60 bg-card/95 backdrop-blur-sm px-3 sm:px-6 gap-3">
-      {/* Sidebar trigger — visible on all breakpoints */}
       <SidebarTrigger className="shrink-0" />
 
-      {/* Brand wordmark */}
       <span className="font-bold text-base sm:text-lg tracking-[0.2em] text-primary uppercase select-none">
         Rail
       </span>
 
-      {/* Org name — shows on mobile when sidebar is hidden */}
       {orgName && (
         <span className="hidden xs:block sm:hidden text-sm text-muted-foreground truncate max-w-[120px]">
           {orgName}
@@ -47,7 +42,7 @@ export function AppHeader({ email, posProvider, orgName }: Props) {
 
       <div className="flex-1" />
 
-      {/* POS integration status badge */}
+      {/* POS badge — desktop */}
       {hasPOS && (
         <div
           className="hidden sm:flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"
@@ -61,15 +56,15 @@ export function AppHeader({ email, posProvider, orgName }: Props) {
         </div>
       )}
 
-      {/* POS status — compact for mobile */}
+      {/* POS icon — mobile */}
       {hasPOS && (
-        <div
-          className="sm:hidden flex items-center"
-          title={`Connected to ${POS_LABELS[posProvider!] ?? posProvider}`}
-        >
+        <div className="sm:hidden flex items-center" title={`Connected to ${POS_LABELS[posProvider!] ?? posProvider}`}>
           <Wifi className="h-4 w-4 text-emerald-500" />
         </div>
       )}
+
+      {/* Notification bell */}
+      <NotificationBell orgSlug={orgSlug} />
 
       {/* Account dropdown */}
       <DropdownMenu>
@@ -96,9 +91,7 @@ export function AppHeader({ email, posProvider, orgName }: Props) {
           <DropdownMenuSeparator />
           <DropdownMenuItem>
             <form action={signOut} className="w-full">
-              <button type="submit" className="w-full text-left">
-                Log out
-              </button>
+              <button type="submit" className="w-full text-left">Log out</button>
             </form>
           </DropdownMenuItem>
         </DropdownMenuContent>

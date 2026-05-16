@@ -20,6 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             email={user?.email ?? ''}
             posProvider={org.pos_provider}
             orgName={org.name}
+            orgSlug={org.slug}
           />
           <main className="flex-1 pb-16 md:pb-0">
             {children}
