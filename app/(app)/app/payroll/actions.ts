@@ -483,6 +483,12 @@ export async function computePayroll(
     throw new Error('Organization not found');
   }
 
+  // Configurable barback cut (Settings → Tip & Pay → Barback tip %).
+  // Falls back to 15 % if not set.
+  const barbackPct  = Math.min(100, Math.max(0, org.bar_settings?.barback_tip_pct ?? 15));
+  const barbackFrac = barbackPct / 100;
+  const poolFrac    = 1 - barbackFrac;
+
   try {
     // Fetch all employees for the organization
     const { data: employees, error: empError } = await supabase
@@ -595,14 +601,14 @@ export async function computePayroll(
       let poolTips: number;
 
       if (barbackShiftsToday.length > 0) {
-        const perBarback = (dailyTips * 0.15) / barbackShiftsToday.length;
+        const perBarback = (dailyTips * barbackFrac) / barbackShiftsToday.length;
         barbackShiftsToday.forEach((s) => {
           employeeTipAmounts.set(
             s.employee_id,
             (employeeTipAmounts.get(s.employee_id) || 0) + perBarback
           );
         });
-        poolTips = dailyTips * 0.85;
+        poolTips = dailyTips * poolFrac;
       } else {
         poolTips = dailyTips;
       }

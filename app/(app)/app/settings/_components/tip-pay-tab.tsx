@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Save, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,77 @@ const ROLES: Array<{ key: keyof HourlyRates; label: string; desc: string }> = [
   { key: 'security',  label: 'Security',   desc: 'Door / floor' },
   { key: 'other',     label: 'Other',      desc: 'Misc hourly staff' },
 ];
+
+// ── Custom drag slider (no native input quirks on mobile) ────────────────────
+
+function DragSlider({
+  value, min, max, step = 1, disabled, onChange, color = '#f59e0b',
+}: {
+  value: number; min: number; max: number; step?: number;
+  disabled?: boolean; onChange: (v: number) => void; color?: string;
+}) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const pct = ((value - min) / (max - min)) * 100;
+
+  const resolve = useCallback((clientX: number) => {
+    const el = trackRef.current;
+    if (!el) return;
+    const { left, width } = el.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - left) / width));
+    const raw   = min + ratio * (max - min);
+    onChange(Math.max(min, Math.min(max, Math.round(raw / step) * step)));
+  }, [min, max, step, onChange]);
+
+  function onMouseDown(e: React.MouseEvent) {
+    if (disabled) return;
+    e.preventDefault();
+    resolve(e.clientX);
+    const move = (ev: MouseEvent) => resolve(ev.clientX);
+    const up   = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }
+
+  function onTouchStart(e: React.TouchEvent) {
+    if (disabled) return;
+    resolve(e.touches[0].clientX);
+    const move = (ev: TouchEvent) => resolve(ev.touches[0].clientX);
+    const end  = () => { document.removeEventListener('touchmove', move); document.removeEventListener('touchend', end); };
+    document.addEventListener('touchmove', move, { passive: true });
+    document.addEventListener('touchend', end);
+  }
+
+  return (
+    <div
+      ref={trackRef}
+      role="slider"
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      tabIndex={disabled ? -1 : 0}
+      className={`relative h-8 flex items-center ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      onMouseDown={onMouseDown}
+      onTouchStart={onTouchStart}
+      onKeyDown={(e) => {
+        if (disabled) return;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowUp')   onChange(Math.min(max, value + step));
+        if (e.key === 'ArrowLeft'  || e.key === 'ArrowDown') onChange(Math.max(min, value - step));
+      }}
+    >
+      {/* Track fill */}
+      <div className="absolute inset-x-0 h-2 bg-muted rounded-full overflow-hidden">
+        <div className="h-full rounded-full transition-none" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+      {/* Thumb — centered exactly on the fill edge */}
+      <div
+        className="absolute h-5 w-5 rounded-full border-2 border-white shadow-md transition-none z-10"
+        style={{ left: `${pct}%`, transform: 'translateX(-50%)', backgroundColor: color }}
+      />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function TipPayTab({ role, settings }: Props) {
   const [form, setForm] = useState({
@@ -82,43 +153,55 @@ export function TipPayTab({ role, settings }: Props) {
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>Tip Pool Split %</Label>
-            <div className="relative">
-              <Input type="number" min={0} max={100} disabled={!canEdit}
-                value={form.tip_split_percent}
-                onChange={(e) => setForm({ ...form, tip_split_percent: Number(e.target.value) })}
-                className="pr-8" />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
-            </div>
-            <p className="text-xs text-muted-foreground">% of total sales allocated to the tip pool</p>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Barback Pool Share</Label>
-            <div className="relative">
-              <Input type="number" min={0} max={50} disabled={!canEdit}
+        {/* Barback slider */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label>Barback Share of Tip Pool</Label>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min={0}
+                max={50}
+                disabled={!canEdit}
                 value={form.barback_tip_pct}
-                onChange={(e) => setForm({ ...form, barback_tip_pct: Number(e.target.value) })}
-                className="pr-8" />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                onChange={(e) => setForm({ ...form, barback_tip_pct: Math.min(50, Math.max(0, Number(e.target.value))) })}
+                className="w-14 h-7 rounded-md border border-input bg-background px-2 text-sm text-center tabular-nums focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+              />
+              <span className="text-sm text-muted-foreground">%</span>
             </div>
-            <p className="text-xs text-muted-foreground">Of the tip pool, barbacks receive this %</p>
           </div>
-        </div>
 
-        {/* Visual split */}
-        <div className="rounded-lg bg-muted/50 px-4 py-3 flex items-center gap-4 text-sm">
-          <div className="flex-1">
-            <div className="h-2 rounded-full bg-border overflow-hidden flex">
-              <div className="bg-primary h-full rounded-l-full transition-all" style={{ width: `${bartenderPool}%` }} />
-              <div className="bg-amber-400 h-full rounded-r-full transition-all" style={{ width: `${form.barback_tip_pct}%` }} />
+          <DragSlider
+            value={form.barback_tip_pct}
+            min={0}
+            max={50}
+            step={1}
+            disabled={!canEdit}
+            onChange={(v) => setForm({ ...form, barback_tip_pct: v })}
+            color="#f59e0b"
+          />
+
+          {/* Visual split bar */}
+          <div>
+            <div className="h-3 rounded-full overflow-hidden flex">
+              <div
+                className="bg-primary h-full transition-all duration-150"
+                style={{ width: `${bartenderPool}%` }}
+              />
+              <div
+                className="bg-amber-400 h-full transition-all duration-150"
+                style={{ width: `${form.barback_tip_pct}%` }}
+              />
             </div>
-            <div className="flex justify-between text-xs text-muted-foreground mt-1.5">
-              <span className="text-primary font-medium">Bartenders {bartenderPool}%</span>
-              <span className="text-amber-500 font-medium">Barbacks {form.barback_tip_pct}%</span>
+            <div className="flex justify-between text-xs mt-1.5">
+              <span className="text-primary font-semibold">Bartenders — {bartenderPool}%</span>
+              <span className="text-amber-500 font-semibold">Barbacks — {form.barback_tip_pct}%</span>
             </div>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Each night, barbacks collectively receive {form.barback_tip_pct}% of the tip pool split equally by headcount.
+            The remaining {bartenderPool}% goes to the bartender pool, distributed by hours worked.
+          </p>
         </div>
       </div>
 

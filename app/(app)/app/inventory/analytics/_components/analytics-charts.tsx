@@ -10,18 +10,37 @@ function fmtDollar(v: number) { return `$${v.toLocaleString('en-US', { maximumFr
 
 export function CategoryValuePie({ data }: { data: CategoryBreakdown[] }) {
   const chartData = data.filter((d) => d.totalValue > 0).slice(0, 8);
-  if (chartData.length === 0) return <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">No data</div>;
+  if (chartData.length === 0) return <div className="h-32 flex items-center justify-center text-sm text-muted-foreground">No data</div>;
   return (
-    <div className="w-full h-56">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie data={chartData} dataKey="totalValue" nameKey="category" cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={2}>
-            {chartData.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
-          </Pie>
-          <Tooltip contentStyle={tooltipStyle} formatter={(v, name) => [fmtDollar(v as number), name]} />
-          <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} formatter={(value: string) => value.length > 14 ? value.slice(0, 13) + '…' : value} />
-        </PieChart>
-      </ResponsiveContainer>
+    // Legend lives OUTSIDE the SVG so it doesn't shrink the drawing area on mobile
+    <div className="w-full">
+      <div className="w-full h-44">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={chartData}
+              dataKey="totalValue"
+              nameKey="category"
+              cx="50%" cy="50%"
+              innerRadius="38%"
+              outerRadius="62%"
+              paddingAngle={2}
+            >
+              {chartData.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+            </Pie>
+            <Tooltip contentStyle={tooltipStyle} formatter={(v, name) => [fmtDollar(v as number), name]} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      {/* Inline legend — wraps cleanly on any width */}
+      <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center mt-1">
+        {chartData.map((d, i) => (
+          <span key={d.category} className="flex items-center gap-1 text-[11px] text-muted-foreground">
+            <span className="inline-block h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: PALETTE[i % PALETTE.length] }} />
+            {d.category.length > 16 ? d.category.slice(0, 15) + '…' : d.category}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

@@ -3,11 +3,15 @@
 import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentOrg } from '@/lib/org';
-import type { BreakdownItem } from '@/lib/email/poll-replies';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type { BreakdownItem };
+export type BreakdownItem = {
+  item:       string;
+  quantity:   string;
+  unit_price: number | null;
+  line_total: number | null;
+};
 
 export type BarMessage = {
   id:               string;

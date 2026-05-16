@@ -11,9 +11,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types (canonical definition lives in app/actions/messages.ts) ────────────
 
-export type BreakdownItem = {
+type BreakdownItem = {
   item:       string;
   quantity:   string;
   unit_price: number | null;

@@ -71,28 +71,44 @@ export default async function InventoryAnalyticsPage() {
       </div>
 
       {/* Category Value + Fast Movers */}
-      <div className="grid gap-6 lg:grid-cols-5">
-        <Card className="lg:col-span-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+        <Card className="md:col-span-1 lg:col-span-2">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold">Value by Category</CardTitle>
             <p className="text-xs text-muted-foreground">Current stock × cost price</p>
           </CardHeader>
           <CardContent>
             <CategoryValuePie data={data.categoryBreakdown} />
-            <div className="mt-3 space-y-1.5">
-              {data.categoryBreakdown.slice(0, 5).map((cat) => (
+            {/* Bar breakdown — sits below the chart at all sizes */}
+            <div className="mt-4 space-y-2">
+              {data.categoryBreakdown.slice(0, 6).map((cat, i) => (
                 <div key={cat.category} className="flex items-center gap-2 text-xs">
-                  <span className="text-muted-foreground w-28 truncate shrink-0">{cat.category}</span>
-                  <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary/70 rounded-full" style={{ width: `${data.totalInventoryValue > 0 ? (cat.totalValue / data.totalInventoryValue) * 100 : 0}%` }} />
+                  {/* Colour dot */}
+                  <span
+                    className="h-2 w-2 rounded-full shrink-0"
+                    style={{ backgroundColor: ['#0d9488','#f59e0b','#10b981','#0ea5e9','#8b5cf6','#e11d48'][i % 6] }}
+                  />
+                  {/* Label — grows but stays in a sensible range */}
+                  <span className="text-muted-foreground truncate min-w-0 flex-1">
+                    {cat.category}
+                  </span>
+                  {/* Bar */}
+                  <div className="w-16 sm:w-24 h-1.5 bg-muted rounded-full overflow-hidden shrink-0">
+                    <div
+                      className="h-full bg-primary/70 rounded-full"
+                      style={{ width: `${data.totalInventoryValue > 0 ? (cat.totalValue / data.totalInventoryValue) * 100 : 0}%` }}
+                    />
                   </div>
-                  <span className="font-medium tabular-nums w-16 text-right">{fmtMoney(cat.totalValue)}</span>
+                  {/* Value */}
+                  <span className="font-medium tabular-nums shrink-0 text-right min-w-[3.5rem]">
+                    {fmtMoney(cat.totalValue)}
+                  </span>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
-        <Card className="lg:col-span-3">
+        <Card className="md:col-span-1 lg:col-span-3">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2"><Zap className="h-4 w-4 text-amber-500" /><CardTitle className="text-sm font-semibold">Fast Movers</CardTitle></div>
             <p className="text-xs text-muted-foreground">Highest average daily usage, last 30 days</p>
