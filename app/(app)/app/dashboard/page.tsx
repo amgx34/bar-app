@@ -16,17 +16,6 @@ export const dynamic = 'force-dynamic';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function pad(n: number) { return String(n).padStart(2, '0'); }
-function toDate(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
-
-function getWeekStart() {
-  const t = new Date();
-  const d = t.getDay();
-  const m = new Date(t);
-  m.setDate(t.getDate() - (d === 0 ? 6 : d - 1));
-  return toDate(m);
-}
-
 function fmtDate(iso: string) {
   const d = new Date(iso + 'T00:00:00');
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -65,9 +54,7 @@ const REASON_LABEL: Record<string, string> = {
 export default async function DashboardPage() {
   const { org } = await getCurrentOrg();
   const supabase = await createClient();
-  const orgId    = org.id;
-  const today    = toDate(new Date());
-  const weekStart = getWeekStart();
+  const orgId = org.id;
 
   // 30-day window for usage (seed logs all have created_at = seed time, not per-day)
   const d30ago = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -90,10 +77,12 @@ export default async function DashboardPage() {
     supabase.from('employees')
       .select('id, name, role, hourly_rate')
       .eq('organization_id', orgId),
-    // No joins — cost_price, par_level, rep_id, category_id fetched as plain columns
+    // select('*') — never fails on missing columns.
+    // is_active filtered in-memory below to handle NULL values correctly.
     supabase.from('inventory_items')
-      .select('id, name, unit, current_stock, par_level, cost_price, rep_id, category_id')
-      .eq('organization_id', orgId).eq('is_active', true).order('name'),
+      .select('*')
+      .eq('organization_id', orgId)
+      .order('name'),
     supabase.from('inventory_categories')
       .select('id, name')
       .eq('organization_id', orgId),
@@ -131,7 +120,27 @@ export default async function DashboardPage() {
   const periodSales  = periodNights.reduce((s, d) => s + (d.total_sales ?? 0), 0);
   const periodTips   = periodNights.reduce((s, d) => s + ((d.cash_tips ?? 0) + (d.cc_tips ?? 0)), 0);
 
-  const items = inventoryItems ?? [];
+  // Filter active items in-memory: include items where is_active is true OR null
+  // (NULL means the column defaulted without being set, not that it was deactivated)
+  const items = (inventoryItems ?? []).filter(
+    (i) => (i as Record<string, unknown>).is_active !== false,
+  );
+
+  // rep_id was added by a migration — fetch it separately so a missing column
+  // never breaks the main inventory query above.
+  const repAssignMap = new Map<string, string>(); // item_id → rep_id
+  try {
+    const { data: repRows } = await supabase
+      .from('inventory_items')
+      .select('id, rep_id')
+      .eq('organization_id', orgId)
+      .eq('is_active', true)
+      .not('rep_id', 'is', null);
+    for (const r of repRows ?? []) {
+      const row = r as { id: string; rep_id: string | null };
+      if (row.rep_id) repAssignMap.set(row.id, row.rep_id);
+    }
+  } catch { /* rep_id column not yet in this database — skip reorder suggestions */ }
 
   // ── Lookup maps (replaces join-based data access) ─────────────────────────
   type RawItem = typeof items[0] & { cost_price?: number | null; rep_id?: string | null; category_id?: string | null };
@@ -180,19 +189,17 @@ export default async function DashboardPage() {
   }
   const fastMovers = [...fastMoverMap.values()].sort((a, b) => b.qty - a.qty).slice(0, 5);
 
-  // Reorder suggestions — use repNameMap instead of join
+  // Reorder suggestions — use the separately-fetched repAssignMap
   const reorderItems = items.filter((i) => {
-    const row = i as RawItem;
-    const par = Number(row.par_level ?? 0);
-    return par > 0 && i.current_stock < par && row.rep_id;
+    const par = Number((i as RawItem).par_level ?? 0);
+    return par > 0 && i.current_stock < par && repAssignMap.has(i.id);
   });
   const reorderByRep = new Map<string, { rep: { id: string; name: string }; items: typeof reorderItems }>();
   for (const item of reorderItems) {
-    const repId   = (item as RawItem).rep_id;
+    const repId   = repAssignMap.get(item.id);
     const repName = repId ? repNameMap.get(repId) : undefined;
     if (!repId || !repName) continue;
-    const rep = { id: repId, name: repName };
-    if (!reorderByRep.has(repId)) reorderByRep.set(repId, { rep, items: [] });
+    if (!reorderByRep.has(repId)) reorderByRep.set(repId, { rep: { id: repId, name: repName }, items: [] });
     reorderByRep.get(repId)!.items.push(item);
   }
   const reorderGroups = [...reorderByRep.values()];
