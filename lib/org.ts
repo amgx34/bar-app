@@ -38,6 +38,12 @@ export type BarSettings = {
   bar_city?:    string;
   bar_state?:   string;
   bar_phone?:   string;
+
+  // ── ACH / NACHA payroll ───────────────────────────────────────────────────
+  nacha_routing_number?: string;             // ODFI routing (bar's bank), 9 digits
+  nacha_company_ein?:    string;             // 9-digit EIN without dashes
+  nacha_bank_name?:      string;             // bar's bank name
+  nacha_company_name?:   string;             // company name shown on employee statements
 };
 
 export type OrgMembership = {

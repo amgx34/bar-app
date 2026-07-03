@@ -1,0 +1,467 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║              RAIL BAR MANAGEMENT — INSTALLER GUIDE                          ║
+║              2TouchPOS SQL Agent + POS Integration Setup                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+This guide covers everything needed to connect a bar's POS system to Rail.
+Follow only the section that matches the bar's POS system.
+
+  Section A — Prerequisites (ALL installs, do this first)
+  Section B — Clover POS
+  Section C — Toast POS
+  Section D — 2TouchPOS (SQL Agent)
+  Section E — Verify everything is working
+
+Estimated time per install:
+  Clover    →  15 minutes
+  Toast     →  10 minutes
+  2TouchPOS →  30-45 minutes (SQL setup takes longer)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION A — PREREQUISITES (do this before ANY POS setup)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  A1. Log into Vercel
+      ─────────────────
+      URL:  https://vercel.com
+      Navigate to the Rail project → Settings → Environment Variables
+
+  A2. Confirm these variables are set (they should already be there):
+      ──────────────────────────────────────────────────────────────────
+      NEXT_PUBLIC_SUPABASE_URL          (Supabase project URL)
+      NEXT_PUBLIC_SUPABASE_ANON_KEY     (Supabase anon key)
+      SUPABASE_SERVICE_ROLE_KEY         (Supabase service role key)
+      GROQ_API_KEY                      (AI parsing — needed for 2Touch email)
+      GMAIL_USER                        (railpossystems@gmail.com)
+      GMAIL_APP_PASSWORD                (ebhljbnzmbmcnyly)
+
+  A3. Log into Rail as the bar owner
+      ─────────────────────────────────
+      URL:  https://bar-app-drab.vercel.app/login
+      Once logged in, go to Settings → POS Integration
+      You will configure the POS connection from this page.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION B — CLOVER POS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Clover uses OAuth — the bar owner clicks a button and approves access.
+  No software needs to be installed on any local machine.
+
+  B1. Confirm environment variables are set in Vercel
+      ──────────────────────────────────────────────────
+      Check that these exist in Vercel → Settings → Environment Variables:
+
+        CLOVER_CLIENT_ID       3102ffdc-b7b7-dff8-cd34-36f1dba1afc0
+        CLOVER_REDIRECT_URI    https://bar-app-drab.vercel.app/api/clover/callback
+        CLOVER_SANDBOX         false
+
+      If any are missing, add them now and click Save, then
+      Deployments → Redeploy (to pick up new env vars).
+
+  B2. Register the redirect URI in the Clover Developer Dashboard
+      ─────────────────────────────────────────────────────────────
+      URL:  https://www.clover.com/developers
+      → Your Apps → select the app (ID: 3102ffdc-...)
+      → Edit → REST Configuration section
+      → Find "Site URL" or "OAuth Redirect URL"
+      → Enter exactly:
+            https://bar-app-drab.vercel.app/api/clover/callback
+      → Save
+
+  B3. Connect Clover in Rail
+      ──────────────────────────
+      In Rail → Settings → POS Integration → Clover section
+      → Click "Authorize with Clover"
+      → You are redirected to Clover's website
+      → Log in with the bar's Clover account
+      → Click "Allow"
+      → You are returned to Rail with "Clover connected" confirmation
+
+  B4. Sync data
+      ────────────
+      In Rail → Settings → POS Integration → Clover section:
+      → Click "Sync Inventory"  (imports Clover item catalog)
+      → Click "Sync Sales (7 days)"  (imports last 7 nights of sales)
+
+      Both buttons show a success toast when done.
+
+  ✓  Clover setup complete.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION C — TOAST POS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Toast uses API keys — no OAuth redirect. The bar generates credentials
+  from their own Toast Web account and enters them into Rail directly.
+
+  C1. Generate Toast API credentials
+      ────────────────────────────────
+      The bar owner needs to do this from their Toast account:
+
+      1. Go to  https://pos.toasttab.com  and log in
+      2. Navigate to:  Integrations → Toast API access → Manage credentials
+      3. Click:  Create new credentials → Standard API
+      4. Enter a name:  Rail
+      5. Select these scopes (permissions):
+           ☑  Orders
+           ☑  Labor
+           ☑  Menu
+      6. Select the location (the bar's location)
+      7. Click Confirm
+      8. Copy the three values shown:
+           Client ID       →  save this
+           Client Secret   →  save this (shown ONCE — copy it now)
+           Restaurant GUID →  save this
+
+      NOTE: The Client Secret is only shown once.
+      If it was missed, delete and recreate the credentials.
+
+  C2. Enter credentials in Rail
+      ───────────────────────────
+      In Rail → Settings → POS Integration → Toast section:
+      → Enter Client ID
+      → Enter Client Secret
+      → Enter Restaurant GUID
+      → Click "Connect Toast"
+
+      Rail will test the connection. If it succeeds you'll see
+      "Toast connected successfully!"
+
+      If it fails:
+        - Double check the credentials (no extra spaces)
+        - Confirm the bar has Toast Restaurant Management Suite Essentials
+          or higher (API access is not available on the base plan)
+
+  C3. Sync data
+      ────────────
+      In Rail → Settings → POS Integration → Toast section:
+      → Click "Sync Sales (7 days)"   →  imports last 7 nights to Dashboard
+      → Click "Sync Menu / Inventory" →  imports menu items to Inventory
+      → Click "Sync Shifts (7 days)"  →  imports employee hours to Payroll
+
+      OR in Rail → Payroll → Import tab, you will see a Toast Sync panel
+      with the same three sync buttons.
+
+  ✓  Toast setup complete.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION D — 2TOUCHPOS (SQL AGENT)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  2Touch has no cloud API. This installs a small background agent on the
+  POS Windows machine. It reads from the local SQL Server database every
+  5 minutes and sends data to Rail automatically.
+
+  You will need:
+    - Physical or remote access to the 2Touch Windows POS machine
+    - The 2Touch SQL file:  2touchpart1.sql  (creates the read-only login)
+    - The Rail agent files: copy of the 2touch-agent folder
+
+  ─────────────────────────────────────────────────────────────────────────
+  D1. Add the ingest secret to Vercel
+  ─────────────────────────────────────────────────────────────────────────
+
+      In Vercel → Settings → Environment Variables, add:
+
+        Key:    TWOTOUCH_INGEST_SECRET
+        Value:  (create any long random string, e.g. 32+ random characters)
+                Example: xK9mP2vL8nQ4rT7yW3bA6cE1dF5gH0jJ
+
+      Save it. You will need this exact value again in step D7.
+      Redeploy the project after adding new env vars.
+
+  ─────────────────────────────────────────────────────────────────────────
+  D2. On the 2Touch POS Windows machine — enable Mixed Authentication
+  ─────────────────────────────────────────────────────────────────────────
+
+      This is needed so the agent can log in with a username and password.
+      (2Touch itself uses Windows auth; we need to add SQL auth.)
+
+      1. Open SQL Server Management Studio (SSMS)
+      2. In Object Explorer, right-click the server name at the top
+      3. Click Properties
+      4. Click Security on the left panel
+      5. Under "Server authentication", select:
+            ● SQL Server and Windows Authentication mode
+      6. Click OK
+      7. SSMS shows a message saying restart is required — do step D3 now
+
+  ─────────────────────────────────────────────────────────────────────────
+  D3. Enable SQL Server Browser service
+  ─────────────────────────────────────────────────────────────────────────
+
+      The 2Touch SQL Server uses dynamic ports (not the standard 1433).
+      SQL Server Browser is a small Windows service that tells the agent
+      which port SQL Server is on. Without this, the agent cannot connect.
+
+      1. Open SQL Server Configuration Manager
+         (Start → search "Sql Server Configuration Manager")
+      2. In the left panel, click SQL Server Services
+      3. Find "SQL Server Browser" in the list
+      4. Right-click it → Properties
+      5. On the Service tab, set Start Mode to: Automatic
+      6. Click Apply, then click OK
+      7. Right-click SQL Server Browser again → Start
+
+      While you are here, also confirm TCP/IP is enabled:
+      4. In the left panel, click:
+            SQL Server Network Configuration
+            → Protocols for MSSQLSERVER  (or your instance name)
+      5. Right-click TCP/IP → Enable  (if not already Enabled)
+      6. Click OK
+
+  ─────────────────────────────────────────────────────────────────────────
+  D4. Restart SQL Server
+  ─────────────────────────────────────────────────────────────────────────
+
+      In SQL Server Configuration Manager:
+      → Left panel → SQL Server Services
+      → Right-click SQL Server (MSSQLSERVER) → Restart
+
+      Wait for the status to return to "Running" before continuing.
+
+  ─────────────────────────────────────────────────────────────────────────
+  D5. Create the read-only login (run 2touchpart1.sql)
+  ─────────────────────────────────────────────────────────────────────────
+
+      In SSMS, open a new Query window and run the contents of
+      2touchpart1.sql (the SQL you already have).
+
+      It creates a login called BarAppRead with read-only access.
+      You should see "Commands completed successfully."
+
+      Verify it worked:
+        USE TwoTouch;
+        SELECT name FROM sys.database_principals
+        WHERE name = 'BarAppRead';
+        -- Should return 1 row
+
+  ─────────────────────────────────────────────────────────────────────────
+  D6. Install Node.js on the POS machine
+  ─────────────────────────────────────────────────────────────────────────
+
+      1. Open a browser on the POS machine
+      2. Go to:  https://nodejs.org
+      3. Download the LTS version (Windows Installer .msi)
+      4. Run the installer — click Next through all defaults
+      5. When finished, open Command Prompt and type:
+              node --version
+         It should print something like v20.x.x
+         If it does, Node.js is installed correctly.
+
+  ─────────────────────────────────────────────────────────────────────────
+  D7. Copy and configure the Rail agent
+  ─────────────────────────────────────────────────────────────────────────
+
+      1. Copy the 2touch-agent folder to the POS machine
+         Suggested location:  C:\rail-agent\
+
+      2. Open Command Prompt and run:
+              cd C:\rail-agent
+              npm install
+         Wait for it to finish (downloads the mssql library).
+
+      3. Copy the config template:
+              copy config.json config.local.json
+
+      4. Open config.local.json in Notepad:
+              notepad config.local.json
+
+      5. Find your SQL Server instance name.
+         In SSMS, run this query:
+              SELECT @@SERVICENAME
+         The result is your instance name.
+         Common values:  MSSQLSERVER  or  SQLEXPRESS  or  TwoTouch
+
+      6. Update these fields in config.local.json:
+
+            "server"       change to your computer name or leave as "localhost"
+            "password"     change to the password you used in 2touchpart1.sql
+            "instanceName" change to the result from the query above
+
+            "authToken"    paste the TWOTOUCH_INGEST_SECRET from Vercel (step D1)
+
+         Leave the table names as-is for now (you will fix them in step D8).
+
+      7. Save and close Notepad.
+
+  ─────────────────────────────────────────────────────────────────────────
+  D8. Find the correct 2Touch table names
+  ─────────────────────────────────────────────────────────────────────────
+
+      The exact table/view names depend on which version of 2Touch is
+      installed. You need to find them before the agent can query correctly.
+
+      In SSMS, connect to TwoTouch and run this query:
+
+        USE TwoTouch;
+        SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_NAME LIKE '%Z%'
+           OR TABLE_NAME LIKE '%Report%'
+           OR TABLE_NAME LIKE '%Daily%'
+           OR TABLE_NAME LIKE '%Sales%'
+           OR TABLE_NAME LIKE '%Server%'
+           OR TABLE_NAME LIKE '%Employee%'
+           OR TABLE_NAME LIKE '%Item%'
+           OR TABLE_NAME LIKE '%Audit%'
+        ORDER BY TABLE_NAME;
+
+      Look through the results and identify:
+        a) The Z Report table  (daily sales totals)
+        b) The EW Report table (employee/server sales and hours)
+        c) The Item Audit table (items sold per day)
+
+      For each table you find, run:
+        SELECT TOP 3 * FROM [TableNameHere]
+      to see the columns and verify it contains the right data.
+
+      Update config.local.json:
+        "tables": {
+          "zReport":   "the table name you found for Z reports",
+          "ewReport":  "the table name for employee/server reports",
+          "itemAudit": "the table name for item/product audit"
+        }
+
+      Also update the "columns" section if the column names differ
+      from the defaults (BusinessDate, NetSales, CreditCardTips, etc.).
+      Run  SELECT TOP 1 * FROM [TableName]  to see exact column names.
+
+  ─────────────────────────────────────────────────────────────────────────
+  D9. Test the connection
+  ─────────────────────────────────────────────────────────────────────────
+
+      In Command Prompt on the POS machine:
+
+        cd C:\rail-agent
+        node test-connection.js --password "YourStrongP@ss123!"
+
+      The script tries every possible connection method and prints
+      which one works. Example successful output:
+
+        [localhost + Browser (default instance)] ... ✓
+          SERVER: POSPC\MSSQLSERVER  INSTANCE: MSSQLSERVER  ACTUAL PORT: 49712
+
+        ✅ SUCCESS — use this in config.local.json:
+        { "server": "localhost", "options": { "instanceName": "MSSQLSERVER" ... } }
+
+      Copy the printed config block into config.local.json.
+
+      If nothing connects:
+        - Confirm step D3 (SQL Browser is running and set to Automatic)
+        - Confirm step D4 (SQL Server was restarted after enabling Browser)
+        - Try running the test again
+
+  ─────────────────────────────────────────────────────────────────────────
+  D10. Test the full agent (SQL + Rail API)
+  ─────────────────────────────────────────────────────────────────────────
+
+      First, test SQL queries without sending to Rail:
+        node agent.js --test
+
+      You should see the number of rows found and a sample record.
+      If the Z Reports shows 0 rows, the table name in config may be wrong.
+      Go back to step D8 and check the table names.
+
+      Once --test works, run a real sync:
+        node agent.js
+
+      Then log into Rail at  https://bar-app-drab.vercel.app
+      Go to Dashboard — you should see sales data appearing.
+
+  ─────────────────────────────────────────────────────────────────────────
+  D11. Configure the Rail app to use 2TouchPOS
+  ─────────────────────────────────────────────────────────────────────────
+
+      In Rail → Settings → POS Integration → 2TouchPOS section:
+      → In the "2Touch Report Sender Email" field, enter the email address
+        that 2Touch sends reports from (for email backup — optional).
+      → Click Activate.
+
+      The bar's POS is now shown as "2TouchPOS — Active" in Rail.
+
+  ─────────────────────────────────────────────────────────────────────────
+  D12. Schedule the agent to run every 5 minutes
+  ─────────────────────────────────────────────────────────────────────────
+
+      Open Command Prompt AS ADMINISTRATOR (right-click → Run as administrator)
+      and run this single command:
+
+        schtasks /create /tn "Rail 2Touch Sync" /tr "node C:\rail-agent\agent.js" /sc MINUTE /mo 5 /ru SYSTEM /rl HIGHEST /f
+
+      Verify it was created:
+        schtasks /query /tn "Rail 2Touch Sync" /fo LIST
+
+      Run it immediately to confirm it works:
+        schtasks /run /tn "Rail 2Touch Sync"
+
+      Wait 30 seconds, then check Rail Dashboard for new data.
+
+      To enable logging to a file (recommended):
+        schtasks /change /tn "Rail 2Touch Sync" /tr "cmd /c node C:\rail-agent\agent.js >> C:\rail-agent\sync.log 2>&1"
+
+      You can then view the log at  C:\rail-agent\sync.log
+
+  ✓  2TouchPOS setup complete.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION E — VERIFY EVERYTHING IS WORKING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  After completing the POS setup, confirm these work in Rail:
+
+  E1. Dashboard
+      ──────────
+      URL:  https://bar-app-drab.vercel.app/app/dashboard
+      ✓ Inventory Value shows a dollar amount (not $0)
+      ✓ Last Night shows a sales figure
+      ✓ Revenue Trend chart has bars
+
+  E2. Inventory
+      ──────────
+      URL:  https://bar-app-drab.vercel.app/app/inventory
+      ✓ Items are listed with names and categories
+      ✓ Items show cost_price and par_level values
+        (if empty, the bar needs to fill these in manually)
+
+  E3. Payroll → Import
+      ─────────────────
+      URL:  https://bar-app-drab.vercel.app/app/payroll?tab=import
+      ✓ For Toast: "Toast POS Sync" card appears at the top
+      ✓ For 2Touch: agent log shows successful syncs
+
+  E4. POS Connection badge
+      ──────────────────────
+      In the top navigation bar of Rail, you should see a green
+      pulsing dot with the POS name (Clover / Toast) when connected.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUPPORT CONTACTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Rail support email:     railsystemspos@gmail.com
+
+  Clover developer:       developer.support@toasttab.com
+  Toast API support:      https://developers.toasttab.com
+  2Touch support:         techsupport@2touchpos.com  |  888-756-7994 ext 2
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+QUICK REFERENCE — WHAT EACH POS SYNCS TO RAIL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ┌─────────────────────┬──────────────┬──────────────┬────────────────────┐
+  │ Data                │ Clover       │ Toast        │ 2TouchPOS          │
+  ├─────────────────────┼──────────────┼──────────────┼────────────────────┤
+  │ Daily sales + tips  │ Manual sync  │ Manual sync  │ Auto every 5 min   │
+  │ Inventory items     │ Manual sync  │ Manual sync  │ Auto every 5 min   │
+  │ Employee shifts     │ —            │ Manual sync  │ Auto every 5 min   │
+  │ Per-server tips     │ —            │ —            │ Auto every 5 min   │
+  │ Item audit by day   │ —            │ —            │ Auto every 5 min   │
+  └─────────────────────┴──────────────┴──────────────┴────────────────────┘
+
+  "Manual sync" = click the sync button in Rail → Settings → POS Integration
+  "Auto" = runs on schedule, no action needed after initial setup
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+END OF INSTALLER GUIDE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

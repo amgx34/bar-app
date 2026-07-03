@@ -9,16 +9,28 @@ import {
   generateOTP, generateSalt, hashOTP, maskAccount,
   validateRoutingNumber, verifyOTP,
 } from '@/lib/direct-deposit/crypto';
-import { maskPhone, sendConfirmationSms, sendOTPSms } from '@/lib/direct-deposit/sms';
+import {
+  maskPhone, maskEmail,
+  sendConfirmationSms, sendOTPSms,
+  sendConfirmationEmail, sendOTPEmail,
+} from '@/lib/direct-deposit/sms';
 
 const OTP_TTL_MS        = 10 * 60 * 1000;
 const MAX_ATTEMPTS      = 3;
 const MAX_CODES_PER_HOUR = 5;
 
+// IMPORTANT — Rail does not originate, process, or initiate ACH transactions.
+// Rail is a secure data management tool only. The bar owner is responsible for
+// providing this information to their licensed payroll provider (bank, Gusto,
+// ADP, Paychex, etc.) who will initiate the actual direct deposit payments.
+// Rail makes no guarantees regarding payment processing or fund transfers.
+
 const CONSENT_TEXT =
-  'I authorize my employer to initiate ACH credit entries to the bank account I have provided ' +
-  'and to adjust for any credits made in error. This authorization remains in effect until ' +
-  'I notify my employer in writing to cancel it.';
+  'I authorize my employer to record and securely store my banking information ' +
+  'in Rail for use with their designated payroll provider. I understand that ' +
+  'Rail does not process, initiate, or guarantee any direct deposit payments — ' +
+  'actual payment processing is handled by my employer\'s bank or payroll service. ' +
+  'I may request removal of this information at any time by notifying my employer.';
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -70,7 +82,7 @@ export async function getAllDirectDepositAccounts(): Promise<Record<string, DDAc
 export async function initiateDirectDeposit(
   employeeId: string,
   input: AccountInput,
-): Promise<{ verificationId: string; phoneLast4: string; expiresInSec: number }> {
+): Promise<{ verificationId: string; channel: 'sms' | 'email'; hint: string; expiresInSec: number }> {
   const { org } = await getCurrentOrg();
 
   // Validate bank details
@@ -85,10 +97,24 @@ export async function initiateDirectDeposit(
   if (input.depositType === 'fixed_amount' && (!input.depositValue || input.depositValue < 1))
     throw new Error('Fixed amount must be at least $0.01.');
 
-  // Require a phone number for SMS 2FA
   const settings = (org.bar_settings ?? {}) as Record<string, unknown>;
-  const phone = settings.admin_phone as string | undefined;
-  if (!phone) throw new Error('NO_PHONE');
+  const phone    = settings.admin_phone as string | undefined;
+
+  // Resolve delivery channel: SMS if phone configured, email fallback otherwise
+  let channel: 'sms' | 'email' = 'sms';
+  let deliveryAddress = '';
+
+  if (phone) {
+    channel         = 'sms';
+    deliveryAddress = phone;
+  } else {
+    // Fall back to the bar owner's login email
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.email) throw new Error('No phone number configured and no email address found. Add a phone number in Settings to enable 2FA.');
+    channel         = 'email';
+    deliveryAddress = user.email;
+  }
 
   const admin = createAdminClient();
 
@@ -117,6 +143,11 @@ export async function initiateDirectDeposit(
   const codeHash        = hashOTP(rawCode, salt);
   const intentEncrypted = encryptJSON({ input, employeeId, action: 'add' });
 
+  // phone_last4 column stores a 4-char hint regardless of channel
+  const hint4 = channel === 'sms'
+    ? maskPhone(deliveryAddress)                          // last 4 digits
+    : deliveryAddress.slice(0, 4).padEnd(4, '*');        // first 4 chars of email
+
   const { data: record, error } = await admin
     .from('dd_verification_codes')
     .insert({
@@ -126,7 +157,7 @@ export async function initiateDirectDeposit(
       code_salt:        salt,
       action:           'add',
       intent_encrypted: intentEncrypted,
-      phone_last4:      maskPhone(phone),
+      phone_last4:      hint4,
       expires_at:       new Date(Date.now() + OTP_TTL_MS).toISOString(),
     })
     .select('id')
@@ -134,17 +165,22 @@ export async function initiateDirectDeposit(
 
   if (error || !record) throw new Error('Failed to create verification session.');
 
-  // Send SMS — if this throws the caller shows an error and the record is abandoned
-  await sendOTPSms(phone, rawCode);
+  // Send OTP via the resolved channel
+  if (channel === 'sms') {
+    await sendOTPSms(deliveryAddress, rawCode);
+  } else {
+    await sendOTPEmail(deliveryAddress, rawCode);
+  }
 
   await admin.from('dd_audit_log').insert({
     organization_id: org.id,
     employee_id:     employeeId,
     action:          'OTP_ISSUED',
-    after_state:     { phone_last4: maskPhone(phone), action: 'add' },
+    after_state:     { channel, hint: hint4, action: 'add' },
   });
 
-  return { verificationId: record.id, phoneLast4: maskPhone(phone), expiresInSec: OTP_TTL_MS / 1000 };
+  const hint = channel === 'sms' ? maskPhone(deliveryAddress) : maskEmail(deliveryAddress);
+  return { verificationId: record.id, channel, hint, expiresInSec: OTP_TTL_MS / 1000 };
 }
 
 // ── Step 2: verify + commit ───────────────────────────────────────────────────
@@ -213,6 +249,8 @@ export async function verifyAndCommit(
       deposit_type:      input.depositType,
       deposit_value:     input.depositValue ?? null,
       priority:          input.priority ?? 1,
+      // 'prenote_sent_at' column name preserved for DB compatibility, but this
+      // records ENROLLMENT date only — Rail does not send actual bank prenotes.
       prenote_sent_at:   new Date().toISOString(),
       consent_text:      CONSENT_TEXT,
     })
@@ -229,9 +267,15 @@ export async function verifyAndCommit(
     code_id:         verificationId,
   });
 
-  // Non-critical confirmation SMS
+  // Non-critical confirmation — SMS if phone set, email otherwise
   const phone = ((org.bar_settings ?? {}) as Record<string, unknown>).admin_phone as string | undefined;
-  if (phone) sendConfirmationSms(phone, 'add', maskAccount(input.accountNumber));
+  if (phone) {
+    sendConfirmationSms(phone, 'add', maskAccount(input.accountNumber));
+  } else {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.email) sendConfirmationEmail(user.email, 'add', maskAccount(input.accountNumber));
+  }
 
   revalidatePath('/app/payroll');
   return account as DDAccount;
@@ -242,11 +286,25 @@ export async function verifyAndCommit(
 export async function initiateDeleteAccount(
   employeeId: string,
   accountId: string,
-): Promise<{ verificationId: string; phoneLast4: string }> {
+): Promise<{ verificationId: string; channel: 'sms' | 'email'; hint: string }> {
   const { org } = await getCurrentOrg();
   const settings = (org.bar_settings ?? {}) as Record<string, unknown>;
-  const phone = settings.admin_phone as string | undefined;
-  if (!phone) throw new Error('NO_PHONE');
+  const phone    = settings.admin_phone as string | undefined;
+
+  // Resolve delivery channel
+  let channel: 'sms' | 'email' = 'sms';
+  let deliveryAddress = '';
+
+  if (phone) {
+    channel         = 'sms';
+    deliveryAddress = phone;
+  } else {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.email) throw new Error('No phone number configured and no email found. Add a phone number in Settings.');
+    channel         = 'email';
+    deliveryAddress = user.email;
+  }
 
   const admin = createAdminClient();
 
@@ -265,6 +323,9 @@ export async function initiateDeleteAccount(
 
   const rawCode = generateOTP();
   const salt    = generateSalt();
+  const hint4   = channel === 'sms'
+    ? maskPhone(deliveryAddress)
+    : deliveryAddress.slice(0, 4).padEnd(4, '*');
 
   const { data: rec } = await admin.from('dd_verification_codes').insert({
     organization_id:  org.id,
@@ -273,13 +334,20 @@ export async function initiateDeleteAccount(
     code_salt:        salt,
     action:           'delete',
     intent_encrypted: encryptJSON({ accountId, employeeId, action: 'delete', account_last4: acct.account_last4 }),
-    phone_last4:      maskPhone(phone),
+    phone_last4:      hint4,
     expires_at:       new Date(Date.now() + OTP_TTL_MS).toISOString(),
   }).select('id').single();
 
   if (!rec) throw new Error('Failed to create verification session.');
-  await sendOTPSms(phone, rawCode);
-  return { verificationId: rec.id, phoneLast4: maskPhone(phone) };
+
+  if (channel === 'sms') {
+    await sendOTPSms(deliveryAddress, rawCode);
+  } else {
+    await sendOTPEmail(deliveryAddress, rawCode);
+  }
+
+  const hint = channel === 'sms' ? maskPhone(deliveryAddress) : maskEmail(deliveryAddress);
+  return { verificationId: rec.id, channel, hint };
 }
 
 export async function verifyAndDelete(
@@ -321,6 +389,58 @@ export async function verifyAndDelete(
   if (phone) sendConfirmationSms(phone, 'delete', account_last4);
 
   revalidatePath('/app/payroll');
+}
+
+// ── Export for payroll provider ───────────────────────────────────────────────
+// Generates a CSV the bar owner can hand to their bank or payroll processor.
+// Routing and account numbers are decrypted for this purpose only and are
+// never logged or persisted outside this function call.
+
+export async function exportBankingInfoCsv(): Promise<string> {
+  const { org, role } = await getCurrentOrg();
+  if (role !== 'owner') throw new Error('Only the account owner can export banking information.');
+
+  const admin = createAdminClient();
+
+  const { data: accounts } = await admin
+    .from('direct_deposit_accounts')
+    .select('employee_id, routing_encrypted, account_encrypted, account_last4, bank_name, account_type, deposit_type, deposit_value, priority')
+    .eq('organization_id', org.id)
+    .eq('is_active', true)
+    .order('employee_id')
+    .order('priority');
+
+  if (!accounts?.length) return '';
+
+  const { data: employees } = await admin
+    .from('employees')
+    .select('id, name')
+    .eq('organization_id', org.id);
+
+  const empNameById = new Map((employees ?? []).map(e => [e.id, e.name]));
+
+  const rows = [
+    ['Employee Name', 'Routing Number', 'Account Number', 'Bank Name', 'Account Type', 'Deposit Type', 'Deposit Value', 'Priority'],
+    ...(accounts.map(a => [
+      empNameById.get(a.employee_id) ?? a.employee_id,
+      decrypt(a.routing_encrypted),
+      decrypt(a.account_encrypted),
+      a.bank_name,
+      a.account_type,
+      a.deposit_type,
+      a.deposit_value?.toString() ?? '',
+      a.priority.toString(),
+    ])),
+  ];
+
+  await admin.from('dd_audit_log').insert({
+    organization_id: org.id,
+    employee_id:     org.id, // org-level action
+    action:          'BANKING_INFO_EXPORTED',
+    after_state:     { record_count: accounts.length, exported_by_role: role },
+  });
+
+  return rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
 }
 
 // ── Phone management ──────────────────────────────────────────────────────────

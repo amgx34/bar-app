@@ -14,7 +14,7 @@ import {
 export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get('next') ?? '/app/inventory';
+  const next = params.get('next') ?? '/app/dashboard';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

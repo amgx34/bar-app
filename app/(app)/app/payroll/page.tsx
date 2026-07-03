@@ -3,7 +3,6 @@ import { computePayroll, Employee } from './actions';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
 import PayrollTab from './_components/payroll-tab';
-import ImportTab from './_components/import-tab';
 import EmployeesTab from './_components/employees-tab';
 import DaySplitTab from './_components/day-split-tab';
 import DirectDepositTab from './_components/direct-deposit-tab';
@@ -71,41 +70,30 @@ export default async function PayrollPage({
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Payroll</h1>
-        <p className="text-muted-foreground">
-          Manage payroll, import reports, and configure employees
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Payroll</h1>
+          <p className="text-muted-foreground">Calculate wages, tips, and manage staff pay</p>
+        </div>
+        {/* Run Payroll — prominent CTA, links to the review page */}
+        <a
+          href={`/app/payroll/review?startDate=${startDate}&endDate=${endDate}`}
+          className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          Run Payroll
+        </a>
       </div>
 
       {/* Tab Navigation */}
       <div className="border-b">
         <div className="flex gap-8">
-          <TabLink
-            href="/app/payroll?tab=payroll"
-            active={tab === 'payroll'}
-            label="Payroll"
-          />
-          <TabLink
-            href="/app/payroll?tab=import"
-            active={tab === 'import'}
-            label="Import"
-          />
-          <TabLink
-            href="/app/payroll?tab=employees"
-            active={tab === 'employees'}
-            label="Employees"
-          />
-          <TabLink
-            href="/app/payroll?tab=split"
-            active={tab === 'split'}
-            label="Day Split"
-          />
-          <TabLink
-            href="/app/payroll?tab=direct-deposit"
-            active={tab === 'direct-deposit'}
-            label="Direct Deposit"
-          />
+          <TabLink href="/app/payroll?tab=payroll"         active={tab === 'payroll'}         label="Payroll" />
+          <TabLink href="/app/payroll?tab=employees"       active={tab === 'employees'}       label="Employees" />
+          <TabLink href="/app/payroll?tab=split"           active={tab === 'split'}           label="Day Split" />
+          <TabLink href="/app/payroll?tab=direct-deposit"  active={tab === 'direct-deposit'}  label="Direct Deposit" />
         </div>
       </div>
 
@@ -120,12 +108,6 @@ export default async function PayrollPage({
               employees={employees || []}
               weeklyTrend={weeklyTrend}
             />
-          </Suspense>
-        )}
-
-        {tab === 'import' && (
-          <Suspense fallback={<div>Loading import...</div>}>
-            <ImportTab />
           </Suspense>
         )}
 

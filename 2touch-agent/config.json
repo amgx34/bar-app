@@ -1,0 +1,43 @@
+{
+  "_comment": "Copy this file to config.local.json and fill in your values.",
+  "_note": "config.local.json is gitignored — never commit real credentials.",
+
+  "sql": {
+    "server":   "localhost",
+    "database": "TwoTouch",
+    "user":     "BarAppRead",
+    "password": "YourStrongP@ss123!",
+    "_port_note": "NO port field — dynamic ports are resolved via SQL Server Browser (instanceName below)",
+    "options": {
+      "instanceName":           "MSSQLSERVER",
+      "trustServerCertificate": true,
+      "encrypt":                false,
+      "connectTimeout":         15000
+    }
+  },
+
+  "rail": {
+    "apiUrl":    "https://bar-app-drab.vercel.app/api/2touch/ingest",
+    "_token_note": "Copy org_id and agentToken from Rail → Settings → POS Integration → 2TouchPOS",
+    "orgId":     "REPLACE_WITH_ORG_ID_FROM_RAIL_SETTINGS",
+    "authToken": "REPLACE_WITH_AGENT_TOKEN_FROM_RAIL_SETTINGS"
+  },
+
+  "tables": {
+    "_comment": "Update after running discover-schema.sql in SSMS",
+    "zReport":   "vwZReport",
+    "ewReport":  "vwServerSales",
+    "itemAudit": "vwItemAudit"
+  },
+
+  "columns": {
+    "zReport":   { "date": "BusinessDate", "sales": "NetSales",   "ccTips": "CreditCardTips", "cashTips": "CashTips"   },
+    "ewReport":  { "date": "WorkDate", "employeeName": "EmployeeName", "totalSales": "TotalSales", "tipsPaidOut": "TipsPaidOut", "regularHours": "RegularHours", "overtimeHours": "OvertimeHours" },
+    "itemAudit": { "date": "SaleDate", "itemName": "ItemName", "category": "CategoryName", "qtySold": "QuantitySold", "netSales": "NetSales" }
+  },
+
+  "sync": {
+    "lookbackDays":      2,
+    "intervalMinutes":   5
+  }
+}

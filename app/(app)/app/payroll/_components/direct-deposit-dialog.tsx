@@ -48,7 +48,8 @@ export function DirectDepositDialog({
   const [step, setStep] = useState<Step>('form');
   const [loading, setLoading] = useState(false);
   const [verificationId, setVerificationId] = useState('');
-  const [phoneLast4, setPhoneLast4] = useState('');
+  const [channel,  setChannel]  = useState<'sms' | 'email'>('sms');
+  const [hint,     setHint]     = useState('');
   const [showAccount, setShowAccount] = useState(false);
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -87,7 +88,8 @@ export function DirectDepositDialog({
       if (mode === 'delete' && existingAccount) {
         const res = await initiateDeleteAccount(employeeId, existingAccount.id);
         setVerificationId(res.verificationId);
-        setPhoneLast4(res.phoneLast4);
+        setChannel(res.channel);
+        setHint(res.hint);
         setStep('otp');
       } else {
         const res = await initiateDirectDeposit(employeeId, {
@@ -100,7 +102,8 @@ export function DirectDepositDialog({
           priority: 1,
         });
         setVerificationId(res.verificationId);
-        setPhoneLast4(res.phoneLast4);
+        setChannel(res.channel);
+        setHint(res.hint);
         setStep('otp');
       }
     } catch (err) {
@@ -292,7 +295,10 @@ export function DirectDepositDialog({
               <div>
                 <p className="text-sm font-medium">Check your phone</p>
                 <p className="text-xs text-muted-foreground">
-                  A 6-digit code was sent to the number ending in <strong>••••{phoneLast4}</strong>. Expires in 10 minutes.
+                  {channel === 'sms'
+                    ? <>A 6-digit code was sent via <strong>SMS</strong> to the number ending in <strong>••••{hint}</strong>.</>
+                    : <>A 6-digit code was sent to <strong>{hint}</strong> via email. Check your inbox.</>
+                  }{' '}Expires in 10 minutes.
                 </p>
               </div>
             </div>

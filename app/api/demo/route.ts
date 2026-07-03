@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
     }
 
     // ── 4. Redirect into the app ──────────────────────────────────────────────
-    return NextResponse.redirect(`${origin}/app/inventory?demo=1`);
+    return NextResponse.redirect(`${origin}/app/dashboard`);
 
   } catch (err) {
     console.error('Demo creation error:', err);

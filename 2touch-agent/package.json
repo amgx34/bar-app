@@ -1,0 +1,13 @@
+{
+  "name": "rail-2touch-agent",
+  "version": "1.0.0",
+  "description": "Pulls 2TouchPOS SQL data and syncs to Rail every 5 minutes",
+  "main": "agent.js",
+  "scripts": {
+    "start": "node agent.js",
+    "test-connection": "node agent.js --test"
+  },
+  "dependencies": {
+    "mssql": "^11.0.1"
+  }
+}

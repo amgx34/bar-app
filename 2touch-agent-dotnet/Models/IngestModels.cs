@@ -1,0 +1,35 @@
+namespace RailAgent.Models;
+
+// Property names are snake_case ON PURPOSE — they are serialized verbatim and
+// must match the JSON contract that POST /api/2touch/ingest expects.
+
+public sealed record ZReportRow(
+    string report_date,
+    decimal total_sales,
+    decimal cc_tips,
+    decimal cash_tips);
+
+public sealed record EwReportRow(
+    string shift_date,
+    string employee_name,
+    decimal total_sales,
+    decimal tips_paid_out,
+    decimal regular_hours,
+    decimal overtime_hours);
+
+public sealed record ItemAuditRow(
+    string sale_date,
+    string item_name,
+    string category_name,
+    decimal qty_sold,
+    decimal net_sales);
+
+public sealed record IngestPayload(
+    string org_id,
+    string source,
+    string pulledAt,
+    IReadOnlyList<ZReportRow> zReports,
+    IReadOnlyList<EwReportRow> ewReports,
+    IReadOnlyList<ItemAuditRow> itemAudit);
+
+public sealed record SyncResult(bool Ok, int ZReports, int EwReports, int ItemAudit, string? Error = null);

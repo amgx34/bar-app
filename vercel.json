@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/2touch",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

@@ -6,7 +6,7 @@ import {
   CheckCircle, ShoppingCart, Activity, RefreshCw,
   Clock, Scale,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentOrg } from '@/lib/org';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -53,7 +53,10 @@ const REASON_LABEL: Record<string, string> = {
 
 export default async function DashboardPage() {
   const { org } = await getCurrentOrg();
-  const supabase = await createClient();
+  // Use admin client — same pattern as the inventory page — to bypass RLS
+  // policies that may reference the old `organization_members` table name.
+  // org is already validated by getCurrentOrg() above.
+  const supabase = createAdminClient();
   const orgId = org.id;
 
   // 30-day window for usage (seed logs all have created_at = seed time, not per-day)

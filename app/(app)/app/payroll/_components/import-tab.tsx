@@ -1,22 +1,124 @@
 'use client';
 
+import { useState, useTransition } from 'react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import EmployeeShiftsUpload from './employee-shifts-upload';
 import ZReportTextUpload from './z-report-text-upload';
 import CSVUpload from './csv-upload';
-import { FileSpreadsheet, BarChart2, FileText } from 'lucide-react';
+import { FileSpreadsheet, BarChart2, FileText, Flame, RefreshCw, Users, Package, Settings } from 'lucide-react';
+import Link from 'next/link';
+import { syncToastSales, syncToastInventory, syncToastShifts } from '../../settings/actions';
 
-export default function ImportTab() {
+interface ImportTabProps {
+  posProvider?: 'clover' | 'toast' | '2touch' | null;
+}
+
+function ToastSyncPanel() {
+  const [, startTransition]  = useTransition();
+  const [syncingSales,   setSyncingSales]   = useState(false);
+  const [syncingInv,     setSyncingInv]     = useState(false);
+  const [syncingShifts,  setSyncingShifts]  = useState(false);
+
+  async function run<T>(
+    setter: (v: boolean) => void,
+    action: () => Promise<T>,
+    onSuccess: (r: T) => string,
+  ) {
+    setter(true);
+    try {
+      const r = await action();
+      toast.success(onSuccess(r));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Sync failed');
+    } finally {
+      setter(false);
+    }
+  }
+
+  return (
+    <Card className="border-orange-500/30 bg-orange-500/5 md:col-span-2 lg:col-span-3">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500/15">
+              <Flame className="h-4 w-4 text-orange-400" />
+            </div>
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                Toast POS Sync
+                <Badge className="bg-orange-500/15 text-orange-400 border-orange-400/30 text-[10px]">Connected</Badge>
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Pull live data directly from your Toast account
+              </CardDescription>
+            </div>
+          </div>
+          <Link href="/app/settings?tab=pos" className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1">
+            <Settings className="h-3 w-3" /> Manage connection
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid sm:grid-cols-3 gap-3">
+          <button
+            disabled={syncingSales || syncingInv || syncingShifts}
+            onClick={() => run(setSyncingSales, () => syncToastSales(14), (r) => `${(r as {upserted:number}).upserted} days of sales synced`)}
+            className="flex flex-col items-start gap-2 rounded-lg border bg-card p-3 text-left hover:bg-muted/50 transition-colors disabled:opacity-50"
+          >
+            <div className="flex items-center gap-2 w-full">
+              <RefreshCw className={`h-4 w-4 text-orange-400 ${syncingSales ? 'animate-spin' : ''}`} />
+              <span className="text-sm font-medium">{syncingSales ? 'Syncing…' : 'Sync Sales'}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Last 14 nights of orders → Dashboard &amp; Books</p>
+          </button>
+
+          <button
+            disabled={syncingSales || syncingInv || syncingShifts}
+            onClick={() => run(setSyncingInv, () => syncToastInventory(), (r) => { const res = r as {created:number;updated:number}; return `${res.created} created, ${res.updated} updated`; })}
+            className="flex flex-col items-start gap-2 rounded-lg border bg-card p-3 text-left hover:bg-muted/50 transition-colors disabled:opacity-50"
+          >
+            <div className="flex items-center gap-2 w-full">
+              <Package className={`h-4 w-4 text-orange-400 ${syncingInv ? 'animate-spin' : ''}`} />
+              <span className="text-sm font-medium">{syncingInv ? 'Syncing…' : 'Sync Menu'}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Import Toast menu items → Inventory</p>
+          </button>
+
+          <button
+            disabled={syncingSales || syncingInv || syncingShifts}
+            onClick={() => run(setSyncingShifts, () => syncToastShifts(14), (r) => { const res = r as {upserted:number;newEmployees:number}; return `${res.upserted} shifts, ${res.newEmployees} new employees`; })}
+            className="flex flex-col items-start gap-2 rounded-lg border bg-card p-3 text-left hover:bg-muted/50 transition-colors disabled:opacity-50"
+          >
+            <div className="flex items-center gap-2 w-full">
+              <Users className={`h-4 w-4 text-orange-400 ${syncingShifts ? 'animate-spin' : ''}`} />
+              <span className="text-sm font-medium">{syncingShifts ? 'Syncing…' : 'Sync Shifts'}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Last 14 days of labor → Payroll</p>
+          </button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function ImportTab({ posProvider }: ImportTabProps) {
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold">Import Data</h2>
         <p className="text-sm text-muted-foreground">
-          Upload your POS exports. New employees are created automatically.
+          {posProvider === 'toast'
+            ? 'Sync live data from Toast, or manually upload POS exports below.'
+            : 'Upload your POS exports. New employees are created automatically.'}
         </p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Toast live sync — shown only when connected */}
+        {posProvider === 'toast' && <ToastSyncPanel />}
         {/* Employee shifts — auto-detects CSV or text report */}
         <Card>
           <CardHeader className="pb-3">

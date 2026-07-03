@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { saveAdminPhone } from '../direct-deposit-actions';
+import { saveAdminPhone, exportBankingInfoCsv } from '../direct-deposit-actions';
 import { DirectDepositDialog } from './direct-deposit-dialog';
 import type { DDAccount } from '../direct-deposit-actions';
 import type { Employee } from '../actions';
@@ -33,7 +33,8 @@ export default function DirectDepositTab({ employees, accountsByEmployee, adminP
   const [targetAccount, setTargetAcct] = useState<DDAccount | null>(null);
 
   // Local account cache so UI updates without full page reload
-  const [accounts, setAccounts] = useState(accountsByEmployee);
+  const [accounts,     setAccounts]     = useState(accountsByEmployee);
+  const [exporting,    setExporting]    = useState(false);
 
   const EXCLUDED = new Set(['front door']);
   const eligibleEmployees = employees.filter(e => !EXCLUDED.has(e.name.toLowerCase()));
@@ -85,14 +86,54 @@ export default function DirectDepositTab({ employees, accountsByEmployee, adminP
     setDialogOpen(false);
   }
 
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const csv = await exportBankingInfoCsv();
+      if (!csv) { toast.error('No banking records to export.'); return; }
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url;
+      a.download = `banking-info-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Banking info exported — provide this file to your payroll provider.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
+
+      {/* ── Liability disclaimer — must be the first thing the user sees ── */}
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-5 py-4 space-y-2">
+        <p className="text-sm font-semibold text-amber-700 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Important — Rail does not process payroll payments
+        </p>
+        <p className="text-xs text-amber-700/80 leading-relaxed">
+          This tool <strong>securely stores</strong> employee banking information only. Rail is not a
+          payroll processor, payment processor, or financial institution. Rail does not initiate,
+          originate, or guarantee any ACH direct deposit transactions.
+        </p>
+        <p className="text-xs text-amber-700/80 leading-relaxed">
+          To pay employees via direct deposit, you must provide this information to your{' '}
+          <strong>bank, payroll provider (Gusto, ADP, Paychex, etc.), or accountant</strong> who
+          is licensed to originate ACH transactions. Use the <em>Export for Payroll Provider</em>{' '}
+          button below to download the data in a standard format.
+        </p>
+      </div>
+
       {/* Security notice */}
       <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 px-5 py-4">
         <Shield className="h-5 w-5 text-primary shrink-0 mt-0.5" />
         <div className="text-xs text-muted-foreground leading-relaxed space-y-1">
-          <p className="font-semibold text-foreground text-sm">Two-step SMS verification required</p>
-          <p>Every direct deposit change requires a 6-digit code sent to your registered phone. Bank account numbers are AES-256 encrypted at rest. An audit trail is maintained for every change.</p>
+          <p className="font-semibold text-foreground text-sm">Bank-grade security · SMS 2-factor verification required</p>
+          <p>Every change requires a 6-digit SMS code. Account numbers are AES-256 encrypted. A full audit trail is maintained for every addition or removal.</p>
         </div>
       </div>
 
@@ -140,12 +181,23 @@ export default function DirectDepositTab({ employees, accountsByEmployee, adminP
       {/* Employee list */}
       {localPhone && (
         <div className="rounded-xl border overflow-hidden">
-          <div className="px-5 py-3.5 border-b bg-muted/20 flex items-center justify-between">
+          <div className="px-5 py-3.5 border-b bg-muted/20 flex items-center justify-between gap-3 flex-wrap">
             <h2 className="text-sm font-semibold flex items-center gap-2">
               <Banknote className="h-4 w-4 text-muted-foreground" />
-              Employee Direct Deposit
+              Employee Banking Information
             </h2>
-            <span className="text-xs text-muted-foreground">{eligibleEmployees.length} employees</span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground">{eligibleEmployees.length} employees</span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleExport}
+                disabled={exporting}
+                className="h-7 text-xs gap-1.5"
+              >
+                {exporting ? 'Exporting…' : 'Export for Payroll Provider'}
+              </Button>
+            </div>
           </div>
 
           {eligibleEmployees.length === 0 ? (
@@ -190,15 +242,11 @@ export default function DirectDepositTab({ employees, accountsByEmployee, adminP
                                   : `$${((acct.deposit_value ?? 0) / 100).toFixed(2)}`}
                               </Badge>
                             )}
-                            {acct.prenote_sent_at && !acct.prenote_sent_at.includes('cleared') ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] text-amber-400">
-                                <Clock className="h-3 w-3" /> Pre-note pending
-                              </span>
-                            ) : (
+                            {acct.prenote_sent_at ? (
                               <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400">
-                                <CheckCircle className="h-3 w-3" /> Active
+                                <CheckCircle className="h-3 w-3" /> Recorded
                               </span>
-                            )}
+                            ) : null}
                           </div>
                         ))
                       )}

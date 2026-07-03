@@ -37,12 +37,17 @@ interface Props {
 }
 
 export function GeneralTab({ orgName, role, settings }: Props) {
+  const s = settings as Record<string, unknown>;
   const [form, setForm] = useState({
-    bar_type:    settings.bar_type    ?? 'bar',
-    bar_city:    settings.bar_city    ?? '',
-    bar_state:   settings.bar_state   ?? '',
-    bar_phone:   settings.bar_phone   ?? '',
-    bar_address: settings.bar_address ?? '',
+    bar_type:           settings.bar_type    ?? 'bar',
+    bar_city:           settings.bar_city    ?? '',
+    bar_state:          settings.bar_state   ?? '',
+    bar_phone:          settings.bar_phone   ?? '',
+    bar_address:        settings.bar_address ?? '',
+    nacha_routing_number: (s.nacha_routing_number as string | undefined) ?? '',
+    nacha_company_ein:    (s.nacha_company_ein    as string | undefined) ?? '',
+    nacha_bank_name:      (s.nacha_bank_name      as string | undefined) ?? '',
+    nacha_company_name:   (s.nacha_company_name   as string | undefined) ?? '',
   });
   const [saving, setSaving] = useState(false);
   const canEdit = role === 'owner' || role === 'manager';
@@ -121,6 +126,67 @@ export function GeneralTab({ orgName, role, settings }: Props) {
           <Input placeholder="123 Main St" value={form.bar_address}
             onChange={(e) => setForm({ ...form, bar_address: e.target.value })}
             disabled={!canEdit} />
+        </div>
+      </div>
+
+      {/* ACH / NACHA Payroll */}
+      <div className="rounded-xl border bg-card p-5 space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest">Payroll &amp; ACH Direct Deposit</h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            Used to generate NACHA files for direct deposit. Upload the file to your bank's
+            business portal (Chase ACH Manager, BofA CashPro, etc.) — no third-party service needed.
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Bank Routing Number (ODFI) <span className="text-destructive">*</span></Label>
+            <Input
+              placeholder="021000021"
+              maxLength={9}
+              value={form.nacha_routing_number}
+              onChange={(e) => setForm({ ...form, nacha_routing_number: e.target.value.replace(/\D/g, '') })}
+              disabled={!canEdit}
+              className="font-mono"
+            />
+            <p className="text-xs text-muted-foreground">Your business bank's 9-digit routing number</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Bank Name <span className="text-destructive">*</span></Label>
+            <Input
+              placeholder="JP Morgan Chase"
+              value={form.nacha_bank_name}
+              onChange={(e) => setForm({ ...form, nacha_bank_name: e.target.value })}
+              disabled={!canEdit}
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Company EIN <span className="text-destructive">*</span></Label>
+            <Input
+              placeholder="123456789"
+              maxLength={9}
+              value={form.nacha_company_ein}
+              onChange={(e) => setForm({ ...form, nacha_company_ein: e.target.value.replace(/\D/g, '') })}
+              disabled={!canEdit}
+              className="font-mono"
+            />
+            <p className="text-xs text-muted-foreground">9-digit EIN without dashes (e.g. 123456789)</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Company Name on Payroll</Label>
+            <Input
+              placeholder="Demo Bar LLC"
+              maxLength={16}
+              value={form.nacha_company_name}
+              onChange={(e) => setForm({ ...form, nacha_company_name: e.target.value })}
+              disabled={!canEdit}
+            />
+            <p className="text-xs text-muted-foreground">Max 16 chars — shown on employee bank statements</p>
+          </div>
         </div>
       </div>
 
