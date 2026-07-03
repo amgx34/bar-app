@@ -1,9 +1,10 @@
-// Vercel Cron endpoint — runs every 15 minutes to check Gmail for new
-// 2TouchPOS report emails and auto-ingest them into z_report_days.
+// Vercel Cron endpoint — checks Gmail for new 2TouchPOS report emails and
+// auto-ingests them into z_report_days. This is a fallback path; the .NET SQL
+// agent pushes data directly every ~5 min for bars that run it.
 //
 // Vercel passes the CRON_SECRET via Authorization header.
-// vercel.json schedule: "*/15 * * * *"  (Pro plan)
-//                    or "0 * * * *"     (free plan — hourly)
+// vercel.json schedule: "0 13 * * *"    (Hobby plan — must be once per day)
+//                    or "*/15 * * * *"  (Pro plan — sub-daily crons)
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { poll2TouchEmails } from '@/lib/2touch/poll-emails';
