@@ -55,6 +55,33 @@ type Payload = {
   itemAudit: ItemAuditRow[];
 };
 
+// Shapes written to Supabase. Collected into arrays and sent as one upsert per
+// table rather than one per row — see the note in the EW section below.
+
+type ShiftInsert = {
+  organization_id: string;
+  employee_id:     string;
+  shift_date:      string;
+  regular_hours:   number;
+  overtime_hours:  number;
+};
+
+type ServerTipInsert = {
+  organization_id: string;
+  report_date:     string;
+  employee_name:   string;
+  total_sales:     number;
+  tips_paid_out:   number;
+};
+
+type InventoryItemInsert = {
+  organization_id: string;
+  name:            string;
+  category_id:     string | null;
+  unit:            string;
+  is_active:       boolean;
+};
+
 // ── Auth: per-org HMAC ────────────────────────────────────────────────────────
 
 async function resolveOrgAndVerify(
@@ -141,51 +168,90 @@ export async function POST(req: NextRequest) {
 
   // ── EW Reports → employee_shifts + z_report_server_tips ──────────────────
 
+  // This section used to issue two round-trips PER ROW (plus one insert per
+  // unseen employee). At ~165ms each, a two-week backfill needed well over the
+  // 30s function budget and died mid-write with a 504, leaving the payload
+  // half-applied. It is now a fixed handful of statements regardless of size.
+
   if (data.ewReports?.length) {
-    const { data: empRows } = await supabase
+    const rows = data.ewReports.filter(r => r.employee_name?.trim() && r.shift_date);
+
+    const { data: empRows, error: empErr } = await supabase
       .from('employees')
       .select('id, name')
       .eq('organization_id', resolvedOrgId);
+    if (empErr) result.errors.push(`employees: ${empErr.message}`);
 
     const empByName = new Map(
       (empRows ?? []).map(e => [e.name.toLowerCase(), e.id]),
     );
 
-    for (const row of data.ewReports) {
-      if (!row.employee_name?.trim() || !row.shift_date) continue;
+    // Create every unseen employee in one insert. Keyed lowercase so a bar that
+    // spells a name two ways doesn't end up with two employee records.
+    const newNames = [...new Map(
+      rows
+        .map(r => r.employee_name.trim())
+        .filter(n => !empByName.has(n.toLowerCase()))
+        .map(n => [n.toLowerCase(), n]),
+    ).values()];
 
-      let empId = empByName.get(row.employee_name.toLowerCase());
-      if (!empId) {
-        const { data: newEmp } = await supabase
-          .from('employees')
-          .insert({ organization_id: resolvedOrgId, name: row.employee_name.trim(), tip_mode: 'pool' })
-          .select('id').single();
-        if (newEmp?.id) {
-          empId = newEmp.id;
-          empByName.set(row.employee_name.toLowerCase(), empId);
-        }
-      }
+    if (newNames.length) {
+      const { data: created, error } = await supabase
+        .from('employees')
+        .insert(newNames.map(name => ({
+          organization_id: resolvedOrgId,
+          name,
+          tip_mode: 'pool',
+        })))
+        .select('id, name');
+      if (error) result.errors.push(`employees: ${error.message}`);
+      for (const e of created ?? []) empByName.set(e.name.toLowerCase(), e.id);
+    }
+
+    // Postgres rejects an ON CONFLICT statement that touches the same key twice
+    // ("cannot affect row a second time"), so collapse duplicates before
+    // sending. Keyed exactly like each table's unique constraint, and last row
+    // wins — the same result the previous row-by-row upserts produced.
+    const shifts = new Map<string, ShiftInsert>();
+    const tips   = new Map<string, ServerTipInsert>();
+
+    for (const row of rows) {
+      const name  = row.employee_name.trim();
+      const empId = empByName.get(name.toLowerCase());
       if (!empId) continue;
 
-      await supabase.from('employee_shifts').upsert({
+      shifts.set(`${empId}|${row.shift_date}`, {
         organization_id: resolvedOrgId,
         employee_id:     empId,
         shift_date:      row.shift_date,
         regular_hours:   row.regular_hours  ?? 0,
         overtime_hours:  row.overtime_hours ?? 0,
-      }, { onConflict: 'organization_id,employee_id,shift_date' });
+      });
 
       if (row.tips_paid_out > 0) {
-        await supabase.from('z_report_server_tips').upsert({
+        tips.set(`${row.shift_date}|${name}`, {
           organization_id: resolvedOrgId,
           report_date:     row.shift_date,
-          employee_name:   row.employee_name.trim(),
+          employee_name:   name,
           total_sales:     row.total_sales   ?? 0,
           tips_paid_out:   row.tips_paid_out ?? 0,
-        }, { onConflict: 'organization_id,report_date,employee_name' });
+        });
       }
+    }
 
-      result.ewReports++;
+    if (shifts.size) {
+      const { error } = await supabase
+        .from('employee_shifts')
+        .upsert([...shifts.values()], { onConflict: 'organization_id,employee_id,shift_date' });
+      if (error) result.errors.push(`employee_shifts: ${error.message}`);
+      else result.ewReports = shifts.size;
+    }
+
+    if (tips.size) {
+      const { error } = await supabase
+        .from('z_report_server_tips')
+        .upsert([...tips.values()], { onConflict: 'organization_id,report_date,employee_name' });
+      if (error) result.errors.push(`z_report_server_tips: ${error.message}`);
     }
   }
 
@@ -195,27 +261,48 @@ export async function POST(req: NextRequest) {
     const catNames = [...new Set(data.itemAudit.map(r => r.category_name).filter(Boolean))];
     const catIdMap = new Map<string, string>();
 
-    for (const name of catNames) {
-      const { data: cat } = await supabase
+    if (catNames.length) {
+      const { data: cats, error } = await supabase
         .from('inventory_categories')
-        .upsert({ organization_id: resolvedOrgId, name }, { onConflict: 'organization_id,name' })
-        .select('id').single();
-      if (cat?.id) catIdMap.set(name, cat.id);
+        .upsert(
+          catNames.map(name => ({ organization_id: resolvedOrgId, name })),
+          { onConflict: 'organization_id,name' },
+        )
+        .select('id, name');
+      if (error) result.errors.push(`inventory_categories: ${error.message}`);
+      for (const c of cats ?? []) catIdMap.set(c.name, c.id);
     }
 
+    // Keyed on name alone, matching the UNIQUE (organization_id, name)
+    // constraint this upsert targets.
+    const items = new Map<string, InventoryItemInsert>();
     for (const row of data.itemAudit) {
-      if (!row.item_name?.trim()) continue;
-      const catId = catIdMap.get(row.category_name ?? '') ?? null;
-
-      await supabase.from('inventory_items').upsert({
+      const name = row.item_name?.trim();
+      if (!name) continue;
+      items.set(name, {
         organization_id: resolvedOrgId,
-        name:        row.item_name.trim(),
-        category_id: catId,
+        name,
+        category_id: catIdMap.get(row.category_name ?? '') ?? null,
         unit:        'each',
         is_active:   true,
-      }, { onConflict: 'organization_id,name', ignoreDuplicates: true });
+      });
+    }
 
-      result.itemAudit++;
+    if (items.size) {
+      // ignoreDuplicates leaves items the bar already has untouched, so manual
+      // edits to category/unit/pricing survive the next sync.
+      //
+      // The error check matters: this upsert silently failed with 42P10 on
+      // every row until inventory_items got its UNIQUE (organization_id, name)
+      // constraint, while the old code still counted the rows as written.
+      const { error } = await supabase
+        .from('inventory_items')
+        .upsert([...items.values()], {
+          onConflict: 'organization_id,name',
+          ignoreDuplicates: true,
+        });
+      if (error) result.errors.push(`inventory_items: ${error.message}`);
+      else result.itemAudit = items.size;
     }
   }
 

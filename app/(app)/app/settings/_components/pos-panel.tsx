@@ -265,7 +265,7 @@ function TwoTouchPanel({
             </div>
           </div>
           <p className="text-[10px] text-muted-foreground">
-            Each bar has a unique token — paste both into config.local.json on the POS server.
+            Each bar has a unique token — paste both into appsettings.local.json on the POS server (next to rail-2touch-agent.exe).
           </p>
         </div>
       )}
