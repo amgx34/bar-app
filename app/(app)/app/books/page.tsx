@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import dynamicImport from 'next/dynamic';
 import Link from 'next/link';
 import {
@@ -52,6 +53,8 @@ function getDateRange(preset: string): { start: string; end: string } {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 type SearchParams = Promise<{ preset?: string; start?: string; end?: string }>;
+
+export const metadata: Metadata = { title: 'Books' };
 
 export default async function BooksPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;

@@ -22,6 +22,8 @@ traffic, read by the real agent exe.
 | `01-create-test-db.sql` | Creates `TwoTouchTest` + the three views the agent reads |
 | `02-seed-test-data.sql` | Seeds N days of deterministic sales/shift/item data |
 | `03-create-test-org.sql` | Creates an isolated Supabase org + agent token (+ teardown) |
+| `04-create-unlike-schema.sql` | Creates `TwoTouchOdd` — the same data under names the scorer has never seen |
+| `05-create-twotouch-schema.sql` | Creates `TwoTouchLocal` — a faithful copy of the **real** 2TouchPOS schema |
 | `mock-ingest-server.js` | Local stand-in for the ingest route — verifies HMAC, writes nothing |
 
 ## Stage 1 — local SQL
@@ -111,7 +113,13 @@ teardown at the bottom of `03` cascades the whole thing away when you're done.
 .\rail-2touch-agent.exe --once --days 14
 ```
 
-Expect `Rail ingest OK: {"zReports":14,"ewReports":56,"itemAudit":154,"errors":[]}`.
+Expect `Rail ingest OK: {"zReports":14,"ewReports":56,"itemAudit":11,"errors":[]}`
+in about 3 seconds.
+
+The agent logs `Audit:154` while the server reports `itemAudit:11` — not a
+mismatch. The agent counts item-audit *rows* (11 menu items × 14 days), and the
+route counts the distinct items it wrote to the catalogue. `inventory_items` is
+a list of what the bar sells, not a per-day sales log.
 
 **4. Confirm the writes landed** — in the Supabase SQL editor:
 
@@ -142,10 +150,90 @@ The ingest route uses the Supabase **admin** client, so the deployment needs
 | `Login failed for user 'BarAppRead'` | Instance is Windows-auth-only — use `"User": ""` |
 | `errors: ["z_report_days: …"]` | Reached Supabase but a write failed — usually a missing migration |
 
+## Stage 4 — schema discovery
+
+`TwoTouchTest` cannot test discovery. Its relations *are* the configured
+defaults — `vwZReport`, `BusinessDate`, `NetSales` — so the scorer would be
+graded on recognising the answer it was written from. `04` exists for this:
+
+```powershell
+& $sqlcmd -S "lpc:(local)" -E -b -i 04-create-unlike-schema.sql
+```
+
+It creates `TwoTouchOdd`, holding the same figures as `tblDayClose`,
+`EmpWorkSummary` and `ItemSalesAudit` with column names to match, plus three
+decoy relations that share keywords with a feed but cannot supply it.
+
+With that database present, the integration tests in `RailAgent.Tests` run
+instead of skipping:
+
+```powershell
+cd ..
+dotnet test
+```
+
+They assert that discovery ranks all three real relations first and proposes
+every column correctly with **no operator override** — which is the only
+evidence that the scorer generalises.
+
+To watch the wizard do it by hand, run the exe, pair against the test org from
+`03`, and pick `TwoTouchOdd` at stage 5.
+
+## Stage 5 — the real schema
+
+`01` and `04` are both inventions. `05` is not: every table and column in it is
+copied name-for-name and type-for-type out of a production TwoTouch database.
+
+```powershell
+& $sqlcmd -S "lpc:(local)" -E -b -i 05-create-twotouch-schema.sql
+```
+
+It recreates the fourteen relations the Rail profile touches and seeds three
+business days of deliberately round numbers, so the tests can assert exact
+totals rather than "some rows came back":
+
+| Feed | Per day |
+|---|---|
+| Z Report | net sales `350.00`, cc tips `30.00`, cash tips `7.00` |
+| EW Report | 2 employees, `8.00` regular + `1.50` overtime, `400` sales, `40` tips |
+| Item Audit | 4 items, qty `10`, net `60.00` each |
+
+It also seeds three rows that must **not** appear: a `blnDeleted` clock row, a
+`szRefundFlg='N'` sale line, and a modifier line with a null `fkItemID`.
+
+With `TwoTouchLocal` present, `dotnet test` exercises the built-in mapping
+end-to-end through `SqlReader` instead of skipping.
+
+To drive the whole path — profile → derived-table SQL → HMAC → ingest — point
+the config at `TwoTouchLocal` and replay stage 2 against the mock server:
+
+```powershell
+node mock-ingest-server.js                    # terminal 1
+.\rail-2touch-agent.exe --once --days 30      # terminal 2, elevated
+```
+
+Expect `Rail ingest OK: {"zReports":3,"ewReports":6,"itemAudit":12,"errors":[]}`
+and `✓ HMAC verified` on the server. Those three counts are the seed, so a
+mapping that double-counts a join shows up as a wrong number rather than as a
+plausible-looking success.
+
+**What this database demonstrates**, and `01`/`04` cannot:
+
+- Hungarian notation everywhere — `fNetAmt`, `dtmClaimDate`, `szDescription`.
+- The Item Audit item name and category are `INT` foreign keys; the names are
+  in `tblItem` / `tblCategory` and the amount is in a separate `RptCtg` table.
+- The EW Report employee is two joins from the hours, via `tblUserJobs`.
+- The cash/credit tip split is per payment row, by `lPaymentType`.
+
+The last three are why `Setup/TwoTouchProfile.cs` exists: one-relation discovery
+cannot reach any of them.
+
 ## Cleanup
 
 ```powershell
 & $sqlcmd -S "lpc:(local)" -E -Q "DROP DATABASE TwoTouchTest;"
+& $sqlcmd -S "lpc:(local)" -E -Q "DROP DATABASE TwoTouchOdd;"
+& $sqlcmd -S "lpc:(local)" -E -Q "DROP DATABASE TwoTouchLocal;"
 ```
 
 Plus the `DELETE FROM organizations …` teardown at the bottom of `03`.

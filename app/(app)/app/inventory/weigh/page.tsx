@@ -1,9 +1,12 @@
+import type { Metadata } from 'next';
 import { Scale } from 'lucide-react';
 import { InventoryNav } from '../_components/inventory-nav';
 import { getWeighReports, getInventoryItemsForWeigh } from './actions';
 import { WeighManager } from './_components/weigh-manager';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = { title: 'Weigh Reports' };
 
 export default async function WeighPage() {
   const [reports, inventoryItems] = await Promise.all([

@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
 import { computePayroll } from '../payroll/actions';
@@ -5,6 +6,8 @@ import EmployeeRoster from './_components/employee-roster';
 import type { Employee } from '../payroll/actions';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = { title: 'Employees' };
 
 export default async function EmployeesPage() {
   const { org } = await getCurrentOrg();

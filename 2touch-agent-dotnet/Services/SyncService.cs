@@ -14,6 +14,9 @@ public sealed class SyncService(SqlReader sql, RailClient rail, IOptions<AgentCo
 {
     private readonly AgentConfig _cfg = cfg.Value;
 
+    /// <summary>A feed is configured when it has a table or view to read from.</summary>
+    public static bool Enabled(string? table) => !string.IsNullOrWhiteSpace(table);
+
     public async Task<SyncResult> RunOnceAsync(int? daysOverride, bool test, CancellationToken ct)
     {
         var days = daysOverride ?? _cfg.Sync.LookbackDays;
@@ -26,14 +29,29 @@ public sealed class SyncService(SqlReader sql, RailClient rail, IOptions<AgentCo
         await using var conn = await sql.OpenAsync(ct);
         log.LogInformation("SQL Server connected via {DataSource}", conn.DataSource);
 
-        try { z = await sql.QueryZReportsAsync(conn, days, ct); log.LogInformation("  Z Reports:  {Count} day(s)", z.Count); }
-        catch (Exception e) { log.LogWarning("Z Report query failed: {Message}", e.Message); }
+        // An empty Tables.X means this bar has no such feed — setup could not find
+        // one, or the operator skipped it. Don't query it; send an empty array,
+        // which the ingest route already treats as a no-op for that section.
+        if (Enabled(_cfg.Tables.ZReport))
+        {
+            try { z = await sql.QueryZReportsAsync(conn, days, ct); log.LogInformation("  Z Reports:  {Count} day(s)", z.Count); }
+            catch (Exception e) { log.LogWarning("Z Report query failed: {Message}", e.Message); }
+        }
+        else log.LogInformation("  Z Reports:  not configured — skipped");
 
-        try { ew = await sql.QueryEwReportsAsync(conn, days, ct); log.LogInformation("  EW Reports: {Count} row(s)", ew.Count); }
-        catch (Exception e) { log.LogWarning("EW Report query failed: {Message}", e.Message); }
+        if (Enabled(_cfg.Tables.EwReport))
+        {
+            try { ew = await sql.QueryEwReportsAsync(conn, days, ct); log.LogInformation("  EW Reports: {Count} row(s)", ew.Count); }
+            catch (Exception e) { log.LogWarning("EW Report query failed: {Message}", e.Message); }
+        }
+        else log.LogInformation("  EW Reports: not configured — skipped");
 
-        try { audit = await sql.QueryItemAuditAsync(conn, days, ct); log.LogInformation("  Item Audit: {Count} row(s)", audit.Count); }
-        catch (Exception e) { log.LogWarning("Item Audit query failed: {Message}", e.Message); }
+        if (Enabled(_cfg.Tables.ItemAudit))
+        {
+            try { audit = await sql.QueryItemAuditAsync(conn, days, ct); log.LogInformation("  Item Audit: {Count} row(s)", audit.Count); }
+            catch (Exception e) { log.LogWarning("Item Audit query failed: {Message}", e.Message); }
+        }
+        else log.LogInformation("  Item Audit: not configured — skipped");
 
         if (test)
         {

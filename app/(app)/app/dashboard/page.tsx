@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import dynamicImport from 'next/dynamic';
 import {
@@ -50,6 +51,8 @@ const REASON_LABEL: Record<string, string> = {
 };
 
 // ── Page ──────────────────────────────────────────────────────────────────────
+
+export const metadata: Metadata = { title: 'Dashboard' };
 
 export default async function DashboardPage() {
   const { org } = await getCurrentOrg();

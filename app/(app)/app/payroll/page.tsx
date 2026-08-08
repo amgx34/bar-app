@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { computePayroll, Employee } from './actions';
 import { createClient } from '@/lib/supabase/server';
@@ -9,6 +10,8 @@ import DirectDepositTab from './_components/direct-deposit-tab';
 import { getAllDirectDepositAccounts } from './direct-deposit-actions';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = { title: 'Payroll' };
 
 export default async function PayrollPage({
   searchParams,

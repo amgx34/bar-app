@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
 import AnalyticsTab from './_components/analytics-tab';
@@ -36,6 +37,8 @@ function getDefaultEndDate(): string {
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
+
+export const metadata: Metadata = { title: 'Tips' };
 
 export default async function TipsPage({
   searchParams,

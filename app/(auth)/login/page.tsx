@@ -1,7 +1,15 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { LoginForm } from './login-form';
 import { ArrowLeft, Zap } from 'lucide-react';
+
+export const metadata: Metadata = {
+  title: 'Sign in',
+  // A login form has nothing to rank for, and indexing it just gives searchers
+  // a dead end. Still followable so crawlers can walk back to the marketing page.
+  robots: { index: false, follow: true },
+};
 
 export default function LoginPage() {
   return (
@@ -15,7 +23,11 @@ export default function LoginPage() {
       />
       <div className="absolute inset-0 bg-gray-900/65" />
       <div className="relative z-10 w-full flex flex-col items-center gap-6">
-        <p className="text-white/40 text-xs font-medium tracking-widest uppercase select-none">
+        {/* The page's real heading. Visually hidden because the design leads
+            with the card's own "Log in" title, but the document still needs
+            exactly one h1 for assistive tech and crawlers. */}
+        <h1 className="sr-only">Sign in to Rail</h1>
+        <p aria-hidden="true" className="text-white/40 text-xs font-medium tracking-widest uppercase select-none">
           Rail
         </p>
         <Suspense>

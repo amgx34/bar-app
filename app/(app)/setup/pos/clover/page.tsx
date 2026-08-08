@@ -1,7 +1,10 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getCurrentOrg } from '@/lib/org';
 import { Leaf, ExternalLink, ArrowRight, CheckCircle, Shield, Zap, Package } from 'lucide-react';
 import Link from 'next/link';
+
+export const metadata: Metadata = { title: 'Connect Clover' };
 
 export default async function CloverConnectPage() {
   const { org } = await getCurrentOrg();

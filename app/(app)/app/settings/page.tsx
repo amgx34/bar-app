@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { getCurrentOrg } from '@/lib/org';
 import { GeneralTab } from './_components/general-tab';
 import { TipPayTab } from './_components/tip-pay-tab';
@@ -34,6 +35,8 @@ function buildCloverAuthUrl(orgId: string): string | null {
   url.searchParams.set('state',         orgId);
   return url.toString();
 }
+
+export const metadata: Metadata = { title: 'Settings' };
 
 export default async function SettingsPage({
   searchParams,

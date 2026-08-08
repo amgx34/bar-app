@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, Download, CheckCircle, Clock, DollarSign, Users, AlertTriangle } from 'lucide-react';
 import { computePayroll } from '../actions';
@@ -33,6 +34,8 @@ function fmtDateRange(start: string, end: string) {
 function fmtMoney(n: number) {
   return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
 }
+
+export const metadata: Metadata = { title: 'Pay Period Review' };
 
 export default async function PayrollReviewPage({ searchParams }: { searchParams: SearchParams }) {
   const params    = await searchParams;

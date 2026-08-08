@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { AlertTriangle } from 'lucide-react';
 import { getCurrentOrg } from '@/lib/org';
 import { createClient } from '@/lib/supabase/server';
@@ -8,6 +9,8 @@ import TaxReport from './_components/tax-report';
 import type { Employee } from '../payroll/actions';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = { title: 'Tax' };
 
 export default async function TaxPage({
   searchParams,

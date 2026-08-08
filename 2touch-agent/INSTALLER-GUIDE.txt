@@ -15,7 +15,7 @@ Follow only the section that matches the bar's POS system.
 Estimated time per install:
   Clover    →  15 minutes
   Toast     →  10 minutes
-  2TouchPOS →  30-45 minutes (SQL setup takes longer)
+  2TouchPOS →  10 minutes (one file, double-click, answer a few prompts)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SECTION A — PREREQUISITES (do this before ANY POS setup)
@@ -149,258 +149,152 @@ SECTION C — TOAST POS
 SECTION D — 2TOUCHPOS (SQL AGENT)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  2Touch has no cloud API. This installs a small background agent on the
-  POS Windows machine. It reads from the local SQL Server database every
-  5 minutes and sends data to Rail automatically.
+  2Touch has no cloud API, so a small Windows Service runs on the POS machine,
+  reads the local SQL Server every 5 minutes, and pushes to Rail.
+
+  THIS SECTION WAS REWRITTEN. The old steps — enable Mixed Authentication,
+  start SQL Server Browser, restart SQL Server, install Node.js, hand-edit a
+  config file, create a scheduled task — are all gone. The .NET agent connects
+  over shared memory, so there is no port to find and no Browser service to
+  start, and it installs itself.
 
   You will need:
     - Physical or remote access to the 2Touch Windows POS machine
-    - The 2Touch SQL file:  2touchpart1.sql  (creates the read-only login)
-    - The Rail agent files: copy of the 2touch-agent folder
+    - Administrator on that machine
+    - ONE file:  rail-2touch-agent.exe
+    - The pairing code from Rail (step D1)
+
+  Nothing else. No Node.js. No .NET runtime. No SQL script. No second file:
+  the agent's default configuration is embedded in the exe.
 
   ─────────────────────────────────────────────────────────────────────────
-  D1. Add the ingest secret to Vercel
+  D1. In Rail — activate 2TouchPOS and copy the pairing code
   ─────────────────────────────────────────────────────────────────────────
 
-      In Vercel → Settings → Environment Variables, add:
+      Rail → Settings → POS Integration → 2TouchPOS:
 
-        Key:    TWOTOUCH_INGEST_SECRET
-        Value:  (create any long random string, e.g. 32+ random characters)
-                Example: xK9mP2vL8nQ4rT7yW3bA6cE1dF5gH0jJ
+      1. (Optional) In "2Touch Report Sender Email", enter the address that
+         2Touch emails reports from. That is the email fallback for bars not
+         running the agent; leave it blank if you are installing the agent.
+      2. Click Activate.
+      3. Click "Copy pairing code".
 
-      Save it. You will need this exact value again in step D7.
-      Redeploy the project after adding new env vars.
+      The code is one line beginning RAIL1- and carries the org id, this bar's
+      unique token, and the Rail URL. It is per-bar — never reuse one bar's
+      code on another bar's machine.
 
-  ─────────────────────────────────────────────────────────────────────────
-  D2. On the 2Touch POS Windows machine — enable Mixed Authentication
-  ─────────────────────────────────────────────────────────────────────────
-
-      This is needed so the agent can log in with a username and password.
-      (2Touch itself uses Windows auth; we need to add SQL auth.)
-
-      1. Open SQL Server Management Studio (SSMS)
-      2. In Object Explorer, right-click the server name at the top
-      3. Click Properties
-      4. Click Security on the left panel
-      5. Under "Server authentication", select:
-            ● SQL Server and Windows Authentication mode
-      6. Click OK
-      7. SSMS shows a message saying restart is required — do step D3 now
+      Get it onto the POS box however is easiest (email it to yourself, a
+      remote-desktop clipboard, a text file on a USB stick). You will paste it
+      once; nothing is typed by hand.
 
   ─────────────────────────────────────────────────────────────────────────
-  D3. Enable SQL Server Browser service
+  D2. On the POS machine — copy the agent and double-click it
   ─────────────────────────────────────────────────────────────────────────
 
-      The 2Touch SQL Server uses dynamic ports (not the standard 1433).
-      SQL Server Browser is a small Windows service that tells the agent
-      which port SQL Server is on. Without this, the agent cannot connect.
+      Copy rail-2touch-agent.exe anywhere on the machine (the Desktop is
+      fine — setup relocates it to C:\rail-agent\ itself).
 
-      1. Open SQL Server Configuration Manager
-         (Start → search "Sql Server Configuration Manager")
-      2. In the left panel, click SQL Server Services
-      3. Find "SQL Server Browser" in the list
-      4. Right-click it → Properties
-      5. On the Service tab, set Start Mode to: Automatic
-      6. Click Apply, then click OK
-      7. Right-click SQL Server Browser again → Start
+      Double-click it. Windows will ask for Administrator — click Yes.
 
-      While you are here, also confirm TCP/IP is enabled:
-      4. In the left panel, click:
-            SQL Server Network Configuration
-            → Protocols for MSSQLSERVER  (or your instance name)
-      5. Right-click TCP/IP → Enable  (if not already Enabled)
-      6. Click OK
+      A console window opens and runs twelve stages. Answer the prompts:
+
+        [2/12]  Paste the pairing code from D1.
+        [4/12]  Pick the SQL Server instance, if there is more than one.
+        [5/12]  Pick the database — it selects TwoTouch automatically when
+                there is one.
+        [7/12]  Confirm the schema mapping. See D3.
+        [8/12]  Check the preview looks like this bar's real trade.
+
+      Everything else runs unattended.
 
   ─────────────────────────────────────────────────────────────────────────
-  D4. Restart SQL Server
+  D3. Confirming the schema (stage 7)
   ─────────────────────────────────────────────────────────────────────────
 
-      In SQL Server Configuration Manager:
-      → Left panel → SQL Server Services
-      → Right-click SQL Server (MSSQLSERVER) → Restart
+      TwoTouch databases differ between versions and sites, so the agent does
+      not assume any table names. It reads the whole database and, for each of
+      the three feeds, offers the five relations that best fit, with a proposed
+      column for every field it needs.
 
-      Wait for the status to return to "Running" before continuing.
+      For each feed you can:
+        - press Enter to accept the top suggestion
+        - type a number to pick a different relation
+        - answer "n" to the "Use this mapping?" prompt and override one column
+        - type 0 to skip the feed, if this bar genuinely has no such data
 
-  ─────────────────────────────────────────────────────────────────────────
-  D5. Create the read-only login (run 2touchpart1.sql)
-  ─────────────────────────────────────────────────────────────────────────
+      Any column marked "← guess: name gives no clue, check this" was chosen on
+      data type alone. Look at those before accepting.
 
-      In SSMS, open a new Query window and run the contents of
-      2touchpart1.sql (the SQL you already have).
-
-      It creates a login called BarAppRead with read-only access.
-      You should see "Commands completed successfully."
-
-      Verify it worked:
-        USE TwoTouch;
-        SELECT name FROM sys.database_principals
-        WHERE name = 'BarAppRead';
-        -- Should return 1 row
+      Each accepted mapping is immediately run against the database. If the
+      query fails, the error and the SQL are printed and you go back to the
+      mapping — a wrong guess is caught here, not weeks later.
 
   ─────────────────────────────────────────────────────────────────────────
-  D6. Install Node.js on the POS machine
+  D4. Watching the data land (stages 10-12)
   ─────────────────────────────────────────────────────────────────────────
 
-      1. Open a browser on the POS machine
-      2. Go to:  https://nodejs.org
-      3. Download the LTS version (Windows Installer .msi)
-      4. Run the installer — click Next through all defaults
-      5. When finished, open Command Prompt and type:
-              node --version
-         It should print something like v20.x.x
-         If it does, Node.js is installed correctly.
+      Setup installs the service, starts it, and then runs one real sync in
+      front of you. Do not leave the site until you have seen:
+
+        ✓ Rail accepted the data — Z:7 EW:28 Audit:42
+
+      The final screen prints the install path, the service name
+      (Rail2TouchSync), where the logs go, the uninstall command, and the
+      confirmed schema mapping as JSON.
+
+      COPY THAT JSON into the repo issue for this bar. Real mappings from real
+      boxes are how the agent's guesses get better.
 
   ─────────────────────────────────────────────────────────────────────────
-  D7. Copy and configure the Rail agent
+  D5. If something goes wrong
   ─────────────────────────────────────────────────────────────────────────
 
-      1. Copy the 2touch-agent folder to the POS machine
-         Suggested location:  C:\rail-agent\
+      Every stage prints a diagnosis rather than a stack trace. The ones you
+      are most likely to hit:
 
-      2. Open Command Prompt and run:
-              cd C:\rail-agent
-              npm install
-         Wait for it to finish (downloads the mssql library).
+      "token must be 64 hex characters, got 61"
+          The paste was truncated. Copy the whole line again.
 
-      3. Copy the config template:
-              copy config.json config.local.json
+      "Rail rejected the token (401)"
+          The code belongs to a different bar, or the token was regenerated in
+          Rail after the code was copied. Re-copy from Settings.
 
-      4. Open config.local.json in Notepad:
-              notepad config.local.json
+      "Rail rejected the org (400)"
+          2TouchPOS was never activated for this bar. Do D1 step 2.
 
-      5. Find your SQL Server instance name.
-         In SSMS, run this query:
-              SELECT @@SERVICENAME
-         The result is your instance name.
-         Common values:  MSSQLSERVER  or  SQLEXPRESS  or  TwoTouch
+      "Could not reach https://…"
+          The box needs OUTBOUND HTTPS only. No inbound rule, no port forward,
+          no static IP. Check the site's firewall or proxy.
 
-      6. Update these fields in config.local.json:
+      "No SQL Server instance is registered on this machine"
+          Almost always the wrong machine. The agent must run on the box that
+          hosts the TwoTouch database.
 
-            "server"       change to your computer name or leave as "localhost"
-            "password"     change to the password you used in 2touchpart1.sql
-            "instanceName" change to the result from the query above
+      "This server is set to Windows Authentication only"
+          Setup normally avoids this entirely by granting NT AUTHORITY\SYSTEM
+          read access and running the service under Windows auth. You only see
+          this if the account you ran setup as is not a SQL sysadmin. Re-run
+          setup as an account that is. Do NOT enable Mixed Mode on a live POS
+          box to work around it — that needs a SQL Server restart.
 
-            "authToken"    paste the TWOTOUCH_INGEST_SECRET from Vercel (step D1)
-
-         Leave the table names as-is for now (you will fix them in step D8).
-
-      7. Save and close Notepad.
-
-  ─────────────────────────────────────────────────────────────────────────
-  D8. Find the correct 2Touch table names
-  ─────────────────────────────────────────────────────────────────────────
-
-      The exact table/view names depend on which version of 2Touch is
-      installed. You need to find them before the agent can query correctly.
-
-      In SSMS, connect to TwoTouch and run this query:
-
-        USE TwoTouch;
-        SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
-        WHERE TABLE_NAME LIKE '%Z%'
-           OR TABLE_NAME LIKE '%Report%'
-           OR TABLE_NAME LIKE '%Daily%'
-           OR TABLE_NAME LIKE '%Sales%'
-           OR TABLE_NAME LIKE '%Server%'
-           OR TABLE_NAME LIKE '%Employee%'
-           OR TABLE_NAME LIKE '%Item%'
-           OR TABLE_NAME LIKE '%Audit%'
-        ORDER BY TABLE_NAME;
-
-      Look through the results and identify:
-        a) The Z Report table  (daily sales totals)
-        b) The EW Report table (employee/server sales and hours)
-        c) The Item Audit table (items sold per day)
-
-      For each table you find, run:
-        SELECT TOP 3 * FROM [TableNameHere]
-      to see the columns and verify it contains the right data.
-
-      Update config.local.json:
-        "tables": {
-          "zReport":   "the table name you found for Z reports",
-          "ewReport":  "the table name for employee/server reports",
-          "itemAudit": "the table name for item/product audit"
-        }
-
-      Also update the "columns" section if the column names differ
-      from the defaults (BusinessDate, NetSales, CreditCardTips, etc.).
-      Run  SELECT TOP 1 * FROM [TableName]  to see exact column names.
+      "The service did not start"
+          The last five Event Log entries are printed underneath. They are also
+          in Event Viewer → Windows Logs → Application, source Rail2TouchSync.
 
   ─────────────────────────────────────────────────────────────────────────
-  D9. Test the connection
+  D6. Re-running, and uninstalling
   ─────────────────────────────────────────────────────────────────────────
 
-      In Command Prompt on the POS machine:
+      To fix a bad schema mapping, or to move a bar to a different Rail org,
+      just run setup again. It stops the service, rewrites the configuration,
+      and restarts. There is no uninstall-first step.
 
-        cd C:\rail-agent
-        node test-connection.js --password "YourStrongP@ss123!"
+      To remove it, from an elevated Command Prompt:
 
-      The script tries every possible connection method and prints
-      which one works. Example successful output:
+        C:\rail-agent\rail-2touch-agent.exe --uninstall
 
-        [localhost + Browser (default instance)] ... ✓
-          SERVER: POSPC\MSSQLSERVER  INSTANCE: MSSQLSERVER  ACTUAL PORT: 49712
-
-        ✅ SUCCESS — use this in config.local.json:
-        { "server": "localhost", "options": { "instanceName": "MSSQLSERVER" ... } }
-
-      Copy the printed config block into config.local.json.
-
-      If nothing connects:
-        - Confirm step D3 (SQL Browser is running and set to Automatic)
-        - Confirm step D4 (SQL Server was restarted after enabling Browser)
-        - Try running the test again
-
-  ─────────────────────────────────────────────────────────────────────────
-  D10. Test the full agent (SQL + Rail API)
-  ─────────────────────────────────────────────────────────────────────────
-
-      First, test SQL queries without sending to Rail:
-        node agent.js --test
-
-      You should see the number of rows found and a sample record.
-      If the Z Reports shows 0 rows, the table name in config may be wrong.
-      Go back to step D8 and check the table names.
-
-      Once --test works, run a real sync:
-        node agent.js
-
-      Then log into Rail at  https://bar-app-drab.vercel.app
-      Go to Dashboard — you should see sales data appearing.
-
-  ─────────────────────────────────────────────────────────────────────────
-  D11. Configure the Rail app to use 2TouchPOS
-  ─────────────────────────────────────────────────────────────────────────
-
-      In Rail → Settings → POS Integration → 2TouchPOS section:
-      → In the "2Touch Report Sender Email" field, enter the email address
-        that 2Touch sends reports from (for email backup — optional).
-      → Click Activate.
-
-      The bar's POS is now shown as "2TouchPOS — Active" in Rail.
-
-  ─────────────────────────────────────────────────────────────────────────
-  D12. Schedule the agent to run every 5 minutes
-  ─────────────────────────────────────────────────────────────────────────
-
-      Open Command Prompt AS ADMINISTRATOR (right-click → Run as administrator)
-      and run this single command:
-
-        schtasks /create /tn "Rail 2Touch Sync" /tr "node C:\rail-agent\agent.js" /sc MINUTE /mo 5 /ru SYSTEM /rl HIGHEST /f
-
-      Verify it was created:
-        schtasks /query /tn "Rail 2Touch Sync" /fo LIST
-
-      Run it immediately to confirm it works:
-        schtasks /run /tn "Rail 2Touch Sync"
-
-      Wait 30 seconds, then check Rail Dashboard for new data.
-
-      To enable logging to a file (recommended):
-        schtasks /change /tn "Rail 2Touch Sync" /tr "cmd /c node C:\rail-agent\agent.js >> C:\rail-agent\sync.log 2>&1"
-
-      You can then view the log at  C:\rail-agent\sync.log
+      That stops and deletes the service and leaves C:\rail-agent\ in place.
+      Delete the folder afterwards if you want the configuration gone too.
 
   ✓  2TouchPOS setup complete.
 
@@ -428,7 +322,8 @@ SECTION E — VERIFY EVERYTHING IS WORKING
       ─────────────────
       URL:  https://bar-app-drab.vercel.app/app/payroll?tab=import
       ✓ For Toast: "Toast POS Sync" card appears at the top
-      ✓ For 2Touch: agent log shows successful syncs
+      ✓ For 2Touch: 'sc query Rail2TouchSync' shows RUNNING, and the Dashboard
+          shows data for today
 
   E4. POS Connection badge
       ──────────────────────

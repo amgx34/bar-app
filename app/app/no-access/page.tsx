@@ -1,8 +1,11 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { signOut } from '../../(app)/app/actions';
+
+export const metadata: Metadata = { title: 'No access' };
 
 export default async function NoAccessPage() {
   const supabase = await createClient();

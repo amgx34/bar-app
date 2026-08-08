@@ -1,9 +1,12 @@
+import type { Metadata } from 'next';
 import { getCurrentOrg } from '@/lib/org';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { RepsTable } from './_components/reps-table';
 import type { Rep } from './actions';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = { title: 'Reps' };
 
 export default async function RepsPage({
   searchParams,

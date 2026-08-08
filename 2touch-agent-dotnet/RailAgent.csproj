@@ -2,7 +2,10 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <!-- -windows, not plain net9.0: the setup wizard reads the registry, checks
+         the Administrators role, and ACLs a file. All three live in the Windows
+         targeting pack, and this has always been a Windows-only service. -->
+    <TargetFramework>net9.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>RailAgent</RootNamespace>
@@ -15,6 +18,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The test project lives under this directory, so keep it out of the
+         root project's default **/*.cs glob. -->
+    <Compile Remove="tests/**" />
+    <None Remove="tests/**" />
+    <EmbeddedResource Remove="tests/**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
@@ -22,12 +33,21 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Baked into the exe so a lone .exe is a complete install. An on-disk
+         appsettings.json still layers on top of it if one is present. -->
+    <EmbeddedResource Include="appsettings.json" LogicalName="RailAgent.appsettings.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Copied for local dev only. Publish stays one file: the wizard writes
+         appsettings.local.json itself, and the defaults are embedded. -->
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </None>
     <None Update="appsettings.local.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </None>
   </ItemGroup>
 

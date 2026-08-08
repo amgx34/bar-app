@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { getCurrentOrg } from '@/lib/org';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { InventoryTable, type ItemRow } from './_components/inventory-table';
@@ -12,6 +13,8 @@ type SearchParams = Promise<{
   category?: string;
   include_inactive?: string;
 }>;
+
+export const metadata: Metadata = { title: 'Inventory' };
 
 export default async function InventoryPage({
   searchParams,
@@ -56,6 +59,9 @@ export default async function InventoryPage({
 
   return (
     <main className="p-6 space-y-4">
+      {/* This page leads with a dashboard rather than a title bar, so the
+          heading is visually hidden — but the document still needs one h1. */}
+      <h1 className="sr-only">Inventory</h1>
       <InventoryDashboard
         usageLogs={(usageLogs ?? []) as unknown as DashboardUsageLog[]}
         items={(items ?? []) as unknown as DashboardItem[]}

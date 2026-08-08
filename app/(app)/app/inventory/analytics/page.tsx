@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import dynamicImport from 'next/dynamic';
 import Link from 'next/link';
 import { TrendingUp, Package, AlertTriangle, DollarSign, Zap, Turtle, ShoppingCart, Scale, ArrowRight } from 'lucide-react';
@@ -26,6 +27,8 @@ const URGENCY_COLOR: Record<AlertItem['urgency'], string> = {
   medium:   'bg-yellow-50 text-yellow-700 border-yellow-200',
 };
 const URGENCY_LABEL: Record<AlertItem['urgency'], string> = { critical: 'OUT', high: '< 3 days', medium: 'Low' };
+
+export const metadata: Metadata = { title: 'Inventory Analytics' };
 
 export default async function InventoryAnalyticsPage() {
   const data = await getAnalyticsData();

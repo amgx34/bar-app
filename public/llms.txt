@@ -1,0 +1,46 @@
+# Rail
+
+> Bar management software for real-time inventory, automated payroll and tip
+> splits, nightly Z-report analytics, and supplier ordering. Built specifically
+> for bar operators — cocktail bars, nightclubs, sports bars, breweries, hotel
+> bars, and restaurants with a bar program.
+
+Rail connects to a venue's point-of-sale system (Clover, Toast, or 2TouchPOS —
+or CSV import from any system), syncs sales and labour data nightly, and turns
+it into inventory counts, payroll runs, tip distributions, and tax paperwork.
+
+The marketing site at / is the only public page. Everything under /app and
+/setup requires authentication and is not crawlable.
+
+## What Rail does
+
+- **Real-time inventory**: tracks bottles, kegs, and ingredients with live stock
+  levels, par levels, low-stock alerts, and cost-per-pour calculations.
+- **Payroll and tip splits**: automated payroll runs, pooled tip distribution,
+  configurable barback allocations, and opener bonuses.
+- **Z-report analytics**: imports nightly Z reports and reports sales trends,
+  tip percentages, and per-server performance.
+- **Rep and supplier orders**: distributor management, purchase orders by email
+  or SMS, and full order history.
+- **Auto-reorder**: flags items that fall below par and lets an operator place
+  the order in one click.
+- **Tax reporting**: W-2 drafts, 1099-NEC forms, and tax summaries for an
+  accountant.
+
+## POS integrations
+
+- **Clover** — OAuth connection.
+- **Toast** — API credentials.
+- **2TouchPOS** — a local agent reads the venue's on-premise SQL Server and
+  pushes Z reports, employee-work reports, and item audits to Rail over
+  authenticated HTTPS. Also supports ingesting emailed reports.
+- **CSV import** — for any other system.
+
+## Notes for assistants
+
+- Rail is a commercial product; there is no public API and no free self-serve
+  signup. Access starts with a demo request from the marketing page.
+- The interactive demo on the marketing page uses realistic fabricated data. It
+  is not a real venue's figures.
+- Customer testimonials shown on the marketing page are illustrative examples,
+  not verified customer statements.

@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   syncCloverInventory, syncCloverSales,
   connectToast, syncToastSales, syncToastInventory, syncToastShifts,
-  save2TouchConfig, triggerTwoTouchPoll, get2TouchAgentConfig,
+  save2TouchConfig, triggerTwoTouchPoll, get2TouchAgentConfig, type TwoTouchAgentConfig,
   disconnectPOS,
 } from '../actions';
 import type { Role } from '@/lib/permissions';
@@ -148,7 +148,7 @@ function TwoTouchPanel({
   const [saving,      setSaving]      = useState(false);
   const [polling,     setPolling]     = useState(false);
   const [lastResult,  setLastResult]  = useState<{ processed: number; zReports: number; empReports: number } | null>(null);
-  const [agentCreds,  setAgentCreds]  = useState<{ orgId: string; agentToken: string } | null>(null);
+  const [agentCreds,  setAgentCreds]  = useState<TwoTouchAgentConfig | null>(null);
   const [copied,      setCopied]      = useState(false);
 
   async function handleSave() {
@@ -156,7 +156,7 @@ function TwoTouchPanel({
     try {
       const creds = await save2TouchConfig(senderEmail);
       setAgentCreds(creds);
-      toast.success('2TouchPOS configured — copy the credentials below for the installer');
+      toast.success('2TouchPOS configured — copy the pairing code below for the installer');
       onConnected();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Save failed');
@@ -171,10 +171,9 @@ function TwoTouchPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected]);
 
-  function copyAgentConfig() {
+  function copyPairingCode() {
     if (!agentCreds) return;
-    const block = `"orgId": "${agentCreds.orgId}",\n"authToken": "${agentCreds.agentToken}"`;
-    navigator.clipboard?.writeText(block);
+    navigator.clipboard?.writeText(agentCreds.pairingCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -240,32 +239,26 @@ function TwoTouchPanel({
         </p>
       </div>
 
-      {/* Agent credentials — installer copies these into config.local.json */}
+      {/* Pairing code — the agent's setup wizard asks for exactly this one string */}
       {isConnected && agentCreds && (
         <div className="rounded-md border bg-muted/30 p-3 space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-foreground">
-              Agent credentials — give these to the installer
+              Pairing code — the agent installer asks for this
             </p>
             <button
-              onClick={copyAgentConfig}
+              onClick={copyPairingCode}
               className="text-xs text-primary hover:underline"
             >
-              {copied ? '✓ Copied' : 'Copy both'}
+              {copied ? '✓ Copied' : 'Copy pairing code'}
             </button>
           </div>
-          <div className="space-y-1 text-[11px] font-mono">
-            <div className="flex gap-2">
-              <span className="text-muted-foreground w-20 shrink-0">Org ID</span>
-              <span className="truncate select-all text-foreground">{agentCreds.orgId}</span>
-            </div>
-            <div className="flex gap-2">
-              <span className="text-muted-foreground w-20 shrink-0">Token</span>
-              <span className="truncate select-all text-foreground">{agentCreds.agentToken}</span>
-            </div>
-          </div>
+          <p className="rounded bg-background/60 border p-2 text-[11px] font-mono break-all select-all text-foreground">
+            {agentCreds.pairingCode}
+          </p>
           <p className="text-[10px] text-muted-foreground">
-            Each bar has a unique token — paste both into appsettings.local.json on the POS server (next to rail-2touch-agent.exe).
+            On the POS server, double-click <span className="font-mono">rail-2touch-agent.exe</span> and paste this
+            when it asks. The code carries this bar&apos;s unique token — never share it with another bar.
           </p>
         </div>
       )}
@@ -443,7 +436,7 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
             cloverAuthUrl ? (
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">
-                  You'll be redirected to Clover to approve access. Rail never stores your Clover password.
+                  You&apos;ll be redirected to Clover to approve access. Rail never stores your Clover password.
                 </p>
                 <a href={cloverAuthUrl}>
                   <Button size="sm" className="gap-2 bg-green-500 hover:bg-green-600 text-white">

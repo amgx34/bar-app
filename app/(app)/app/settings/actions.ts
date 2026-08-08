@@ -5,6 +5,7 @@ import { randomBytes }    from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
+import { SITE_URL } from '@/lib/site';
 import type { BarSettings, HourlyRates } from '@/lib/org';
 
 // ── Shared helper: safely merge into pos_config without overwriting other keys ──
@@ -249,13 +250,36 @@ export async function disconnectPOS() {
 
 // ── 2TouchPOS ─────────────────────────────────────────────────────────────────
 
+export type TwoTouchAgentConfig = {
+  orgId:       string;
+  agentToken:  string;
+  /** The single string the operator pastes into the agent's setup wizard. */
+  pairingCode: string;
+};
+
+/**
+ * RAIL1-<base64url({"o":orgId,"t":agentToken,"u":apiBaseUrl})> — see
+ * `2touch-agent-dotnet/Setup/PairingCode.cs`, which parses this.
+ *
+ * Built on the SERVER on purpose. SITE_URL resolves from
+ * VERCEL_PROJECT_PRODUCTION_URL, which is not a NEXT_PUBLIC_ variable and so is
+ * undefined in the browser — assembling this client-side would silently fall
+ * back to the hardcoded default origin and hand out codes pointing at the wrong
+ * host on any non-default deployment.
+ */
+function buildPairingCode(orgId: string, agentToken: string): string {
+  const payload = JSON.stringify({ o: orgId, t: agentToken, u: SITE_URL });
+  const b64url  = Buffer.from(payload, 'utf8').toString('base64url');
+  return `RAIL1-${b64url}`;
+}
+
 /**
  * Save 2Touch config and generate a unique per-org agent_token.
- * The token is what the installer copies into config.local.json on the POS server.
+ * The token is half of the pairing code the installer consumes.
  * Using per-org tokens means 1000 different bars each have their own secret —
  * a compromised token from one bar cannot be used to inject data into another.
  */
-export async function save2TouchConfig(senderEmail: string): Promise<{ orgId: string; agentToken: string }> {
+export async function save2TouchConfig(senderEmail: string): Promise<TwoTouchAgentConfig> {
   const { org, role } = await getCurrentOrg();
   assertEditor(role);
   const admin = createAdminClient();
@@ -276,17 +300,17 @@ export async function save2TouchConfig(senderEmail: string): Promise<{ orgId: st
     .eq('id', org.id);
   if (error) throw new Error(error.message);
   revalidatePath('/app/settings');
-  return { orgId: org.id, agentToken };
+  return { orgId: org.id, agentToken, pairingCode: buildPairingCode(org.id, agentToken) };
 }
 
-/** Returns the agent configuration the installer needs for config.local.json */
-export async function get2TouchAgentConfig(): Promise<{ orgId: string; agentToken: string } | null> {
+/** Returns the pairing code the agent's setup wizard asks for. */
+export async function get2TouchAgentConfig(): Promise<TwoTouchAgentConfig | null> {
   const { org } = await getCurrentOrg();
   if (org.pos_provider !== '2touch') return null;
   const cfg = (org.pos_config ?? {}) as Record<string, unknown>;
   const token = cfg.agent_token as string | undefined;
   if (!token) return null;
-  return { orgId: org.id, agentToken: token };
+  return { orgId: org.id, agentToken: token, pairingCode: buildPairingCode(org.id, token) };
 }
 
 /** Manually trigger an IMAP poll for new 2Touch emails. */

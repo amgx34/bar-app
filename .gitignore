@@ -9,6 +9,8 @@
 2touch-agent-dotnet/bin/
 2touch-agent-dotnet/obj/
 2touch-agent-dotnet/publish/
+2touch-agent-dotnet/tests/**/bin/
+2touch-agent-dotnet/tests/**/obj/
 
 # dependencies
 /node_modules

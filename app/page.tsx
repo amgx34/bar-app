@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
   ArrowRight, Package, CircleDollarSign, BarChart2,
@@ -5,7 +6,14 @@ import {
   CheckCircle, Star, ChevronRight,
 } from 'lucide-react';
 import { DemoButton } from './_components/landing/demo-button';
-import { DemoRequestForm } from './_components/landing/demo-request-form';
+import { DemoRequestFormLazy } from './_components/landing/demo-request-form-lazy';
+import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from '@/lib/site';
+
+// The only indexable route in the app, so it owns the canonical URL.
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+  openGraph:  { url: '/' },
+};
 
 const FEATURES = [
   { icon: Package,          title: 'Real-Time Inventory',       color: 'text-teal-500 bg-teal-500/10',    desc: 'Track every bottle, keg, and ingredient with live stock levels and instant low-stock alerts.' },
@@ -43,9 +51,61 @@ const STATS = [
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
+/**
+ * Structured data describing the product and the organisation.
+ *
+ * Deliberately omits Review / AggregateRating. The testimonials rendered below
+ * are illustrative copy, not collected customer feedback — publishing them as
+ * schema.org reviews would misrepresent them to search engines as verified
+ * ratings. Add those only once they are backed by real, attributable reviews.
+ *
+ * `offers` is likewise omitted rather than invented: Rail has no public price.
+ */
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id':   `${SITE_URL}/#organization`,
+      name:    SITE_NAME,
+      url:     SITE_URL,
+      description: SITE_DESCRIPTION,
+    },
+    {
+      '@type': 'WebSite',
+      '@id':   `${SITE_URL}/#website`,
+      url:     SITE_URL,
+      name:    SITE_NAME,
+      description: SITE_DESCRIPTION,
+      publisher: { '@id': `${SITE_URL}/#organization` },
+      inLanguage: 'en-US',
+    },
+    {
+      '@type': 'SoftwareApplication',
+      '@id':   `${SITE_URL}/#software`,
+      name:    SITE_NAME,
+      applicationCategory: 'BusinessApplication',
+      applicationSubCategory: SITE_TAGLINE,
+      operatingSystem: 'Web',
+      url:         SITE_URL,
+      description: SITE_DESCRIPTION,
+      publisher:   { '@id': `${SITE_URL}/#organization` },
+      featureList: FEATURES.map(f => f.title),
+    },
+  ],
+};
+
 export default function HomePage() {
   return (
     <div className="min-h-dvh bg-slate-50 text-slate-900 flex flex-col">
+      {/* Escaping `<` guards against HTML injection if any of the strings above
+          ever become dynamic — per the Next.js JSON-LD guide. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c'),
+        }}
+      />
 
       {/* ── Sticky Nav ─────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-sm">
@@ -244,7 +304,7 @@ export default function HomePage() {
             {/* Right: form */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
               <h3 className="text-lg font-bold mb-6 text-slate-900">Request a Demo</h3>
-              <DemoRequestForm />
+              <DemoRequestFormLazy />
             </div>
           </div>
         </div>
