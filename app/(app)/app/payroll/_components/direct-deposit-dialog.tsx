@@ -180,7 +180,7 @@ export function DirectDepositDialog({
           <form onSubmit={handleSubmitForm} className="space-y-4">
             {isDelete && existingAccount ? (
               <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4 space-y-1">
-                <p className="text-sm font-medium text-red-400">Remove this account?</p>
+                <p className="text-sm font-medium text-red-700 dark:text-red-300">Remove this account?</p>
                 <p className="text-sm text-muted-foreground">
                   {existingAccount.bank_name} — {existingAccount.account_type} ••••{existingAccount.account_last4}
                 </p>
@@ -342,7 +342,7 @@ export function DirectDepositDialog({
         {step === 'done' && (
           <div className="flex flex-col items-center gap-4 py-4 text-center">
             <div className="h-12 w-12 rounded-full bg-emerald-500/15 flex items-center justify-center">
-              <CheckCircle className="h-6 w-6 text-emerald-400" />
+              <CheckCircle className="h-6 w-6 text-emerald-700 dark:text-emerald-300" />
             </div>
             <div>
               <p className="font-semibold">

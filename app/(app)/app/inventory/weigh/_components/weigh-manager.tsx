@@ -53,9 +53,9 @@ const SHIFT_LABELS: Record<string, string> = {
 };
 
 const SHIFT_COLORS: Record<string, string> = {
-  opening: 'bg-blue-100 text-blue-700',
-  closing: 'bg-purple-100 text-purple-700',
-  daily:   'bg-green-100 text-green-700',
+  opening: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+  closing: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
+  daily:   'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300',
 };
 
 // ── sub-components ────────────────────────────────────────────────────────────

@@ -233,7 +233,7 @@ export function InventoryImportDialog({ open, onOpenChange }: Props) {
                             UPDATE · was {item.existingStock ?? 0}
                           </Badge>
                         ) : (
-                          <Badge className="text-[10px] font-medium bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
+                          <Badge className="text-[10px] font-medium bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
                             NEW
                           </Badge>
                         )}
@@ -328,7 +328,7 @@ export function InventoryImportDialog({ open, onOpenChange }: Props) {
           <div className="flex flex-col gap-5 px-6 py-8">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
-                <Check className="h-5 w-5 text-emerald-400" />
+                <Check className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
               </div>
               <div>
                 <p className="font-semibold">Import complete</p>
@@ -341,7 +341,7 @@ export function InventoryImportDialog({ open, onOpenChange }: Props) {
 
             {result.errors.length > 0 && (
               <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 space-y-1">
-                <p className="text-xs font-semibold text-red-400 flex items-center gap-1.5">
+                <p className="text-xs font-semibold text-red-700 dark:text-red-300 flex items-center gap-1.5">
                   <AlertTriangle className="h-3.5 w-3.5" /> Errors
                 </p>
                 {result.errors.map((e, i) => (

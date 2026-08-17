@@ -12,6 +12,13 @@ function getCatName(raw: unknown): string {
 }
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+// Movements that ADD stock rather than consume it. A POS reversal lands here
+// because it only ever fires when the POS restates a day downward — treating it
+// as consumption would inflate velocity every time a void was corrected.
+// `pos_sale` is deliberately absent: a POS sale is consumption, which is the
+// whole point of depleting stock from the item audit.
+const NON_CONSUMPTION_REASONS = new Set(['delivery', 'pos_reversal']);
+
 const SHRINKAGE_REASONS = new Set(['spillage', 'comp', 'staff_drink', 'recount']);
 const REASON_LABELS: Record<string, string> = {
   spillage:    'Spillage',
@@ -73,7 +80,7 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
     if (item.par_level !== null && item.current_stock < item.par_level) e.lowCount++;
   }
   for (const log of logs30 ?? []) {
-    if (log.reason === 'delivery') continue;
+    if (NON_CONSUMPTION_REASONS.has(log.reason)) continue;
     const info = itemMap.get(log.item_id);
     if (info) { const e = catMap.get(info.category); if (e) e.consumption30d += log.quantity ?? 0; }
   }

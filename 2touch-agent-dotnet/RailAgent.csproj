@@ -10,6 +10,17 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>RailAgent</RootNamespace>
     <AssemblyName>rail-2touch-agent</AssemblyName>
+
+    <!-- The single source of truth for the agent's version.
+         RailAgent.Setup.AgentVersion reads it back off the assembly at runtime,
+         and rail-update.exe compares it against the manifest Rail publishes, so
+         bumping this number here is the whole release process.
+         Keep it SemVer: the updater parses it with System.Version. -->
+    <Version>1.0.0</Version>
+    <!-- Shown in the file properties dialog on the POS box, where an operator
+         reading a version number is most likely to be looking. -->
+    <Product>Rail 2Touch Agent</Product>
+    <Company>Rail</Company>
     <!-- NOTE: do NOT enable InvariantGlobalization — Microsoft.Data.SqlClient
          requires ICU/globalization support and throws at connect time without it. -->
     <!-- Publish flags (RID / self-contained / single-file) are passed on the
@@ -18,11 +29,28 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The test project lives under this directory, so keep it out of the
-         root project's default **/*.cs glob. -->
+    <!-- The test project and the standalone diagnostic both live under this
+         directory, so keep them out of the root project's default **/*.cs glob. -->
     <Compile Remove="tests/**" />
     <None Remove="tests/**" />
     <EmbeddedResource Remove="tests/**" />
+    <Compile Remove="tools/**" />
+    <None Remove="tools/**" />
+    <EmbeddedResource Remove="tools/**" />
+    <!-- rail-setup.exe, rail-update.exe and rail-uninstall.exe are separate
+         executables that REFERENCE this project. They must not also be compiled
+         into it, or every one of their entry points would collide with
+         Program.cs. -->
+    <Compile Remove="apps/**" />
+    <None Remove="apps/**" />
+    <EmbeddedResource Remove="apps/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Diagnostics.Bounded is the anti-hang guarantee the whole diagnose mode
+         rests on, and it cannot be exercised through the public surface: a real
+         SqlClient call hits its own ConnectTimeout first. -->
+    <InternalsVisibleTo Include="RailAgent.Tests" />
   </ItemGroup>
 
   <ItemGroup>

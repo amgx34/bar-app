@@ -228,6 +228,7 @@ export async function syncCloverInventory(): Promise<SyncResult> {
     if (!item.name?.trim()) { result.skipped++; continue; }
     const match = (item.code && bySku.get(item.code)) ?? byName.get(item.name.toLowerCase());
     if (match) {
+      // admin-scope-ok: match.id comes from `existing`, fetched with .eq('organization_id', org.id)
       const { error } = await admin.from('inventory_items').update({ sale_price: item.price != null ? item.price / 100 : undefined, sku: item.code || match.sku || null, ...(item.stockCount != null ? { current_stock: item.stockCount } : {}) }).eq('id', match.id);
       error ? result.skipped++ : result.updated++;
     } else {
@@ -440,6 +441,7 @@ export async function syncToastInventory(): Promise<SyncResult> {
     if (!item.name?.trim() || item.hidden) { result.skipped++; continue; }
     const match = (item.sku && bySku.get(item.sku)) ?? byName.get(item.name.toLowerCase());
     if (match) {
+      // admin-scope-ok: match.id comes from `existing`, fetched with .eq('organization_id', org.id)
       const { error } = await admin.from('inventory_items').update({
         sale_price: item.price != null ? item.price / 100 : undefined,
         sku: item.sku || match.sku || null,

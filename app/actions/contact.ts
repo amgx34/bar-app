@@ -1,8 +1,11 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { checkRateLimit, clientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { sendEmail } from '@/lib/reps/email';
 import { demoRequestSchema } from '@/lib/schemas/demo';
+import { formatAttribution, type Attribution } from '@/lib/utm';
 
 const NOTIFY_TO = 'railsystemspos@gmail.com';
 
@@ -26,8 +29,13 @@ function buildNotificationEmail(input: {
   inquiry_type: string;
   message?: string;
   preferred_date?: string;
+  attribution?: Attribution;
 }): string {
   const typeLabel = INQUIRY_LABELS[input.inquiry_type] ?? input.inquiry_type;
+  // Where the lead came from, on the same line as everything else about it —
+  // so whoever reads this inbox can tell paid traffic from organic without
+  // opening the database.
+  const source = formatAttribution(input.attribution ?? {});
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -74,6 +82,10 @@ function buildNotificationEmail(input: {
           <td style="padding:8px 0;color:#6b7280;vertical-align:top">Message</td>
           <td style="padding:8px 0;white-space:pre-wrap">${esc(input.message)}</td>
         </tr>` : ''}
+        <tr style="border-top:1px solid #f3f4f6">
+          <td style="padding:8px 0;color:#6b7280;vertical-align:top">Source</td>
+          <td style="padding:8px 0;color:#6b7280;font-size:12px">${esc(source)}</td>
+        </tr>
       </table>
 
       <div style="margin-top:20px;padding:12px 16px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0">
@@ -94,6 +106,17 @@ function buildNotificationEmail(input: {
 }
 
 export async function submitDemoRequest(raw: unknown): Promise<void> {
+  // Unauthenticated, writes a row and sends mail to a human inbox — so it is
+  // bounded before any of that happens. Keyed on IP: there is no session here.
+  const ip = clientIp(await headers());
+  const limit = await checkRateLimit(RATE_LIMITS.contactForm, ip);
+  if (!limit.allowed) {
+    const minutes = Math.max(1, Math.ceil(limit.retryAfterSeconds / 60));
+    throw new Error(
+      `Too many requests from this connection. Please try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`,
+    );
+  }
+
   const input = demoRequestSchema.parse(raw);
   const admin = createAdminClient();
 
@@ -108,6 +131,11 @@ export async function submitDemoRequest(raw: unknown): Promise<void> {
     message:        input.message       || null,
     preferred_date: input.preferred_date || null,
     status:         'new',
+    // Null rather than {} for a direct visit, so "no campaign" and "captured
+    // nothing" are the same thing in the data instead of two states to explain.
+    attribution:    input.attribution && Object.keys(input.attribution).length > 0
+                      ? input.attribution
+                      : null,
   });
 
   if (error) throw new Error('Failed to save your request. Please try again.');

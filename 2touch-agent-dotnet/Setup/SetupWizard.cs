@@ -15,7 +15,7 @@ namespace RailAgent.Setup;
 /// Re-running on an already-installed box is supported and is the intended way
 /// to fix a bad schema mapping: it stops the service, rewrites config, restarts.
 /// </summary>
-public sealed class SetupWizard(string[] args)
+public sealed class SetupWizard(string[] args, Unattended? unattended = null)
 {
     public const string InstallDirectory = @"C:\rail-agent";
     private const string ReadLogin = "BarAppRead";
@@ -23,6 +23,26 @@ public sealed class SetupWizard(string[] args)
 
     private readonly AgentConfig _cfg = new();
     private string _installDir = InstallDirectory;
+
+    private bool Auto => unattended is not null;
+
+    /// <summary>"Press Enter to close" is for a person at the keyboard; an
+    /// unattended run launched from a script would sit on it forever.</summary>
+    private void Pause()
+    {
+        if (!Auto) ConsoleUi.PauseIfInteractive();
+    }
+
+    /// <summary>
+    /// Refuses a choice that would otherwise have been a prompt. Unattended setup
+    /// must not guess between two instances or two databases — picking wrong
+    /// silently points the service at another bar's data.
+    /// </summary>
+    private void CannotChoose(string what, IEnumerable<string> options, string flag)
+        => ConsoleUi.Diagnose(
+            $"Unattended setup cannot choose {what}.",
+            $"Candidates: {string.Join(", ", options)}",
+            $"Re-run with {flag} to name it, or without {Unattended.Flag} to be asked.");
 
     public async Task<int> RunAsync(CancellationToken ct)
     {
@@ -52,7 +72,7 @@ public sealed class SetupWizard(string[] args)
             if (!await Stage11StartAndVerifyAsync(ct)) return 1;
 
             Stage12Summary();
-            ConsoleUi.PauseIfInteractive();
+            Pause();
             return 0;
         }
         catch (OperationCanceledException)
@@ -66,7 +86,7 @@ public sealed class SetupWizard(string[] args)
             // Last resort only: every stage below diagnoses its own failures.
             ConsoleUi.Blank();
             ConsoleUi.Fail($"Setup stopped: {ex.Message}");
-            ConsoleUi.PauseIfInteractive();
+            Pause();
             return 1;
         }
     }
@@ -93,7 +113,7 @@ public sealed class SetupWizard(string[] args)
         ConsoleUi.Diagnose(
             $"Could not relaunch elevated: {error}",
             "Right-click the exe and choose \"Run as administrator\", then try again.");
-        ConsoleUi.PauseIfInteractive();
+        Pause();
         return false;
     }
 
@@ -102,6 +122,19 @@ public sealed class SetupWizard(string[] args)
     private PairingInfo Stage2PairingCode()
     {
         ConsoleUi.Stage(2, "Pairing code");
+
+        if (unattended is not null)
+        {
+            // Already decoded once in Unattended.TryCreate, before elevation.
+            PairingCode.TryDecode(unattended.Code, out var fromFile, out _);
+            _cfg.Rail.OrgId      = fromFile!.OrgId;
+            _cfg.Rail.AuthToken  = fromFile.AgentToken;
+            _cfg.Rail.ApiBaseUrl = fromFile.ApiBaseUrl;
+            ConsoleUi.Ok($"Read from {unattended.Source}");
+            ConsoleUi.Ok($"Org {fromFile.OrgId} at {fromFile.ApiBaseUrl}");
+            return fromFile;
+        }
+
         ConsoleUi.Info("In Rail: Settings → POS Integration → 2TouchPOS → Copy pairing code.");
 
         while (true)
@@ -192,9 +225,19 @@ public sealed class SetupWizard(string[] args)
         }
 
         string server;
-        if (instances.Count == 1)
+        if (unattended?.Server is { } named)
+        {
+            server = named;
+            ConsoleUi.Info($"Instance given on the command line: {server}");
+        }
+        else if (instances.Count == 1)
         {
             server = instances[0];
+        }
+        else if (Auto)
+        {
+            CannotChoose("between SQL Server instances", instances, "--server <instance>");
+            return null;
         }
         else
         {
@@ -202,9 +245,12 @@ public sealed class SetupWizard(string[] args)
             server = instances[ConsoleUi.Choose("Which instance holds TwoTouch?", instances)];
         }
 
+        // The protocol is settled in stage 5 by trying them, not asserted here.
+        // Shared memory is preferred and usually available, but a real 2Touch box
+        // turned up with it disabled, and claiming it before testing produced a
+        // connection failure that read like the server was missing.
         _cfg.Sql.Server = server;
-        _cfg.Sql.Protocol = "lpc:";   // shared memory: no TCP port, no SQL Browser
-        ConsoleUi.Ok($"Using {server} over shared memory");
+        ConsoleUi.Ok($"Using {server}");
         return server;
     }
 
@@ -214,21 +260,29 @@ public sealed class SetupWizard(string[] args)
     {
         ConsoleUi.Stage(5, "Finding the TwoTouch database");
 
-        SqlConnection conn;
-        try
-        {
-            // master with the elevated Windows identity: enough to enumerate and,
-            // if this account is sysadmin, to grant read access in stage 6.
-            conn = await SqlProbe.OpenAsync(SqlProbe.Probe(server, "master"), ct);
-        }
-        catch (Exception ex)
+        // master with the elevated Windows identity: enough to enumerate and,
+        // if this account is sysadmin, to grant read access in stage 6. The
+        // protocol is whichever one answers first — see SqlProbe.Protocols.
+        var opened = await SqlProbe.OpenFirstWorkingAsync(server, "master", user: "", password: "", ct);
+        if (opened is null)
         {
             ConsoleUi.Diagnose(
-                $"Could not connect to {server}: {ex.Message}",
-                $"{Elevation.CurrentUser()} may have no SQL login on this instance.",
-                "Run setup as an account that can log in to SQL Server.");
+                $"Could not connect to {server} over any protocol "
+                    + $"({string.Join(", ", SqlProbe.Protocols.Select(SqlProbe.Describe))}).",
+                $"{Elevation.CurrentUser()} may have no SQL login on this instance,",
+                "or the SQL Server service for it may not be running.",
+                "Run rail-diagnose.exe for the full picture.");
             return null;
         }
+
+        var (conn, protocol) = opened.Value;
+        _cfg.Sql.Protocol = protocol;
+        ConsoleUi.Ok($"Connected over {SqlProbe.Describe(protocol)}");
+
+        if (protocol != "lpc:")
+            ConsoleUi.Info("Shared memory was unavailable, so the agent will use "
+                         + $"{SqlProbe.Describe(protocol)} instead. This still works, but it is worth "
+                         + "enabling Shared Memory in SQL Server Configuration Manager when convenient.");
 
         List<string> databases;
         try { databases = await SqlProbe.ListDatabasesAsync(conn, ct); }
@@ -249,9 +303,47 @@ public sealed class SetupWizard(string[] args)
         }
 
         var exact = databases.FindIndex(d => d.Equals("TwoTouch", StringComparison.OrdinalIgnoreCase));
-        var chosen = exact >= 0 && databases.Count == 1
-            ? databases[exact]
-            : databases[ConsoleUi.Choose("Which database?", databases, @default: Math.Max(exact, 0))];
+
+        string chosen;
+        if (unattended?.Database is { } namedDb)
+        {
+            var found = databases.FirstOrDefault(d => d.Equals(namedDb, StringComparison.OrdinalIgnoreCase));
+            if (found is null)
+            {
+                ConsoleUi.Diagnose(
+                    $"--database {namedDb} is not on this instance.",
+                    $"Visible: {string.Join(", ", databases)}");
+                conn.Dispose();
+                return null;
+            }
+            chosen = found;
+        }
+        else if (exact >= 0)
+        {
+            chosen = databases[exact];       // an exact "TwoTouch" needs no asking
+        }
+        else if (Auto)
+        {
+            // No exact match: accept a single obvious candidate, refuse a guess.
+            var looksRight = databases
+                .Where(d => d.Contains("2touch", StringComparison.OrdinalIgnoreCase)
+                         || d.Contains("twotouch", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (looksRight.Count != 1)
+            {
+                CannotChoose("which database holds the POS data",
+                             looksRight.Count == 0 ? databases : looksRight,
+                             "--database <name>");
+                conn.Dispose();
+                return null;
+            }
+            chosen = looksRight[0];
+        }
+        else
+        {
+            chosen = databases[ConsoleUi.Choose("Which database?", databases, @default: Math.Max(exact, 0))];
+        }
 
         _cfg.Sql.Database = chosen;
         ConsoleUi.Ok($"Using database {chosen}");
@@ -293,6 +385,19 @@ public sealed class SetupWizard(string[] args)
 
     private async Task<bool> FallbackToSqlLoginAsync(CancellationToken ct)
     {
+        if (Auto)
+        {
+            // The only unattended path is Windows auth, which stores no password.
+            // Asking for sa is exactly what unattended cannot do.
+            ConsoleUi.Diagnose(
+                "Unattended setup cannot grant read access on this instance.",
+                $"{Elevation.CurrentUser()} is not a SQL sysadmin, so the Windows-auth grant failed,",
+                "and creating the BarAppRead login needs an sa password nobody can type here.",
+                $"Either run setup as a SQL sysadmin, or run it without {Unattended.Flag} to be prompted,",
+                $"or have a DBA run:{Environment.NewLine}{Indent(SqlProbe.ManualGrantScript(_cfg.Sql.Database, ReadLogin))}");
+            return false;
+        }
+
         ConsoleUi.Info($"Creating the {ReadLogin} SQL login needs sa (or another sysadmin).");
 
         var saUser = ConsoleUi.Ask("SQL admin username", "sa");
@@ -302,7 +407,7 @@ public sealed class SetupWizard(string[] args)
         try
         {
             sa = await SqlProbe.OpenAsync(
-                SqlProbe.Probe(_cfg.Sql.Server, "master", saUser, saPassword), ct);
+                SqlProbe.Probe(_cfg.Sql.Server, "master", saUser, saPassword, _cfg.Sql.Protocol), ct);
         }
         catch (Exception ex)
         {
@@ -373,6 +478,17 @@ public sealed class SetupWizard(string[] args)
             ConsoleUi.Blank();
             ConsoleUi.Info($"── {feed.Label} ─────────────────────────────");
 
+            if (Auto)
+            {
+                // Discovery is a conversation — propose, adjust, confirm. There is
+                // no honest unattended version of it, so the feed is left off and
+                // named, rather than mapped by guesswork.
+                ConsoleUi.Warn($"{feed.Label} is not covered by the built-in mapping — skipped (unattended).");
+                ConsoleUi.Info($"Re-run without {Unattended.Flag} to map it by hand.");
+                SetFeedSkipped(feed);
+                continue;
+            }
+
             if (!await MapFeedAsync(feed, relations, conn, ct))
                 SetFeedSkipped(feed);
         }
@@ -380,7 +496,12 @@ public sealed class SetupWizard(string[] args)
         if (SyncService.Enabled(_cfg.Tables.ZReport)
             || SyncService.Enabled(_cfg.Tables.EwReport)
             || SyncService.Enabled(_cfg.Tables.ItemAudit))
+        {
+            // Before stage 8, so the preview shows the dates the service will
+            // actually produce rather than raw calendar days.
+            ResolveBusinessDayCutoff();
             return true;
+        }
 
         ConsoleUi.Blank();
         ConsoleUi.Diagnose(
@@ -417,7 +538,11 @@ public sealed class SetupWizard(string[] args)
         }
 
         ConsoleUi.Blank();
-        if (!ConsoleUi.Confirm("Use the built-in mapping for those feeds?"))
+        if (Auto)
+        {
+            ConsoleUi.Info("Using the built-in mapping (unattended).");
+        }
+        else if (!ConsoleUi.Confirm("Use the built-in mapping for those feeds?"))
         {
             ConsoleUi.Info("Falling back to schema discovery for all three feeds.");
             return taken;
@@ -426,6 +551,10 @@ public sealed class SetupWizard(string[] args)
         foreach (var feed in available)
         {
             TwoTouchProfile.Apply(feed, _cfg);
+
+            // The built-in feeds expose the raw ticket timestamp on purpose —
+            // 2Touch has no business-date column. See TwoTouchProfile's date note.
+            if (feed.FeedKey == FeedSpecs.ZReportKey) _zDateType = "datetime";
 
             var spec = FeedSpecs.All.Single(f => f.Key == feed.FeedKey);
             var error = await ProveAsync(spec, conn, ct);
@@ -447,6 +576,63 @@ public sealed class SetupWizard(string[] args)
 
     private static string FeedLabel(string feedKey)
         => FeedSpecs.All.Single(f => f.Key == feedKey).Label;
+
+    /// <summary>
+    /// SQL type of the mapped Z-report date column, recorded during mapping.
+    /// Null when the Z-report feed was skipped.
+    /// </summary>
+    private string? _zDateType;
+
+    /// <summary>
+    /// Settles which hour separates one trading day from the next.
+    ///
+    /// A bar open 17:00-03:00 trades over two calendar dates. Without this the
+    /// hours after midnight are filed under the next day, and sales appear on
+    /// days the venue was closed — so this is asked explicitly rather than left
+    /// to a default nobody sees.
+    /// </summary>
+    private void ResolveBusinessDayCutoff()
+    {
+        ConsoleUi.Blank();
+        ConsoleUi.Info("── Trading day ─────────────────────────────");
+
+        if (_zDateType is null)
+        {
+            ConsoleUi.Info("No sales feed mapped — leaving the trading-day cutoff at its default.");
+            return;
+        }
+
+        if (!SqlTypes.CarriesTime(_zDateType))
+        {
+            // Shifting an already-rounded date would move every night back a day.
+            _cfg.Sync.BusinessDayCutoffHour = 0;
+            ConsoleUi.Ok($"The sales date column is '{_zDateType}' — it already holds a trading date, so no cutoff is applied.");
+            return;
+        }
+
+        var hour = SyncConfig.DefaultBusinessDayCutoffHour;
+        ConsoleUi.Info($"The sales date column is '{_zDateType}', so it records when each ticket was rung.");
+        ConsoleUi.Info($"Sales before {hour}:00 will be counted as part of the previous night.");
+
+        if (!Auto)
+        {
+            ConsoleUi.Info("Change this only if the bar regularly trades past 4am.");
+            var answer = ConsoleUi.Ask("Hour that starts a new trading day (0-12)", hour.ToString());
+            if (int.TryParse(answer, out var parsed) && parsed is >= 0 and <= 12)
+            {
+                hour = parsed;
+            }
+            else if (!string.IsNullOrWhiteSpace(answer) && answer != hour.ToString())
+            {
+                ConsoleUi.Warn($"'{answer}' is not an hour between 0 and 12 — keeping {hour}.");
+            }
+        }
+
+        _cfg.Sync.BusinessDayCutoffHour = hour;
+        ConsoleUi.Ok(hour == 0
+            ? "No trading-day cutoff — calendar dates will be used as-is."
+            : $"Trading day starts at {hour:00}:00.");
+    }
 
     /// <summary>Propose, let the operator adjust, then prove with a TOP 5 query.</summary>
     private async Task<bool> MapFeedAsync(
@@ -544,6 +730,9 @@ public sealed class SetupWizard(string[] args)
                 {
                     Date = Q("Date"), Sales = Q("Sales"), CcTips = Q("CcTips"), CashTips = Q("CashTips"),
                 };
+                // Drives the business-day cutoff: a datetime still holds the hour
+                // the ticket was rung, a plain date has already been rounded.
+                _zDateType = mapping["Date"].DataType;
                 break;
 
             case FeedSpecs.EwReportKey:
@@ -595,11 +784,13 @@ public sealed class SetupWizard(string[] args)
         }
     }
 
+    // Preview must run the EXACT query the service will, cutoff included —
+    // otherwise setup shows dates the running agent would never produce.
     private string FeedSql(FeedSpec feed, int days, int? top) => feed.Key switch
     {
-        FeedSpecs.ZReportKey   => SqlReader.ZReportSql(_cfg.Tables.ZReport, _cfg.Columns.ZReport, days, top),
-        FeedSpecs.EwReportKey  => SqlReader.EwReportSql(_cfg.Tables.EwReport, _cfg.Columns.EwReport, days, top),
-        _                      => SqlReader.ItemAuditSql(_cfg.Tables.ItemAudit, _cfg.Columns.ItemAudit, days, top),
+        FeedSpecs.ZReportKey   => SqlReader.ZReportSql(_cfg.Tables.ZReport, _cfg.Columns.ZReport, days, _cfg.Sync.ResolvedCutoffHour, top),
+        FeedSpecs.EwReportKey  => SqlReader.EwReportSql(_cfg.Tables.EwReport, _cfg.Columns.EwReport, days, _cfg.Sync.ResolvedCutoffHour, top),
+        _                      => SqlReader.ItemAuditSql(_cfg.Tables.ItemAudit, _cfg.Columns.ItemAudit, days, _cfg.Sync.ResolvedCutoffHour, top),
     };
 
     // ── 8. Preview ────────────────────────────────────────────────────────────
@@ -638,7 +829,15 @@ public sealed class SetupWizard(string[] args)
         if (total == 0)
         {
             ConsoleUi.Warn($"The queries ran but returned no rows in the last {PreviewDays} days.");
-            if (!ConsoleUi.Confirm("Install anyway?", @default: false))
+
+            if (Auto)
+            {
+                // The mapping already proved itself at stage 7, so an empty window
+                // is more likely a quiet week than a broken mapping. Install, but
+                // make sure the warning is in the log the installer leaves behind.
+                ConsoleUi.Warn("Installing anyway (unattended). Confirm data appears in Rail before leaving.");
+            }
+            else if (!ConsoleUi.Confirm("Install anyway?", @default: false))
             {
                 ConsoleUi.Info("Stopped. Re-run setup once the mapping points at the right relations.");
                 return false;
@@ -667,8 +866,22 @@ public sealed class SetupWizard(string[] args)
     {
         ConsoleUi.Stage(10, "Installing the Windows Service");
 
-        var target = Path.Combine(_installDir, "rail-2touch-agent.exe");
-        var running = Environment.ProcessPath!;
+        var target = Path.Combine(_installDir, AgentVersion.AgentExeName);
+
+        // The SOURCE is the agent binary sitting beside this installer — not the
+        // running process. rail-setup.exe is its own executable now, and copying
+        // Environment.ProcessPath here would register the installer as the
+        // service: it would start, find no Worker, and the bar would silently
+        // stop syncing.
+        var source = ResolveAgentSource();
+        if (source is null)
+        {
+            ConsoleUi.Diagnose(
+                $"{AgentVersion.AgentExeName} is not in this folder.",
+                "Setup installs the agent that ships beside it. Extract the whole download",
+                "to one folder and run rail-setup.exe from there.");
+            return false;
+        }
 
         if (ServiceControl.Exists())
         {
@@ -677,9 +890,9 @@ public sealed class SetupWizard(string[] args)
             ServiceControl.Delete();
         }
 
-        if (!string.Equals(Path.GetFullPath(running), Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(Path.GetFullPath(source), Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase))
         {
-            try { File.Copy(running, target, overwrite: true); }
+            try { File.Copy(source, target, overwrite: true); }
             catch (Exception ex)
             {
                 ConsoleUi.Diagnose(
@@ -690,6 +903,13 @@ public sealed class SetupWizard(string[] args)
         }
         ConsoleUi.Ok($"Agent installed at {target}");
 
+        // The updater and uninstaller go in beside it. Without this they would
+        // live only in the download folder, which is the first thing anyone
+        // clears out — and rail-update.exe has to sit next to the binary it
+        // replaces to find it.
+        CopyCompanion("rail-update.exe");
+        CopyCompanion("rail-uninstall.exe");
+
         var result = ServiceControl.Install(target, _installDir);
         if (!result.Ok)
         {
@@ -699,6 +919,56 @@ public sealed class SetupWizard(string[] args)
 
         ConsoleUi.Ok($"Service '{ServiceControl.ServiceName}' registered (automatic start, restarts on crash)");
         return true;
+    }
+
+    /// <summary>
+    /// Finds the agent executable to install.
+    ///
+    /// Beside the installer normally. Falling back to the running process keeps
+    /// a one-file install working — an older combined build, or someone who
+    /// renamed the agent to rail-setup.exe — rather than refusing outright.
+    /// </summary>
+    private static string? ResolveAgentSource()
+    {
+        var beside = Path.Combine(
+            Path.GetDirectoryName(Environment.ProcessPath!) ?? AgentVersion.InstallDirectory,
+            AgentVersion.AgentExeName);
+
+        if (File.Exists(beside)) return beside;
+
+        // Is the running process itself the agent? It is when this assembly
+        // carries the Worker, which only the agent build does.
+        var running = Environment.ProcessPath!;
+        return string.Equals(
+            Path.GetFileName(running), AgentVersion.AgentExeName, StringComparison.OrdinalIgnoreCase)
+            ? running
+            : null;
+    }
+
+    /// <summary>
+    /// Copies a sibling tool into the install directory. Best-effort and
+    /// non-fatal: a missing updater is worth a warning, but it must not fail an
+    /// otherwise-good install of the thing that actually syncs data.
+    /// </summary>
+    private void CopyCompanion(string fileName)
+    {
+        try
+        {
+            var source = Path.Combine(
+                Path.GetDirectoryName(Environment.ProcessPath!) ?? "", fileName);
+            if (!File.Exists(source)) return;
+
+            var target = Path.Combine(_installDir, fileName);
+            if (string.Equals(Path.GetFullPath(source), Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase))
+                return;
+
+            File.Copy(source, target, overwrite: true);
+            ConsoleUi.Ok($"{fileName} installed alongside the agent");
+        }
+        catch (Exception ex)
+        {
+            ConsoleUi.Warn($"Could not copy {fileName}: {ex.Message}");
+        }
     }
 
     // ── 11. Start and verify ──────────────────────────────────────────────────
@@ -798,7 +1068,9 @@ public sealed class SetupWizard(string[] args)
             ["Service name",      ServiceControl.ServiceName],
             ["Event Log source",  $"Application → {ServiceControl.ServiceName}"],
             ["Sync interval",     $"every {_cfg.Sync.IntervalMinutes} min, {_cfg.Sync.LookbackDays}-day lookback"],
-            ["Uninstall",         $@"{_installDir}\rail-2touch-agent.exe --uninstall"],
+            ["Agent version",     AgentVersion.ReadFileVersion(Path.Combine(_installDir, AgentVersion.AgentExeName))?.ToString(3) ?? "unknown"],
+            ["Update",            $@"{_installDir}\rail-update.exe"],
+            ["Uninstall",         $@"{_installDir}\rail-uninstall.exe"],
         ], indent: "    ");
 
         ConsoleUi.Blank();

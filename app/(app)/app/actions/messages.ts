@@ -113,7 +113,8 @@ export async function approveOrderReply(messageId: string): Promise<void> {
   await supabase
     .from('bar_messages')
     .update({ message_status: 'approved', is_read: true })
-    .eq('id', messageId);
+    .eq('id', messageId)
+    .eq('organization_id', org.id);
 
   revalidatePath('/app/reps');
 }
@@ -140,7 +141,8 @@ export async function denyOrderReply(messageId: string): Promise<void> {
   await supabase
     .from('bar_messages')
     .update({ message_status: 'denied', is_read: true })
-    .eq('id', messageId);
+    .eq('id', messageId)
+    .eq('organization_id', org.id);
 
   revalidatePath('/app/reps');
 }

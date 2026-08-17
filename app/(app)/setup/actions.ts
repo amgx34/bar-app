@@ -4,9 +4,12 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidatePath } from 'next/cache';
 import type { HourlyRates } from '@/lib/org';
+import { recordTermsAcceptance } from '@/lib/terms';
 
 export type SetupInput = {
   name:               string;
+  /** Ticked on the setup form. The org is not created without it. */
+  accepted_terms?:    boolean;
   bar_type?:          string;
   bar_state?:         string;
   bar_city?:          string;
@@ -38,6 +41,12 @@ export async function createOrgWithSettings(data: SetupInput) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
+
+  // Checked on the server, not just in the form: this is the moment a business
+  // relationship starts, and the record of it has to be trustworthy.
+  if (!data.accepted_terms) {
+    throw new Error('Please accept the Terms of Service to create your bar');
+  }
 
   const admin = createAdminClient();
 
@@ -81,6 +90,11 @@ export async function createOrgWithSettings(data: SetupInput) {
     .insert({ user_id: user.id, organization_id: org.id, role: 'owner' });
 
   if (memberErr) throw new Error(memberErr.message);
+
+  // Recorded after the membership so the acceptance can name the bar it was
+  // made for. Before the seed steps, which are best-effort — a failed rep
+  // insert must not cost us the consent record.
+  await recordTermsAcceptance(org.id);
 
   // ── Seed default categories (best-effort, non-blocking) ───────────────────
   await admin.from('inventory_categories').insert(

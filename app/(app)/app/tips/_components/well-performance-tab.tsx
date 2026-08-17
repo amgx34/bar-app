@@ -63,8 +63,8 @@ function fmtDate(iso: string): string {
 
 function performanceColor(ratio: number) {
   if (ratio >= 1.0) return 'text-primary';
-  if (ratio >= 0.85) return 'text-amber-400';
-  return 'text-red-400';
+  if (ratio >= 0.85) return 'text-amber-700 dark:text-amber-300';
+  return 'text-red-700 dark:text-red-300';
 }
 
 function PerformanceIcon({ ratio }: { ratio: number }) {
@@ -186,7 +186,7 @@ export default function WellPerformanceTab() {
           </div>
           <div>
             <span className="text-muted-foreground">Total Tips</span>
-            <span className="ml-2 font-semibold tabular-nums text-cyan-400">${daySales.totalTips.toFixed(2)}</span>
+            <span className="ml-2 font-semibold tabular-nums text-cyan-700 dark:text-cyan-300">${daySales.totalTips.toFixed(2)}</span>
           </div>
           <div>
             <span className="text-muted-foreground">Wells</span>

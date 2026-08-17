@@ -2,6 +2,12 @@
 
 import Groq from 'groq-sdk';
 import type { ParsedZReportText } from '@/lib/csv-parsers/parse-z-report-text';
+import {
+  businessDateFromLocal,
+  DEFAULT_BUSINESS_DAY_CUTOFF_HOUR,
+} from '@/lib/business-date';
+import { boundModelInput, callModel, enforceAiQuota, wrapUntrustedContent } from './guardrails';
+import { zReportAiSchema, describeSchemaFailure } from './schemas';
 
 const client = new Groq();
 
@@ -10,6 +16,7 @@ const SYSTEM_PROMPT = `You are a POS system data extraction assistant. Extract d
 Return ONLY a valid JSON object with this exact structure — no explanation, no markdown:
 {
   "reportDate": "YYYY-MM-DD",
+  "reportTime": "HH:MM",
   "totalSales": number,
   "totalTips": number,
   "serverData": [
@@ -18,7 +25,8 @@ Return ONLY a valid JSON object with this exact structure — no explanation, no
 }
 
 Rules:
-- reportDate: the business date the report covers (use the end date if it spans two days, or the run date)
+- reportDate: the calendar date printed on the report as the run/close date. Report exactly what the document says. Do NOT reason about which trading day it belongs to — that is applied downstream.
+- reportTime: the run/close time printed on the report, as 24-hour "HH:MM". Use null if the document shows no time.
 - totalSales: gross sales / grand total sales for the day (number, no currency symbols)
 - totalTips: total tips paid out for the day (positive number even if shown as negative in the report)
 - serverData: per-server breakdown if available — extract name, their total sales, and their tips paid out
@@ -29,6 +37,7 @@ Rules:
 Example output:
 {
   "reportDate": "2026-04-18",
+  "reportTime": "03:12",
   "totalSales": 8379.74,
   "totalTips": 1099.20,
   "serverData": [
@@ -42,7 +51,8 @@ Example output:
  * Falls back to this when the dedicated text parser doesn't recognise the file.
  */
 export async function parseZReportWithAI(
-  content: string
+  content: string,
+  cutoffHour: number = DEFAULT_BUSINESS_DAY_CUTOFF_HOUR,
 ): Promise<ParsedZReportText> {
   if (!process.env.GROQ_API_KEY) {
     throw new Error(
@@ -50,18 +60,25 @@ export async function parseZReportWithAI(
     );
   }
 
-  const completion = await client.chat.completions.create({
+  // Bound the spend before the call, and the payload before it is sent.
+  await enforceAiQuota();
+  const bounded = boundModelInput(content);
+
+  const completion = await callModel(() => client.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       {
         role: 'user',
-        content: `Extract the Z report data from this POS export:\n\n${content}`,
+        content: wrapUntrustedContent(
+          bounded,
+          'Extract the Z report data from the POS export below.',
+        ),
       },
     ],
     response_format: { type: 'json_object' },
     temperature: 0,
-  });
+  }));
 
   const raw = completion.choices[0]?.message?.content ?? '';
 
@@ -69,44 +86,35 @@ export async function parseZReportWithAI(
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error(`AI returned invalid JSON: ${raw.slice(0, 200)}`);
+    // Model output is untrusted too — never echo it into an error surfaced to
+    // the user, since a crafted file can choose what it says.
+    throw new Error('The AI returned a response that was not valid JSON. Try a supported export format.');
   }
 
-  const obj = parsed as Record<string, unknown>;
-
-  // Validate required fields
-  const reportDate = String(obj.reportDate ?? '').trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(reportDate)) {
-    throw new Error(`AI returned an invalid date: "${obj.reportDate}"`);
+  // The schema is what makes injection survivable: whatever the model was
+  // talked into saying, anything outside these bounds is rejected rather than
+  // coerced into a payroll figure.
+  const result = zReportAiSchema.safeParse(parsed);
+  if (!result.success) {
+    throw new Error(describeSchemaFailure(result.error));
   }
+  const data = result.data;
 
-  const totalSales = Number(obj.totalSales ?? 0);
-  const totalTips = Math.abs(Number(obj.totalTips ?? 0));
+  // The model reports the printed run date/time as raw facts; the trading-day
+  // rule is applied here. Keeping this out of the prompt means a crafted file
+  // cannot talk the model into re-dating a night's sales, and the rule stays
+  // testable without a model call.
+  const reportDate = businessDateFromLocal(data.reportDate, data.reportTime, cutoffHour);
 
-  if (isNaN(totalSales) || isNaN(totalTips)) {
-    throw new Error('AI returned non-numeric sales or tips values');
-  }
-
-  // Parse server data
   const EXCLUDED = new Set(['front door']);
-  const rawServers = Array.isArray(obj.serverData) ? obj.serverData : [];
-  const serverData = (rawServers as unknown[])
-    .filter((s) => typeof s === 'object' && s !== null)
-    .map((s) => {
-      const row = s as Record<string, unknown>;
-      return {
-        name: String(row.name ?? '').trim(),
-        totalSales: Number(row.totalSales ?? 0),
-        tipsPaidOut: Math.abs(Number(row.tipsPaidOut ?? 0)),
-      };
-    })
-    .filter(
-      (s) =>
-        s.name.length > 0 &&
-        !EXCLUDED.has(s.name.toLowerCase()) &&
-        !isNaN(s.totalSales) &&
-        !isNaN(s.tipsPaidOut)
-    );
+  const serverData = data.serverData.filter(
+    (s) => !EXCLUDED.has(s.name.toLowerCase()),
+  );
 
-  return { reportDate, totalSales, totalTips, serverData };
+  return {
+    reportDate,
+    totalSales: data.totalSales,
+    totalTips: data.totalTips,
+    serverData,
+  };
 }

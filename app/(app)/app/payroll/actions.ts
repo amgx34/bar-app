@@ -466,6 +466,10 @@ export interface PayrollEntry {
   regularPay: number;
   overtimePay: number;
   tipAmount: number;
+  /** Tips earned per hour worked over the period. 0 when no hours are recorded. */
+  tipsPerHour: number;
+  /** Base rate plus tips per hour — what the time was actually worth. */
+  effectiveHourlyRate: number;
   totalCompensation: number;
 }
 
@@ -698,6 +702,15 @@ export async function computePayroll(
 
       const totalCompensation = regularPay + overtimePay + tipAmount;
 
+      // What the shift was actually worth per hour. Bartenders judge a night by
+      // this rather than by the base rate, and it is the number that shows a
+      // slow Tuesday earning less than a busy Sunday at the same wage.
+      //
+      // Guarded on hours: an employee with tips but no recorded shift would
+      // otherwise divide by zero and surface Infinity in the table.
+      const tipsPerHour = totalHours > 0 ? tipAmount / totalHours : 0;
+      const effectiveHourlyRate = hourlyRate + tipsPerHour;
+
       payrollEntries.push({
         employeeId: employee.id,
         employeeName: employee.name,
@@ -709,6 +722,8 @@ export async function computePayroll(
         regularPay,
         overtimePay,
         tipAmount,
+        tipsPerHour,
+        effectiveHourlyRate,
         totalCompensation,
       });
     }

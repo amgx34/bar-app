@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowLeft, Download, CheckCircle, Clock, DollarSign, Users, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, Clock, DollarSign, Users, AlertTriangle } from 'lucide-react';
 import { computePayroll } from '../actions';
 import { getCurrentOrg } from '@/lib/org';
 import { PayrollReviewClient } from './_components/payroll-review-client';
@@ -96,6 +96,17 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
 
         {/* ── Period + totals summary ─────────────────────────────────────────── */}
         <div className="space-y-1">
+          {/* Positional cue for a three-level route — without it this page gives
+              no on-screen indication that it sits under Payroll. */}
+          <nav aria-label="Breadcrumb">
+            <Link
+              href="/app/payroll"
+              className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors duration-200"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+              Payroll
+            </Link>
+          </nav>
           <h1 className="text-2xl font-bold">Pay Period Review</h1>
           <p className="text-muted-foreground">{periodLabel} · {org.name}</p>
         </div>
@@ -131,13 +142,13 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
 
         {/* Unconfigured employees warning */}
         {unconfigured.length > 0 && (
-          <div className="flex items-start gap-3 rounded-xl border border-amber-300/50 bg-amber-50 px-4 py-3">
+          <div className="flex items-start gap-3 rounded-xl border border-amber-300/50 bg-amber-50 dark:bg-amber-950/40 px-4 py-3">
             <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
             <div className="text-sm">
-              <p className="font-medium text-amber-800">
+              <p className="font-medium text-amber-800 dark:text-amber-200">
                 {unconfigured.length} employee{unconfigured.length > 1 ? 's are' : ' is'} missing a role or hourly rate.
               </p>
-              <p className="text-amber-700 text-xs mt-0.5">
+              <p className="text-amber-700 dark:text-amber-300 text-xs mt-0.5">
                 Their pay may be calculated at $0/hr.{' '}
                 <Link href="/app/payroll?tab=employees" className="underline">Configure in Employees tab →</Link>
               </p>
@@ -221,8 +232,8 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
                   </div>
 
                   {!isConfigured && (
-                    <div className="px-5 py-2 bg-amber-50 border-t border-amber-200">
-                      <p className="text-[11px] text-amber-700 flex items-center gap-1">
+                    <div className="px-5 py-2 bg-amber-50 dark:bg-amber-950/40 border-t border-amber-200">
+                      <p className="text-[11px] text-amber-700 dark:text-amber-300 flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3" />
                         Missing role or hourly rate — pay may be $0
                       </p>
@@ -298,9 +309,9 @@ function SummaryKpi({
   highlight?: boolean;
 }) {
   return (
-    <div className={`rounded-xl border p-4 ${highlight ? 'bg-emerald-50 border-emerald-200' : 'bg-card'}`}>
+    <div className={`rounded-xl border p-4 ${highlight ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200' : 'bg-card'}`}>
       <div className={`mb-2 ${color}`}>{icon}</div>
-      <p className={`text-xl font-bold tabular-nums ${highlight ? 'text-emerald-700' : ''}`}>{value}</p>
+      <p className={`text-xl font-bold tabular-nums ${highlight ? 'text-emerald-700 dark:text-emerald-300' : ''}`}>{value}</p>
       <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
     </div>
   );

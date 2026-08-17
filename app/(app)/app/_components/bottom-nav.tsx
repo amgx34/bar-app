@@ -2,15 +2,20 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Package, TrendingUp, Users, BookOpen } from 'lucide-react';
+import { Home, Package, CircleDollarSign, Users, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Top-level destinations only — every entry is a section root that also appears
+// at the top level of the sidebar, so the two navs model the same hierarchy.
+// Previously slot 3 was /app/inventory/analytics, a *child* of Inventory sitting
+// beside four section roots; Payroll takes it, since Payroll was otherwise
+// reachable on a phone only by opening the sidebar sheet.
 const ITEMS = [
-  { label: 'Home',      href: '/app/dashboard',  icon: Home },
-  { label: 'Inventory', href: '/app/inventory',  icon: Package },
-  { label: 'Analytics', href: '/app/inventory/analytics', icon: TrendingUp },
-  { label: 'Reps',      href: '/app/reps',       icon: Users },
-  { label: 'Books',     href: '/app/books',      icon: BookOpen },
+  { label: 'Home',      href: '/app/dashboard', icon: Home },
+  { label: 'Inventory', href: '/app/inventory', icon: Package },
+  { label: 'Payroll',   href: '/app/payroll',   icon: CircleDollarSign },
+  { label: 'Reps',      href: '/app/reps',      icon: Users },
+  { label: 'Books',     href: '/app/books',     icon: BookOpen },
 ];
 
 export function BottomNav() {
@@ -18,8 +23,9 @@ export function BottomNav() {
 
   return (
     <nav
+      aria-label="Primary"
       className={cn(
-        'fixed bottom-0 left-0 right-0 z-50 md:hidden',
+        'fixed bottom-0 left-0 right-0 z-nav md:hidden',
         'bg-card/95 backdrop-blur-md border-t border-border',
         'shadow-[0_-2px_16px_rgba(0,0,0,0.07)]',
       )}
@@ -35,6 +41,7 @@ export function BottomNav() {
             <Link
               key={href}
               href={href}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex flex-col items-center gap-0.5 flex-1 py-1.5 px-1 rounded-xl transition-all duration-150 active:scale-95',
                 isActive ? 'text-primary' : 'text-muted-foreground',

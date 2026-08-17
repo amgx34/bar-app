@@ -131,7 +131,7 @@ export default function CSVUpload({ reportType }: CSVUploadProps) {
 
       {parseError && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950 flex gap-2">
-          <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+          <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-300 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-red-800 dark:text-red-200">
               Parse Error
@@ -146,7 +146,7 @@ export default function CSVUpload({ reportType }: CSVUploadProps) {
       {previewData && previewData.length > 0 && (
         <div className="space-y-3">
           <div className="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950 flex gap-2">
-            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-300 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-green-800 dark:text-green-200">
                 Ready to import — {totalParsed} row{totalParsed !== 1 ? 's' : ''} found

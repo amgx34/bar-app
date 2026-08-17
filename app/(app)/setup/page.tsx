@@ -73,8 +73,8 @@ export default function SetupPage() {
   const sectionCls = 'rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-5 space-y-4';
 
   return (
-    <main className="relative min-h-dvh flex items-center justify-center p-6 overflow-hidden bg-gray-950">
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-950 to-black" />
+    <main className="relative min-h-dvh flex items-center justify-center p-6 overflow-hidden bg-sidebar text-sidebar-foreground">
+      <div className="absolute inset-0 bg-gradient-to-br from-sidebar-accent via-sidebar to-background dark:to-black" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(20,184,166,0.07),transparent_60%)]" />
 
       <div className="relative z-10 w-full max-w-2xl pb-8">
@@ -217,9 +217,44 @@ export default function SetupPage() {
             </div>
           </div>
 
+          {/* Consent sits directly above the button that creates the account,
+              not buried in a footer link — it is the moment the relationship
+              starts. Links open in a new tab so reading them does not discard
+              a half-filled form. */}
+          <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-4 cursor-pointer hover:bg-white/[0.07] transition-colors">
+            <input
+              type="checkbox"
+              checked={Boolean(form.accepted_terms)}
+              onChange={(e) => set('accepted_terms', e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-primary cursor-pointer"
+            />
+            <span className="text-sm leading-relaxed text-white/70">
+              I agree to the{' '}
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noopener"
+                className="text-white underline underline-offset-2"
+              >
+                Terms of Service
+              </a>{' '}
+              and{' '}
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noopener"
+                className="text-white underline underline-offset-2"
+              >
+                Privacy Policy
+              </a>
+              , and I am authorised to accept them for this business.
+            </span>
+          </label>
+
           <Button
-            type="submit" disabled={loading || !form.name.trim()}
-            className="w-full h-12 text-base font-semibold bg-white text-gray-900 hover:bg-white/90"
+            type="submit"
+            disabled={loading || !form.name.trim() || !form.accepted_terms}
+            className="w-full h-12 text-base font-semibold bg-cta text-cta-foreground hover:brightness-95"
           >
             {loading ? 'Creating your bar…' : 'Continue →'}
           </Button>

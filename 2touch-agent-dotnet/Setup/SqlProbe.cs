@@ -45,15 +45,59 @@ public static class SqlProbe
         return found;
     }
 
-    public static SqlConfig Probe(string server, string database, string? user = null, string? password = null)
+    /// <summary>
+    /// Protocols tried, in order of preference. Shared memory first because it
+    /// needs no port and no SQL Browser, which is the whole reason this agent
+    /// exists — but it is not always available. A real 2Touch box was found with
+    /// Shared Memory disabled in SQL Server Configuration Manager, where only the
+    /// unprefixed form connects; hardcoding "lpc:" made setup impossible there.
+    /// The empty entry lets the client negotiate.
+    /// </summary>
+    public static readonly string[] Protocols = ["lpc:", "", "np:"];
+
+    public static string Describe(string? protocol) => protocol switch
+    {
+        "lpc:" => "shared memory",
+        "np:"  => "named pipes",
+        null or "" => "client default",
+        _      => protocol,
+    };
+
+    public static SqlConfig Probe(string server, string database,
+                                  string? user = null, string? password = null,
+                                  string? protocol = "lpc:", int timeoutSeconds = 15)
         => new()
         {
             Server   = server,
             Database = database,
             User     = user,
             Password = password,
-            Protocol = "lpc:",       // shared memory — no TCP port, no SQL Browser
+            Protocol = protocol,
+            ConnectTimeoutSeconds = timeoutSeconds,
         };
+
+    /// <summary>
+    /// Opens <paramref name="database"/> over the first protocol that works,
+    /// returning it alongside the connection so everything afterwards uses the
+    /// same one. Null when none connect.
+    /// </summary>
+    public static async Task<(SqlConnection Connection, string? Protocol)?> OpenFirstWorkingAsync(
+        string server, string database, string? user, string? password, CancellationToken ct)
+    {
+        foreach (var protocol in Protocols)
+        {
+            try
+            {
+                var cfg = Probe(server, database, user, password, protocol, timeoutSeconds: 5);
+                return (await OpenAsync(cfg, ct), protocol);
+            }
+            catch (Exception) when (!ct.IsCancellationRequested)
+            {
+                // Try the next one; the caller diagnoses only if all of them fail.
+            }
+        }
+        return null;
+    }
 
     public static async Task<SqlConnection> OpenAsync(SqlConfig cfg, CancellationToken ct)
     {
@@ -194,6 +238,22 @@ public static class SqlProbe
             USE [{database}];
             CREATE USER [{login}] FOR LOGIN [{login}];
             ALTER ROLE db_datareader ADD MEMBER [{login}];
+            """;
+
+    /// <summary>
+    /// The exact inverse of <see cref="ManualGrantScript"/>, for uninstall.
+    ///
+    /// The agent cannot run this itself: it connects as this very login, which
+    /// holds db_datareader and nothing more, so dropping it needs a sysadmin.
+    /// Printing the script means the credential does not silently outlive the
+    /// software that needed it.
+    /// </summary>
+    public static string ManualRevokeScript(string database, string login)
+        => $"""
+            USE [{database}];
+            DROP USER IF EXISTS [{login}];
+            USE [master];
+            DROP LOGIN [{login}];
             """;
 
     private static async Task<object?> ScalarAsync(SqlConnection conn, string sql, CancellationToken ct)

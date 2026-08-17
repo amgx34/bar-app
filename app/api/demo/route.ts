@@ -1,81 +1,90 @@
 /**
- * GET /api/demo
+ * POST /api/demo
  *
- * Creates a fresh demo user + org, seeds realistic inventory data,
- * signs in as that user (setting session cookies), and redirects to /app/inventory.
+ * Creates a fresh demo user + org, seeds realistic inventory data, signs in as
+ * that user (setting session cookies), and returns the URL to land on.
  *
- * Cleanup: at the start of every request, demo users older than DEMO_TTL_HOURS
- * are deleted (along with their organizations, which cascade to all child rows).
+ * Deliberately POST, not GET. Provisioning an auth user, an organisation and a
+ * seeded dataset is about as state-changing as a request gets, and as a GET it
+ * fired on link previews, prefetches and crawlers — robots.txt is advisory and
+ * does not stop any of them.
+ *
+ * Expired demos are swept by GET /api/cron/2touch, not here: the purge paged
+ * through every auth user in the project, so the cost of one visitor's request
+ * grew with the size of the user table.
  */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { seedDemoOrg } from '@/lib/demo/seed';
+import { recordTermsAcceptanceForUser } from '@/lib/terms';
+import { checkRateLimit, clientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 
-const DEMO_TTL_HOURS = 24;
-const DEMO_EMAIL_SUFFIX = '@rail.demo';
+export const DEMO_TTL_HOURS = 24;
+export const DEMO_EMAIL_SUFFIX = '@rail.demo';
+export const DEMO_SLUG_PREFIX = 'demo-tipsy-tavern-';
 
-// ── Cleanup expired demo accounts ────────────────────────────────────────────
+/**
+ * Ceiling on demo orgs alive at once. The per-IP limit alone does not bound
+ * total cost — a botnet spreads across addresses — so this caps the blast
+ * radius on the database regardless of where requests come from.
+ */
+const MAX_LIVE_DEMO_ORGS = 250;
 
-async function purgeExpiredDemoUsers() {
-  const admin = createAdminClient();
-  const cutoff = new Date(Date.now() - DEMO_TTL_HOURS * 60 * 60 * 1000).toISOString();
-
-  // Collect all expired demo user IDs (paginated)
-  const expiredIds: string[] = [];
-  let page = 1;
-
-  for (;;) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 100 });
-    if (error || !data?.users?.length) break;
-
-    for (const u of data.users) {
-      if (u.email?.endsWith(DEMO_EMAIL_SUFFIX) && u.created_at < cutoff) {
-        expiredIds.push(u.id);
-      }
-    }
-
-    if (data.users.length < 100) break; // last page
-    page++;
-  }
-
-  if (expiredIds.length === 0) return;
-
-  // Delete their organizations first — cascades to all child tables
-  // (inventory_items, z_report_days, employees, reps, weigh_reports, etc.)
-  const { data: memberRows } = await admin
-    .from('memberships')
-    .select('organization_id')
-    .in('user_id', expiredIds);
-
-  const orgIds = [...new Set((memberRows ?? []).map((m) => m.organization_id))];
-  if (orgIds.length > 0) {
-    await admin.from('organizations').delete().in('id', orgIds);
-  }
-
-  // Delete the auth users themselves
-  await Promise.allSettled(expiredIds.map((id) => admin.auth.admin.deleteUser(id)));
-
-  console.log(`[demo] purged ${expiredIds.length} expired demo account(s)`);
+function fail(reason: string, status: number) {
+  return NextResponse.json({ error: reason }, { status });
 }
 
-// ── Route handler ─────────────────────────────────────────────────────────────
-
-export async function GET(req: NextRequest) {
-  const origin = new URL(req.url).origin;
+export async function POST(req: NextRequest) {
+  // ── 0. Bound the abuse ────────────────────────────────────────────────────
+  const ip = clientIp(req.headers);
+  const limit = await checkRateLimit(RATE_LIMITS.demoCreate, ip);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many demo sessions from this address. Try again later.' },
+      { status: 429, headers: { 'Retry-After': String(Math.max(limit.retryAfterSeconds, 1)) } },
+    );
+  }
 
   try {
-    // Purge expired demos before creating a new one (non-blocking on failure)
-    await purgeExpiredDemoUsers().catch((e) =>
-      console.warn('[demo] purge error (non-fatal):', e),
-    );
+    // ── Never take over a real session ───────────────────────────────────────
+    //
+    // signInWithPassword below REPLACES whatever session cookie is present. An
+    // operator already signed in to their own bar who clicked "Try Demo" was
+    // therefore silently signed out of it and into a throwaway demo user — one
+    // the 24-hour purge then deletes. From their seat their account and the
+    // demo had merged.
+    //
+    // Anyone already signed in has no use for a demo, so send them to their own
+    // dashboard and provision nothing.
+    const existing = await createClient();
+    const { data: { user: signedIn } } = await existing.auth.getUser();
+
+    if (signedIn && !signedIn.email?.endsWith(DEMO_EMAIL_SUFFIX)) {
+      return NextResponse.json({
+        redirectTo: '/app/dashboard',
+        alreadySignedIn: true,
+      });
+    }
 
     const admin = createAdminClient();
 
+    // Counting orgs by slug prefix is one indexed query; counting auth users
+    // would page through the whole project.
+    const { count, error: countErr } = await admin
+      .from('organizations')
+      .select('id', { count: 'exact', head: true })
+      .like('slug', `${DEMO_SLUG_PREFIX}%`);
+
+    if (!countErr && (count ?? 0) >= MAX_LIVE_DEMO_ORGS) {
+      console.warn(`[demo] refused: ${count} live demo orgs >= cap ${MAX_LIVE_DEMO_ORGS}`);
+      return fail('Demo capacity is full right now. Please try again shortly.', 503);
+    }
+
     // ── 1. Create a fresh demo user ──────────────────────────────────────────
     const ts        = Date.now().toString(36);
-    const demoEmail = `demo-${ts}${DEMO_EMAIL_SUFFIX}`;
+    const demoEmail = `demo-${ts}-${randomUUID().slice(0, 8)}${DEMO_EMAIL_SUFFIX}`;
     const demoPass  = randomUUID();
 
     const { data: { user }, error: createErr } = await admin.auth.admin.createUser({
@@ -86,11 +95,17 @@ export async function GET(req: NextRequest) {
 
     if (createErr || !user) {
       console.error('Demo user creation failed:', createErr?.message);
-      return NextResponse.redirect(`${origin}/login?error=demo_unavailable`);
+      return fail('Demo is unavailable right now.', 503);
     }
 
     // ── 2. Seed demo org + data ──────────────────────────────────────────────
-    await seedDemoOrg(admin, user.id);
+    const demoOrgId = await seedDemoOrg(admin, user.id);
+
+    // Recorded here rather than left to the /app consent gate, which would put
+    // a wall in front of the demo the moment someone clicked "try it". The demo
+    // form states that continuing accepts the terms, so this is the record of
+    // that — and it is a real record, not a bypass.
+    await recordTermsAcceptanceForUser(user.id, demoOrgId);
 
     // ── 3. Sign in so the session cookie is set ───────────────────────────────
     const supabase = await createClient();
@@ -101,14 +116,22 @@ export async function GET(req: NextRequest) {
 
     if (signInErr) {
       console.error('Demo sign-in failed:', signInErr.message);
-      return NextResponse.redirect(`${origin}/login?error=demo_unavailable`);
+      return fail('Demo is unavailable right now.', 503);
     }
 
-    // ── 4. Redirect into the app ──────────────────────────────────────────────
-    return NextResponse.redirect(`${origin}/app/dashboard`);
+    // The client navigates; returning a URL keeps this a POST end to end.
+    return NextResponse.json({ redirectTo: '/app/dashboard' });
 
   } catch (err) {
     console.error('Demo creation error:', err);
-    return NextResponse.redirect(`${origin}/login?error=demo_unavailable`);
+    return fail('Demo is unavailable right now.', 503);
   }
+}
+
+/**
+ * The route used to be a GET. Anything still linking to it — an old bookmark,
+ * a cached page — gets sent to the marketing page rather than a bare 405.
+ */
+export async function GET(req: NextRequest) {
+  return NextResponse.redirect(new URL('/?demo=use-button', new URL(req.url).origin));
 }

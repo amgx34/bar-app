@@ -35,7 +35,13 @@ export default function ZReportTextUpload() {
     let ai = false;
 
     // Try deterministic parser first
-    try { result = parseZReportText(text); } catch { /* fall through to AI */ }
+    let deterministicError: string | null = null;
+    try {
+      result = parseZReportText(text);
+    } catch (err) {
+      deterministicError = err instanceof Error ? err.message : null;
+      /* fall through to AI */
+    }
 
     // Auto-fallback to AI if deterministic failed
     if (!result) {
@@ -43,7 +49,16 @@ export default function ZReportTextUpload() {
         result = await parseZReportWithAI(text);
         ai = true;
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Could not parse Z report');
+        // The pasted text is deliberately left in place. Losing a Z report
+        // someone retyped at 3am because a third-party service was down is a
+        // worse outcome than the failed import itself.
+        const message = err instanceof Error ? err.message : 'Could not read this Z report';
+        toast.error(message, {
+          description: deterministicError
+            ? `Direct read also failed: ${deterministicError}`
+            : undefined,
+          duration: 8000,
+        });
         setState('idle');
         return;
       }
@@ -123,10 +138,10 @@ export default function ZReportTextUpload() {
       {(state === 'preview' || state === 'saving') && parsed && (
         <div className="space-y-3">
           <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5">
-            <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
+            <CheckCircle className="h-4 w-4 text-emerald-700 dark:text-emerald-300 shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-emerald-300">{parsed.reportDate}</p>
-              <p className="text-xs text-emerald-400/80">
+              <p className="text-xs text-emerald-700 dark:text-emerald-300/80">
                 ${parsed.totalSales.toFixed(2)} sales · ${parsed.totalTips.toFixed(2)} tips · {parsed.serverData.length} servers
               </p>
             </div>

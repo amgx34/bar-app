@@ -8,6 +8,7 @@ import {
   DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { NotificationBell } from './notification-bell';
 
 const POS_LABELS: Record<string, string> = {
@@ -27,41 +28,37 @@ export function AppHeader({ email, posProvider, orgName, orgSlug }: Props) {
   const hasPOS = !!posProvider;
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center border-b border-border/60 bg-card/95 backdrop-blur-sm px-3 sm:px-6 gap-3">
+    <header className="sticky top-0 z-nav flex h-14 items-center border-b border-border/60 bg-card/95 backdrop-blur-sm px-3 sm:px-6 gap-3">
       <SidebarTrigger className="shrink-0" />
 
       <span className="font-bold text-base sm:text-lg tracking-[0.2em] text-primary uppercase select-none">
         Rail
       </span>
 
+      {/* Which bar you are editing. Rail is multi-tenant, so this must be
+          visible on phones too — it previously hid behind an `xs:` breakpoint
+          that Tailwind v4 does not define here, so it never rendered at all. */}
       {orgName && (
-        <span className="hidden xs:block sm:hidden text-sm text-muted-foreground truncate max-w-[120px]">
+        <span className="text-sm text-muted-foreground truncate max-w-[8rem] sm:max-w-[14rem]">
           {orgName}
         </span>
       )}
 
       <div className="flex-1" />
 
-      {/* POS badge — desktop */}
+      {/* POS status.
+          One element at both sizes: the label is the accessible name, so status
+          never depends on a `title` tooltip (unavailable on touch, unreliably
+          announced) or on colour alone. The dot is decorative reinforcement. */}
       {hasPOS && (
-        <div
-          className="hidden sm:flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"
-          title={`Connected to ${POS_LABELS[posProvider!] ?? posProvider}`}
-        >
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-          </span>
+        <p className="flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-2 sm:px-2.5 py-1 text-xs font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+          <Wifi className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span className="sr-only">POS connected: </span>
           {POS_LABELS[posProvider!] ?? posProvider}
-        </div>
+        </p>
       )}
 
-      {/* POS icon — mobile */}
-      {hasPOS && (
-        <div className="sm:hidden flex items-center" title={`Connected to ${POS_LABELS[posProvider!] ?? posProvider}`}>
-          <Wifi className="h-4 w-4 text-emerald-500" />
-        </div>
-      )}
+      <ThemeToggle />
 
       {/* Notification bell */}
       <NotificationBell orgSlug={orgSlug} />
@@ -89,11 +86,21 @@ export function AppHeader({ email, posProvider, orgName, orgSlug }: Props) {
             </DropdownMenuLabel>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>
-            <form action={signOut} className="w-full">
-              <button type="submit" className="w-full text-left">Log out</button>
-            </form>
-          </DropdownMenuItem>
+          {/* The form is the wrapper and the menu item *is* the submit control —
+              nesting a <button> inside the menu item gave two nested stops. */}
+          <form action={signOut}>
+            {/* nativeButton tells Base UI the rendered element is a real
+                <button>, so it skips the role/aria-disabled shims it adds to
+                fake buttons. Without it Base UI warns, and the item ends up
+                carrying attributes a native button already implies. */}
+            <DropdownMenuItem
+              nativeButton
+              render={<button type="submit" />}
+              className="w-full text-left"
+            >
+              Log out
+            </DropdownMenuItem>
+          </form>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

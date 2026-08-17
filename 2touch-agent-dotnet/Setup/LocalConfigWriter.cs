@@ -78,6 +78,10 @@ public static class LocalConfigWriter
             {
                 ["LookbackDays"]    = cfg.Sync.LookbackDays,
                 ["IntervalMinutes"] = cfg.Sync.IntervalMinutes,
+                // Resolved, not raw: setup decides this from the mapped column's
+                // type, and omitting it here would silently fall back to the
+                // default on a schema where no cutoff should be applied at all.
+                ["BusinessDayCutoffHour"] = cfg.Sync.ResolvedCutoffHour,
             },
         };
 

@@ -48,7 +48,7 @@ export default async function TaxPage({
 
       {/* Disclaimer banner */}
       <div className="flex gap-3 rounded-xl border border-amber-500/30 bg-amber-500/8 px-5 py-4">
-        <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+        <AlertTriangle className="h-5 w-5 text-amber-700 dark:text-amber-300 shrink-0 mt-0.5" />
         <div className="space-y-1">
           <p className="text-sm font-semibold text-amber-300">Legal Disclaimer — Read Before Use</p>
           <p className="text-xs text-amber-300/70 leading-relaxed">

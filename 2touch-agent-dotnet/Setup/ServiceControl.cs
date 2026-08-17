@@ -21,6 +21,12 @@ public static class ServiceControl
     public static bool Exists()
         => Sc("query", ServiceName).Ok;
 
+    /// <summary>
+    /// Raw <c>sc query</c> for any service. The diagnostic reports on SQL Server's
+    /// own services too, which are not this one.
+    /// </summary>
+    public static ScResult Query(string serviceName) => Sc("query", serviceName);
+
     public static bool IsRunning()
         => Sc("query", ServiceName).Output.Contains("RUNNING", StringComparison.Ordinal);
 

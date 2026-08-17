@@ -65,21 +65,27 @@ function CollapsibleNavItem({ item, pathname }: { item: NavItem; pathname: strin
   const isSelfActive  = pathname === item.href;
   const hasChildren   = !!item.children?.length;
 
+  // Seeded from the current route. AppSidebar keys this component on the
+  // pathname, so every navigation re-seeds it — arriving at a child route
+  // always reveals the group, while a manual collapse persists until you move.
   const [open, setOpen] = useState(isChildActive || isSelfActive);
   const Icon = item.icon;
+  const submenuId = `nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`;
 
   if (!hasChildren) {
     return (
       <SidebarMenuItem>
-        <Link href={item.href}>
-          <SidebarMenuButton
-            isActive={isSelfActive || isChildActive}
-            className="flex items-center gap-3"
-          >
-            <Icon className="h-4 w-4" />
-            <span>{item.label}</span>
-          </SidebarMenuButton>
-        </Link>
+        {/* `render` rather than wrapping in <Link> — wrapping produces
+            <a><button>, which is invalid and gives keyboard users two
+            overlapping stops. Matches the sub-items below. */}
+        <SidebarMenuButton
+          render={<Link href={item.href} />}
+          isActive={isSelfActive || isChildActive}
+          className="flex items-center gap-3"
+        >
+          <Icon className="h-4 w-4" />
+          <span>{item.label}</span>
+        </SidebarMenuButton>
       </SidebarMenuItem>
     );
   }
@@ -90,10 +96,13 @@ function CollapsibleNavItem({ item, pathname }: { item: NavItem; pathname: strin
         isActive={isSelfActive || isChildActive}
         className="flex items-center gap-3 cursor-pointer select-none"
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-controls={submenuId}
       >
         <Icon className="h-4 w-4" />
         <span>{item.label}</span>
         <ChevronRight
+          aria-hidden
           className={cn(
             'ml-auto h-3.5 w-3.5 opacity-60 transition-transform duration-200',
             open && 'rotate-90',
@@ -102,7 +111,7 @@ function CollapsibleNavItem({ item, pathname }: { item: NavItem; pathname: strin
       </SidebarMenuButton>
 
       {open && (
-        <SidebarMenuSub>
+        <SidebarMenuSub id={submenuId}>
           {item.children!.map((child) => {
             const childActive =
               pathname === child.href ||
@@ -140,7 +149,13 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {PRIMARY.map((item) => (
-                <CollapsibleNavItem key={item.href} item={item} pathname={pathname} />
+                // Keyed on pathname so the open state re-seeds from the route on
+                // every navigation, instead of being frozen at first mount.
+                <CollapsibleNavItem
+                  key={`${item.href}:${pathname}`}
+                  item={item}
+                  pathname={pathname}
+                />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -159,12 +174,14 @@ export function AppSidebar() {
                   (href !== '/app/dashboard' && pathname.startsWith(href + '/'));
                 return (
                   <SidebarMenuItem key={href}>
-                    <Link href={href}>
-                      <SidebarMenuButton isActive={isActive} className="flex items-center gap-3">
-                        <Icon className="h-4 w-4" />
-                        <span>{label}</span>
-                      </SidebarMenuButton>
-                    </Link>
+                    <SidebarMenuButton
+                      render={<Link href={href} />}
+                      isActive={isActive}
+                      className="flex items-center gap-3"
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{label}</span>
+                    </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
               })}

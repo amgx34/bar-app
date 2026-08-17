@@ -165,11 +165,18 @@ public class TwoTouchProfileTests
         var (cfg, conn) = await ProfiledAsync();
         await using var _ = conn;
 
-        var sql = SqlReader.ItemAuditSql(cfg.Tables.ItemAudit, cfg.Columns.ItemAudit, Lookback);
+        var cutoffHour = cfg.Sync.ResolvedCutoffHour;
+        var sql = SqlReader.ItemAuditSql(cfg.Tables.ItemAudit, cfg.Columns.ItemAudit, Lookback, cutoffHour);
 
         Assert.DoesNotContain(SqlReader.CutoffToken, sql);
         Assert.Equal(2, CountOf(sql, "d.dtmSalesDate >="));
-        Assert.Contains($"'{DateTime.Today.AddDays(-Lookback):yyyy-MM-dd}'", sql);
+
+        // With a trading-day cutoff active the raw window reaches back one extra
+        // day: a trading day's late hours are timestamped the next morning, so a
+        // filter stopping at the lookback boundary would return the oldest day
+        // short. See SqlReader.RawCutoff.
+        var expectedRawStart = DateTime.Today.AddDays(-(Lookback + (cutoffHour > 0 ? 1 : 0)));
+        Assert.Contains($"'{expectedRawStart:yyyy-MM-dd}'", sql);
     }
 
     [SkippableFact]

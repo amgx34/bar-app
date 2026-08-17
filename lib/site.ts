@@ -23,6 +23,31 @@ export const SITE_NAME = 'Rail';
 
 export const SITE_TAGLINE = 'Bar Management Platform';
 
+/**
+ * Real-world business details, used for structured data.
+ *
+ * FILL THESE IN to publish LocalBusiness markup. They are deliberately null
+ * rather than placeholders: emitting a made-up address as schema.org data
+ * would be publishing a fabricated business record, and search engines treat
+ * a wrong address as a trust signal against you. The schema builder omits any
+ * field left null instead of guessing.
+ *
+ * LocalBusiness is only the right type if Rail sells to a defined geography.
+ * For a product sold anywhere, leave `streetAddress` null — the Organization
+ * markup below stands on its own and is accurate either way.
+ */
+export const BUSINESS = {
+  email: 'railsystemspos@gmail.com',
+  telephone: null as string | null,
+  streetAddress: null as string | null,
+  addressLocality: null as string | null,
+  addressRegion: null as string | null,
+  postalCode: null as string | null,
+  addressCountry: 'US',
+  /** Where customers are, not where the office is. */
+  areaServed: 'US',
+} as const;
+
 /** Used verbatim as the meta description and the OG/Twitter description. */
 export const SITE_DESCRIPTION =
   'Rail is bar management software for real-time inventory, automated payroll ' +

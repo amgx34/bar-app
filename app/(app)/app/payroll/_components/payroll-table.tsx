@@ -49,6 +49,9 @@ export default function PayrollTable({ entries, totals }: PayrollTableProps) {
             <TableHead className="text-right">Reg. Pay</TableHead>
             <TableHead className="text-right">OT Pay</TableHead>
             <TableHead className="text-right">Tips</TableHead>
+            <TableHead className="text-right" title="Base rate plus tips per hour worked">
+              Eff. /hr
+            </TableHead>
             <TableHead className="pr-4 text-right font-semibold">Total Pay</TableHead>
           </TableRow>
         </TableHeader>
@@ -67,7 +70,7 @@ export default function PayrollTable({ entries, totals }: PayrollTableProps) {
               </TableCell>
               <TableCell className="text-right tabular-nums">
                 {entry.overtimeHours > 0 ? (
-                  <span className="font-medium text-amber-600 dark:text-amber-400">
+                  <span className="font-medium text-amber-600 dark:text-amber-300">
                     {entry.overtimeHours.toFixed(2)}
                   </span>
                 ) : (
@@ -83,13 +86,25 @@ export default function PayrollTable({ entries, totals }: PayrollTableProps) {
               <TableCell className="text-right tabular-nums">{fmt(entry.regularPay)}</TableCell>
               <TableCell className="text-right tabular-nums">
                 {entry.overtimePay > 0 ? (
-                  <span className="text-amber-600 dark:text-amber-400">{fmt(entry.overtimePay)}</span>
+                  <span className="text-amber-600 dark:text-amber-300">{fmt(entry.overtimePay)}</span>
                 ) : (
                   <span className="text-muted-foreground">$0.00</span>
                 )}
               </TableCell>
-              <TableCell className="text-right tabular-nums text-cyan-700 dark:text-cyan-400">
+              <TableCell className="text-right tabular-nums text-cyan-700 dark:text-cyan-300">
                 {fmt(entry.tipAmount)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {entry.totalHours > 0 ? (
+                  <>
+                    <span className="font-medium">{fmt(entry.effectiveHourlyRate)}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      +{fmt(entry.tipsPerHour)} tips
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">&mdash;</span>
+                )}
               </TableCell>
               <TableCell className="pr-4 text-right tabular-nums font-semibold text-primary">
                 {fmt(entry.totalCompensation)}
@@ -105,17 +120,29 @@ export default function PayrollTable({ entries, totals }: PayrollTableProps) {
             <TableCell className="text-right tabular-nums">
               {entries.reduce((s, e) => s + e.regularHours, 0).toFixed(2)}
             </TableCell>
-            <TableCell className="text-right tabular-nums text-amber-600 dark:text-amber-400">
+            <TableCell className="text-right tabular-nums text-amber-600 dark:text-amber-300">
               {entries.reduce((s, e) => s + e.overtimeHours, 0).toFixed(2)}
             </TableCell>
             <TableCell className="text-right tabular-nums">{totals.totalHours.toFixed(2)}</TableCell>
             <TableCell />
             <TableCell className="text-right tabular-nums">{fmt(totals.regularPay)}</TableCell>
-            <TableCell className="text-right tabular-nums text-amber-600 dark:text-amber-400">
+            <TableCell className="text-right tabular-nums text-amber-600 dark:text-amber-300">
               {fmt(totals.overtimePay)}
             </TableCell>
-            <TableCell className="text-right tabular-nums text-cyan-700 dark:text-cyan-400">
+            <TableCell className="text-right tabular-nums text-cyan-700 dark:text-cyan-300">
               {fmt(totals.tips)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {totals.totalHours > 0 ? (
+                <>
+                  <span>{fmt(totals.totalCompensation / totals.totalHours)}</span>
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    +{fmt(totals.tips / totals.totalHours)} tips
+                  </span>
+                </>
+              ) : (
+                <span className="text-muted-foreground">&mdash;</span>
+              )}
             </TableCell>
             <TableCell className="pr-4 text-right tabular-nums text-primary">
               {fmt(totals.totalCompensation)}

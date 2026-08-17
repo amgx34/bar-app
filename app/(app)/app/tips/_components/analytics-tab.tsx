@@ -111,12 +111,12 @@ export default function AnalyticsTab({
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-cyan-400">
+            <Card className="border-l-4 border-l-cyan-600 dark:border-l-cyan-400">
               <CardHeader className="flex flex-row items-center justify-between pb-1 pt-4 px-4">
                 <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Last Night Tips
                 </CardTitle>
-                <Banknote className="h-4 w-4 text-cyan-400" />
+                <Banknote className="h-4 w-4 text-cyan-700 dark:text-cyan-300" />
               </CardHeader>
               <CardContent className="px-4 pb-4">
                 <div className="text-2xl font-bold tabular-nums">{fmt(recentTipTotal)}</div>
@@ -126,12 +126,12 @@ export default function AnalyticsTab({
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-emerald-400">
+            <Card className="border-l-4 border-l-emerald-600 dark:border-l-emerald-400">
               <CardHeader className="flex flex-row items-center justify-between pb-1 pt-4 px-4">
                 <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Last Night Sales
                 </CardTitle>
-                <BarChart2 className="h-4 w-4 text-emerald-400" />
+                <BarChart2 className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
               </CardHeader>
               <CardContent className="px-4 pb-4">
                 <div className="text-2xl font-bold tabular-nums">{fmt(recentSales)}</div>
@@ -141,12 +141,12 @@ export default function AnalyticsTab({
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-violet-400">
+            <Card className="border-l-4 border-l-violet-600 dark:border-l-violet-400">
               <CardHeader className="flex flex-row items-center justify-between pb-1 pt-4 px-4">
                 <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Last Night Tip %
                 </CardTitle>
-                <Calendar className="h-4 w-4 text-violet-400" />
+                <Calendar className="h-4 w-4 text-violet-700 dark:text-violet-300" />
               </CardHeader>
               <CardContent className="px-4 pb-4">
                 <div className="text-2xl font-bold tabular-nums">{pct(recentTipPct)}</div>

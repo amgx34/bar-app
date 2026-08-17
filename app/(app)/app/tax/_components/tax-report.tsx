@@ -269,22 +269,22 @@ export default function TaxReport({ orgName }: { orgName: string }) {
       {/* Preview cards */}
       {data && (data.totalSales > 0 || data.totalWages > 0) && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-l-4 border-l-emerald-400 bg-card px-5 py-4">
+          <div className="rounded-xl border border-l-4 border-l-emerald-600 dark:border-l-emerald-400 bg-card px-5 py-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Revenue</span>
-              <TrendingUp className="h-4 w-4 text-emerald-400" />
+              <TrendingUp className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
             </div>
-            <p className="text-2xl font-bold tabular-nums text-emerald-400">{fmtMoney(data.totalSales + data.totalTips)}</p>
+            <p className="text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{fmtMoney(data.totalSales + data.totalTips)}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{fmtMoney(data.totalSales)} sales + {fmtMoney(data.totalTips)} tips</p>
           </div>
 
           {rateDecimal > 0 && (
-            <div className="rounded-xl border border-l-4 border-l-amber-400 bg-card px-5 py-4">
+            <div className="rounded-xl border border-l-4 border-l-amber-600 dark:border-l-amber-400 bg-card px-5 py-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sales Tax Owed</span>
-                <Receipt className="h-4 w-4 text-amber-400" />
+                <Receipt className="h-4 w-4 text-amber-700 dark:text-amber-300" />
               </div>
-              <p className="text-2xl font-bold tabular-nums text-amber-400">{fmtMoney(salesTaxOwed)}</p>
+              <p className="text-2xl font-bold tabular-nums text-amber-700 dark:text-amber-300">{fmtMoney(salesTaxOwed)}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {(rateDecimal * 100).toFixed(3)}% on {fmtMoney(taxableSales)} taxable sales
                 {taxInclusive ? ' (backed out of inclusive total)' : ''}
@@ -292,19 +292,19 @@ export default function TaxReport({ orgName }: { orgName: string }) {
             </div>
           )}
 
-          <div className="rounded-xl border border-l-4 border-l-cyan-400 bg-card px-5 py-4">
+          <div className="rounded-xl border border-l-4 border-l-cyan-600 dark:border-l-cyan-400 bg-card px-5 py-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Labor Cost</span>
-              <CircleDollarSign className="h-4 w-4 text-cyan-400" />
+              <CircleDollarSign className="h-4 w-4 text-cyan-700 dark:text-cyan-300" />
             </div>
             <p className="text-2xl font-bold tabular-nums">{fmtMoney(data.totalWages + data.employerFICA + data.futatEstimate)}</p>
             <p className="text-xs text-muted-foreground mt-0.5">wages + employer FICA + FUTA</p>
           </div>
 
-          <div className="rounded-xl border border-l-4 border-l-violet-400 bg-card px-5 py-4">
+          <div className="rounded-xl border border-l-4 border-l-violet-600 dark:border-l-violet-400 bg-card px-5 py-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Employer FICA</span>
-              <Users className="h-4 w-4 text-violet-400" />
+              <Users className="h-4 w-4 text-violet-700 dark:text-violet-300" />
             </div>
             <p className="text-2xl font-bold tabular-nums">{fmtMoney(data.employerFICA)}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{data.employeeCount} employees · FUTA ~{fmtMoney(data.futatEstimate)}</p>

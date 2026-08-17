@@ -22,7 +22,7 @@ export default async function OpengraphImage() {
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          background: 'linear-gradient(135deg, #020617 0%, #0f172a 55%, #042f2e 100%)',
+          background: 'linear-gradient(135deg, #080D18 0%, #0E1729 55%, #17264A 100%)',
           padding: 80,
           fontFamily: 'sans-serif',
         }}
@@ -34,7 +34,7 @@ export default async function OpengraphImage() {
               width: 20,
               height: 20,
               borderRadius: 6,
-              background: '#2dd4bf',
+              background: '#7EA6FF',
             }}
           />
           <span
@@ -52,10 +52,10 @@ export default async function OpengraphImage() {
 
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span style={{ fontSize: 78, fontWeight: 900, color: '#ffffff', lineHeight: 1.05 }}>
-            The Smarter Way
+            The smarter way
           </span>
-          <span style={{ fontSize: 78, fontWeight: 900, color: '#2dd4bf', lineHeight: 1.05 }}>
-            to Run Your Bar
+          <span style={{ fontSize: 78, fontWeight: 900, color: '#7EA6FF', lineHeight: 1.05 }}>
+            to run your bar
           </span>
           <span style={{ fontSize: 30, color: 'rgba(255,255,255,0.65)', marginTop: 28 }}>
             Inventory · Payroll · Tips · Z-Report Analytics

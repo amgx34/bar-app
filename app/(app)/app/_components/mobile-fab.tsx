@@ -2,20 +2,25 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, Package, Users, Settings } from 'lucide-react';
+import { Plus, Package, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Actions only. 'Settings' used to live here, which made the FAB a third
+// navigation surface competing with the bottom bar and the sidebar sheet —
+// Settings is a destination, and belongs in the sidebar alone.
 const ACTIONS = [
-  { label: 'Adjust Stock', href: '/app/inventory', icon: Package,  color: 'bg-primary text-primary-foreground' },
-  { label: 'New Rep Order', href: '/app/reps',     icon: Users,    color: 'bg-amber-500 text-white' },
-  { label: 'Settings',     href: '/app/settings',  icon: Settings, color: 'bg-slate-600 text-white' },
+  { label: 'Adjust Stock',  href: '/app/inventory', icon: Package, color: 'bg-primary text-primary-foreground' },
+  { label: 'New Rep Order', href: '/app/reps',      icon: Users,   color: 'bg-cta text-cta-foreground' },
 ];
 
 export function MobileFab() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="fixed bottom-[72px] right-4 z-50 md:hidden flex flex-col-reverse items-end gap-2.5">
+    // Offset and z-layer both come from tokens: `bottom-above-nav` clears the
+    // bar *including* its safe-area inset, and z-fab sits between the bar and
+    // the sheet instead of tying with the bar and being resolved by DOM order.
+    <div className="fixed bottom-above-nav right-4 z-fab md:hidden flex flex-col-reverse items-end gap-2.5">
       {/* Action buttons */}
       {open && ACTIONS.map((action) => {
         const Icon = action.icon;

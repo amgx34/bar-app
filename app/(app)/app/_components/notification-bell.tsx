@@ -24,9 +24,9 @@ function fmtMoney(n: number) {
 }
 
 const STATUS_CONFIG = {
-  pending:  { label: 'Pending',  cls: 'bg-amber-100 text-amber-700' },
-  approved: { label: 'Approved', cls: 'bg-emerald-100 text-emerald-700' },
-  denied:   { label: 'Denied',   cls: 'bg-red-100 text-red-600' },
+  pending:  { label: 'Pending',  cls: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+  approved: { label: 'Approved', cls: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+  denied:   { label: 'Denied',   cls: 'bg-red-100 dark:bg-red-900/40 text-red-600' },
 } as const;
 
 // ── AI Breakdown table ────────────────────────────────────────────────────────
@@ -104,7 +104,7 @@ function MessageRow({
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             {/* Requested / total amount */}
             {msg.requested_amount != null && msg.requested_amount > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-xs font-bold px-2 py-0.5">
                 <DollarSign className="h-3 w-3" />
                 {fmtMoney(msg.requested_amount)} total
               </span>
@@ -130,7 +130,7 @@ function MessageRow({
               </p>
               <BreakdownTable rows={msg.ai_breakdown} />
               {msg.requested_amount != null && msg.requested_amount > 0 && (
-                <p className="text-right text-sm font-bold text-emerald-700 mt-1.5 pr-1">
+                <p className="text-right text-sm font-bold text-emerald-700 dark:text-emerald-300 mt-1.5 pr-1">
                   Order Total: {fmtMoney(msg.requested_amount)}
                 </p>
               )}

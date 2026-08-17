@@ -77,9 +77,15 @@ public static class PairingCode
             return false;
         }
 
+        // https everywhere, with one exception: plain http to loopback. The agent
+        // already accepts "http://localhost:3999" in appsettings for the mock
+        // ingest server, so refusing it here only made the pairing code stricter
+        // than the thing it configures — and untestable end to end. Loopback
+        // cannot leave the machine, so there is nothing to intercept.
         if (string.IsNullOrWhiteSpace(env.U)
             || !Uri.TryCreate(env.U, UriKind.Absolute, out var uri)
-            || uri.Scheme != Uri.UriSchemeHttps)
+            || (uri.Scheme != Uri.UriSchemeHttps
+                && !(uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback)))
         {
             error = $"api url must be an absolute https:// url, got \"{Ellipsis(env.U)}\"";
             return false;

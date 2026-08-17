@@ -100,8 +100,8 @@ export default function POSSelector({ orgId: _ }: Props) {
   }
 
   return (
-    <main className="relative min-h-dvh flex flex-col items-center justify-center p-6 overflow-hidden bg-gray-950">
-      <div className="absolute inset-0 bg-gradient-to-b from-gray-900 via-gray-950 to-black" />
+    <main className="relative min-h-dvh flex flex-col items-center justify-center p-6 overflow-hidden bg-sidebar text-sidebar-foreground">
+      <div className="absolute inset-0 bg-gradient-to-b from-sidebar-accent via-sidebar to-background dark:to-black" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(168,85,247,0.06),transparent_60%)]" />
 
       <div className="relative z-10 w-full max-w-4xl space-y-8">
@@ -188,7 +188,7 @@ export default function POSSelector({ orgId: _ }: Props) {
             className={cn(
               'flex items-center gap-2 px-8 h-12 rounded-xl font-semibold text-base transition-all',
               selected
-                ? 'bg-white text-gray-900 hover:bg-white/90 cursor-pointer'
+                ? 'bg-cta text-cta-foreground hover:brightness-95 cursor-pointer'
                 : 'bg-white/10 text-white/30 cursor-not-allowed'
             )}
           >

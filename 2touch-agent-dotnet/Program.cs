@@ -7,37 +7,79 @@ using RailAgent.Config;
 using RailAgent.Services;
 using RailAgent.Setup;
 
-// Mode selection, resolved before the host is built:
+// This executable is the SERVICE, and now only the service:
 //
 //   launched by the SCM   run as a Windows Service          (no args are passed)
-//   --setup               setup wizard
-//   (double-click)        setup wizard
 //   --run                 foreground service loop, for debugging
-//   --uninstall           stop and delete the service, leave config in place
 //   --test                connect + query only, print samples, send nothing
 //   --once                one full sync (query + push), then exit
 //   --days N              override the lookback window for --test / --once
+//   --version             print the version and exit
+//
+// Setup, diagnostics, updates and removal moved to their own executables:
+//
+//   rail-setup.exe        the menu, the wizard, --unattended, --diagnose
+//   rail-update.exe       check and install a newer agent build
+//   rail-uninstall.exe    remove the service, config and credentials
+//
+// The split is what makes updating possible at all: Windows locks a running
+// image, so the binary that replaces this one cannot BE this one. Keeping the
+// installer out of the service binary also means an update swaps a file that
+// does nothing but sync, rather than one that also contains a wizard.
 //
 // The SCM check MUST come first: a service launch passes no arguments and must
-// never reach the wizard.
+// never reach any of the interactive paths.
 
 var isService = WindowsServiceHelpers.IsWindowsService();
 
 if (!isService)
 {
-    if (Has("--uninstall"))
+    // The console defaults to the OEM codepage, which renders ✓/✗ as mojibake.
+    // Best-effort: some hosts refuse.
+    try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch { /* keep the default */ }
+
+    if (Has("--version"))
     {
-        if (!Elevation.IsAdministrator())
-        {
-            Console.Error.WriteLine("Removing a Windows Service needs Administrator. Re-run from an elevated prompt.");
-            return 1;
-        }
-        Console.WriteLine(ServiceControl.Uninstall());
+        Console.WriteLine(AgentVersion.CurrentDisplay);
         return 0;
     }
 
-    if (Has("--setup") || IsDoubleClick())
-        return await new SetupWizard(args).RunAsync(CancellationToken.None);
+    // These flags used to live here. Rather than silently doing nothing —
+    // which on --uninstall would leave an operator believing a decommissioned
+    // POS box had been cleaned — each one names the executable that took it
+    // over. Existing scripts get an actionable error, not a no-op.
+    var moved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["--setup"]      = "rail-setup.exe --setup",
+        ["--menu"]       = "rail-setup.exe",
+        ["--unattended"] = "rail-setup.exe --unattended",
+        ["--diagnose"]   = "rail-setup.exe --diagnose",
+        ["--uninstall"]  = "rail-uninstall.exe",
+    };
+
+    foreach (var (flag, replacement) in moved)
+    {
+        if (!Has(flag)) continue;
+        Console.Error.WriteLine($"'{flag}' has moved out of the agent. Run: {replacement}");
+        Console.Error.WriteLine("The agent executable is now only the sync service.");
+        return 1;
+    }
+
+    // A double-click on the service binary is almost always someone looking for
+    // the installer. Point at it rather than starting a sync loop in a console
+    // window they will close.
+    if (IsDoubleClick())
+    {
+        Console.WriteLine();
+        Console.WriteLine($"  Rail 2Touch agent {AgentVersion.CurrentDisplay} — this is the background service.");
+        Console.WriteLine();
+        Console.WriteLine("  To install or configure it   run rail-setup.exe");
+        Console.WriteLine("  To update it                 run rail-update.exe");
+        Console.WriteLine("  To remove it                 run rail-uninstall.exe");
+        Console.WriteLine();
+        ConsoleUi.PauseIfInteractive();
+        return 0;
+    }
 }
 
 var isTest = Has("--test");

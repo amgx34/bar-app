@@ -37,12 +37,22 @@ public static class ConsoleUi
 
     public static void Blank() => Console.WriteLine();
 
+    /// <summary>
+    /// Console.ReadLine returns null forever once stdin is closed — piped input
+    /// that ran out, or a window with no keyboard behind it. Treating that as
+    /// "empty" makes every prompt either spin forever or silently take its
+    /// default, so it is a cancellation instead. Callers already handle that.
+    /// </summary>
+    private static string ReadLineOrCancel()
+        => Console.ReadLine()
+           ?? throw new OperationCanceledException("Input ended while setup was waiting for an answer.");
+
     public static string Ask(string prompt, string? @default = null)
     {
         while (true)
         {
             Console.Write(@default is null ? $"    {prompt}: " : $"    {prompt} [{@default}]: ");
-            var line = Console.ReadLine()?.Trim();
+            var line = ReadLineOrCancel().Trim();
             if (!string.IsNullOrEmpty(line)) return line;
             if (@default is not null) return @default;
         }
@@ -72,7 +82,7 @@ public static class ConsoleUi
         while (true)
         {
             Console.Write($"    {prompt} [{(@default ? "Y/n" : "y/N")}]: ");
-            var line = Console.ReadLine()?.Trim().ToLowerInvariant();
+            var line = ReadLineOrCancel().Trim().ToLowerInvariant();
             if (string.IsNullOrEmpty(line)) return @default;
             if (line is "y" or "yes") return true;
             if (line is "n" or "no") return false;
@@ -93,7 +103,7 @@ public static class ConsoleUi
         while (true)
         {
             Console.Write($"    {prompt} [{@default + 1}]: ");
-            var line = Console.ReadLine()?.Trim();
+            var line = ReadLineOrCancel().Trim();
             if (string.IsNullOrEmpty(line)) return @default;
             if (int.TryParse(line, out var n))
             {

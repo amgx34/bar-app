@@ -97,4 +97,30 @@ public sealed class SyncConfig
 {
     public int LookbackDays { get; set; } = 2;
     public int IntervalMinutes { get; set; } = 5;
+
+    /// <summary>
+    /// Hour that separates one trading day from the next, 0-12. A bar open
+    /// 17:00-03:00 trades across two calendar dates; without this, the hours
+    /// after midnight are filed under the following day and sales show up on
+    /// days the bar was closed.
+    ///
+    /// The agent subtracts this many hours from each row's timestamp before
+    /// truncating it to a date, so everything before the cutoff belongs to the
+    /// night that started the evening before. 4 is after last call at nearly
+    /// every venue and before any opening time, so no real session straddles it.
+    ///
+    /// Set to <c>0</c> ONLY when the configured date column already holds a true
+    /// business date rather than a raw timestamp — shifting an already-correct
+    /// date would move every night back by one day. The setup wizard detects
+    /// which kind of column was mapped and sets this accordingly.
+    /// </summary>
+    public int BusinessDayCutoffHour { get; set; } = DefaultBusinessDayCutoffHour;
+
+    public const int DefaultBusinessDayCutoffHour = 4;
+
+    /// <summary>Clamped accessor — config files are hand-edited in the field.</summary>
+    public int ResolvedCutoffHour =>
+        BusinessDayCutoffHour is >= 0 and <= 12
+            ? BusinessDayCutoffHour
+            : DefaultBusinessDayCutoffHour;
 }

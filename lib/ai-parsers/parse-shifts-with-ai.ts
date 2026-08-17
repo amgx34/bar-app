@@ -2,6 +2,8 @@
 
 import Groq from 'groq-sdk';
 import type { ParsedEmployeeShift } from '@/lib/csv-parsers/parse-employee-shifts';
+import { boundModelInput, callModel, enforceAiQuota, wrapUntrustedContent } from './guardrails';
+import { shiftEnvelopeSchema, shiftRowSchema, describeSchemaFailure } from './schemas';
 
 const client = new Groq();
 
@@ -44,18 +46,25 @@ export async function parseShiftsWithAI(
     );
   }
 
-  const completion = await client.chat.completions.create({
+  // Bound the spend before the call, and the payload before it is sent.
+  await enforceAiQuota();
+  const bounded = boundModelInput(content);
+
+  const completion = await callModel(() => client.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       {
         role: 'user',
-        content: `Extract all employee shifts from this POS export:\n\n${content}`,
+        content: wrapUntrustedContent(
+          bounded,
+          'Extract all employee shifts from the POS export below.',
+        ),
       },
     ],
     response_format: { type: 'json_object' },
     temperature: 0,
-  });
+  }));
 
   const raw = completion.choices[0]?.message?.content ?? '';
 
@@ -63,37 +72,30 @@ export async function parseShiftsWithAI(
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error(`AI returned invalid JSON: ${raw.slice(0, 200)}`);
+    // Never echo model output — a crafted file chooses what it would say.
+    throw new Error('The AI returned a response that was not valid JSON. Try a supported export format.');
   }
 
-  const rows =
-    Array.isArray(parsed)
-      ? parsed
-      : Array.isArray((parsed as Record<string, unknown>)?.shifts)
-      ? (parsed as Record<string, unknown>).shifts as unknown[]
-      : null;
-
-  if (!rows) {
-    throw new Error('AI response did not contain a shifts array');
+  const envelope = shiftEnvelopeSchema.safeParse(
+    Array.isArray(parsed) ? { shifts: parsed } : parsed,
+  );
+  if (!envelope.success) {
+    throw new Error(describeSchemaFailure(envelope.error));
   }
 
+  // Rows are validated one at a time so a single malformed line does not throw
+  // away an otherwise good import — but every value that survives is inside the
+  // schema's bounds, so nothing unbounded reaches payroll.
   const shifts: ParsedEmployeeShift[] = [];
-  for (const item of rows) {
-    if (typeof item !== 'object' || item === null) continue;
-    const row = item as Record<string, unknown>;
+  for (const item of envelope.data.shifts) {
+    const row = shiftRowSchema.safeParse(item);
+    if (!row.success) continue;
 
-    const name = String(row.employeeName ?? '').trim();
-    if (!name || EXCLUDED_NAMES.has(name.toLowerCase())) continue;
+    const { employeeName, shiftDate, regularHours, overtimeHours } = row.data;
+    if (EXCLUDED_NAMES.has(employeeName.toLowerCase())) continue;
+    if (regularHours <= 0 && overtimeHours <= 0) continue;
 
-    const date = String(row.shiftDate ?? '').trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-
-    const regular = Number(row.regularHours ?? 0);
-    const overtime = Number(row.overtimeHours ?? 0);
-    if (isNaN(regular) || isNaN(overtime)) continue;
-    if (regular <= 0 && overtime <= 0) continue;
-
-    shifts.push({ employeeName: name, shiftDate: date, regularHours: regular, overtimeHours: overtime });
+    shifts.push({ employeeName, shiftDate, regularHours, overtimeHours });
   }
 
   return shifts;

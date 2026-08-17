@@ -44,12 +44,12 @@ function ToastSyncPanel() {
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500/15">
-              <Flame className="h-4 w-4 text-orange-400" />
+              <Flame className="h-4 w-4 text-orange-700 dark:text-orange-300" />
             </div>
             <div>
               <CardTitle className="text-base flex items-center gap-2">
                 Toast POS Sync
-                <Badge className="bg-orange-500/15 text-orange-400 border-orange-400/30 text-[10px]">Connected</Badge>
+                <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-600 dark:border-orange-400/30 text-[10px]">Connected</Badge>
               </CardTitle>
               <CardDescription className="text-xs">
                 Pull live data directly from your Toast account
@@ -69,7 +69,7 @@ function ToastSyncPanel() {
             className="flex flex-col items-start gap-2 rounded-lg border bg-card p-3 text-left hover:bg-muted/50 transition-colors disabled:opacity-50"
           >
             <div className="flex items-center gap-2 w-full">
-              <RefreshCw className={`h-4 w-4 text-orange-400 ${syncingSales ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 text-orange-700 dark:text-orange-300 ${syncingSales ? 'animate-spin' : ''}`} />
               <span className="text-sm font-medium">{syncingSales ? 'Syncing…' : 'Sync Sales'}</span>
             </div>
             <p className="text-xs text-muted-foreground">Last 14 nights of orders → Dashboard &amp; Books</p>
@@ -81,7 +81,7 @@ function ToastSyncPanel() {
             className="flex flex-col items-start gap-2 rounded-lg border bg-card p-3 text-left hover:bg-muted/50 transition-colors disabled:opacity-50"
           >
             <div className="flex items-center gap-2 w-full">
-              <Package className={`h-4 w-4 text-orange-400 ${syncingInv ? 'animate-spin' : ''}`} />
+              <Package className={`h-4 w-4 text-orange-700 dark:text-orange-300 ${syncingInv ? 'animate-spin' : ''}`} />
               <span className="text-sm font-medium">{syncingInv ? 'Syncing…' : 'Sync Menu'}</span>
             </div>
             <p className="text-xs text-muted-foreground">Import Toast menu items → Inventory</p>
@@ -93,7 +93,7 @@ function ToastSyncPanel() {
             className="flex flex-col items-start gap-2 rounded-lg border bg-card p-3 text-left hover:bg-muted/50 transition-colors disabled:opacity-50"
           >
             <div className="flex items-center gap-2 w-full">
-              <Users className={`h-4 w-4 text-orange-400 ${syncingShifts ? 'animate-spin' : ''}`} />
+              <Users className={`h-4 w-4 text-orange-700 dark:text-orange-300 ${syncingShifts ? 'animate-spin' : ''}`} />
               <span className="text-sm font-medium">{syncingShifts ? 'Syncing…' : 'Sync Shifts'}</span>
             </div>
             <p className="text-xs text-muted-foreground">Last 14 days of labor → Payroll</p>

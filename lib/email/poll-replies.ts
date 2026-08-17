@@ -133,6 +133,8 @@ export async function pollEmailReplies(): Promise<{ processed: number; error?: s
           // Skip already-ingested messages
           const { data: dup } = await supabase
             .from('bar_messages')
+            // admin-scope-ok: cron job with no user context — dedupes inbound mail by
+            // gmail_message_id before the owning org is known.
             .select('id')
             .eq('gmail_message_id', messageId)
             .maybeSingle();
@@ -149,6 +151,8 @@ export async function pollEmailReplies(): Promise<{ processed: number; error?: s
           // Fetch rep info
           const { data: rep } = await supabase
             .from('reps')
+            // admin-scope-ok: cron job. rep_id comes from the order matched just above,
+            // whose organization_id is carried forward for the insert.
             .select('name, email')
             .eq('id', order.rep_id)
             .maybeSingle();

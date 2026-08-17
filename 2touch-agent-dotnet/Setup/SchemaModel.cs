@@ -172,4 +172,16 @@ public static class SqlTypes
         ColumnKind.Text    => Texts.Contains(dataType),
         _                  => false,
     };
+
+    /// <summary>
+    /// True when the column carries a time component, and so needs the
+    /// business-day cutoff applied before it is truncated to a trading date.
+    ///
+    /// A plain <c>date</c> column has already been rounded by whoever wrote it;
+    /// shifting it back would move every night to the day before. A
+    /// <c>datetime</c> still holds the hour the ticket was rung, which is what
+    /// the cutoff needs.
+    /// </summary>
+    public static bool CarriesTime(string dataType)
+        => Dates.Contains(dataType) && !"date".Equals(dataType, StringComparison.OrdinalIgnoreCase);
 }

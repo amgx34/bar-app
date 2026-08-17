@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/select';
 import { demoRequestSchema, type DemoRequestInput } from '@/lib/schemas/demo';
 import { submitDemoRequest } from '@/app/actions/contact';
+import { getAttribution } from '@/lib/utm';
 
 const INQUIRY_TYPES = [
   { value: 'demo',    label: 'Schedule a Demo' },
@@ -23,6 +25,7 @@ const INQUIRY_TYPES = [
 ];
 
 export function DemoRequestForm() {
+  const router = useRouter();
   const [submitted, setSubmitted] = useState(false);
 
   const {
@@ -37,27 +40,30 @@ export function DemoRequestForm() {
 
   async function onSubmit(values: DemoRequestInput) {
     try {
-      await submitDemoRequest(values);
+      // Read at submit time, not at mount: the visitor may have arrived on a
+      // different page and navigated here, and sessionStorage is where the
+      // first-touch parameters have been waiting since then.
+      await submitDemoRequest({ ...values, attribution: getAttribution() });
+      // A real URL rather than an inline state: the submission becomes
+      // measurable, shareable and back-button-safe. The old inline panel also
+      // linked <a href="/api/demo">, which stopped working when that route
+      // became POST-only.
       setSubmitted(true);
+      router.push('/thank-you');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     }
   }
 
+  // Briefly shown while the navigation to /thank-you resolves.
   if (submitted) {
     return (
-      <div className="flex flex-col items-center gap-4 py-12 text-center">
+      <div className="flex flex-col items-center gap-4 py-12 text-center" aria-live="polite">
         <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
           <CheckCircle2 className="h-8 w-8 text-primary" />
         </div>
-        <h3 className="text-xl font-bold">We'll be in touch soon!</h3>
-        <p className="text-muted-foreground max-w-sm">
-          Thanks for reaching out. Our team typically responds within one business day.
-          In the meantime, feel free to{' '}
-          <a href="/api/demo" className="text-primary underline underline-offset-2">
-            explore the demo
-          </a>.
-        </p>
+        <h3 className="text-xl font-bold">Request sent</h3>
+        <p className="text-muted-foreground max-w-sm">Taking you to the next steps…</p>
       </div>
     );
   }
@@ -164,8 +170,13 @@ export function DemoRequestForm() {
         )}
       </Button>
 
+      {/* Disclosure belongs at the point of collection, not only in the footer. */}
       <p className="text-xs text-center text-muted-foreground">
-        No spam, ever. We'll only contact you about your request.
+        No spam, ever. We&rsquo;ll only contact you about your request. See our{' '}
+        <a href="/privacy" className="underline underline-offset-2 hover:text-primary">
+          privacy policy
+        </a>
+        .
       </p>
     </form>
   );

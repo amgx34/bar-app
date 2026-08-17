@@ -1,0 +1,4 @@
+C:\Users\notug\bar-app\2touch-agent-dotnet\tools\RailDiagnose\bin\Release\net9.0-windows\win-x64\publish\rail-diagnose.pdb
+C:\Users\notug\bar-app\2touch-agent-dotnet\tools\RailDiagnose\bin\Release\net9.0-windows\win-x64\publish\rail-2touch-agent.runtimeconfig.json
+C:\Users\notug\bar-app\2touch-agent-dotnet\tools\RailDiagnose\bin\Release\net9.0-windows\win-x64\publish\rail-2touch-agent.pdb
+C:\Users\notug\bar-app\2touch-agent-dotnet\tools\RailDiagnose\bin\Release\net9.0-windows\win-x64\publish\rail-diagnose.exe

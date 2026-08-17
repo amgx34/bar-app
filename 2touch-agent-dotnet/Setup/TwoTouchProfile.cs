@@ -36,6 +36,18 @@ public static class TwoTouchProfile
     /// <summary>2Touch payment types, read out of the shipped stored procedures.</summary>
     private const int Cash = 0, CreditPayment = 2, CreditRefund = 7;
 
+    // NOTE ON DATES — these feeds deliberately expose the RAW timestamp
+    // (dtmTicketDate, dtmPmntDate, dtmSalesDate) rather than casting it to a
+    // date here. 2Touch has no business-date column; it only records when a
+    // ticket was rung. Truncating at this level filed everything after midnight
+    // under the next calendar day, so a bar open 17:00-03:00 showed sales on
+    // days it was closed.
+    //
+    // SqlReader.BusinessDate() applies Sync.BusinessDayCutoffHour to whatever
+    // column is mapped, so the trading-day rule lives in exactly one place.
+    // Casting here again would hide the timestamp from it and reintroduce the
+    // bug — SqlReaderBusinessDateTests guards against that.
+
     public sealed record ProfileFeed(
         string FeedKey,
         string Source,
@@ -46,24 +58,24 @@ public static class TwoTouchProfile
         FeedSpecs.ZReportKey,
         $$"""
         (
-            SELECT CAST(h.dtmTicketDate AS DATE) AS BusinessDate,
-                   h.fNetAmt                     AS NetSales,
-                   CAST(0 AS FLOAT)              AS CcTips,
-                   CAST(0 AS FLOAT)              AS CashTips
+            SELECT h.dtmTicketDate          AS BusinessDate,
+                   h.fNetAmt                AS NetSales,
+                   CAST(0 AS FLOAT)         AS CcTips,
+                   CAST(0 AS FLOAT)         AS CashTips
             FROM dbo.tblSalesHdrHist h
             WHERE h.dtmTicketDate >= '{cutoff}'
             UNION ALL
-            SELECT CAST(h.dtmTicketDate AS DATE), h.fNetAmt, 0, 0
+            SELECT h.dtmTicketDate, h.fNetAmt, 0, 0
             FROM dbo.tblSalesDailyHdr h
             WHERE h.dtmTicketDate >= '{cutoff}'
             UNION ALL
-            SELECT CAST(p.dtmPmntDate AS DATE), 0,
+            SELECT p.dtmPmntDate, 0,
                    CASE WHEN p.lPaymentType IN ({{CreditPayment}}, {{CreditRefund}}) THEN ISNULL(p.fTipAmt, 0) ELSE 0 END,
                    CASE WHEN p.lPaymentType = {{Cash}}                               THEN ISNULL(p.fTipAmt, 0) ELSE 0 END
             FROM dbo.tblSalesHistPmnts p
             WHERE p.dtmPmntDate >= '{cutoff}'
             UNION ALL
-            SELECT CAST(p.dtmPmntDate AS DATE), 0,
+            SELECT p.dtmPmntDate, 0,
                    CASE WHEN p.lPaymentType IN ({{CreditPayment}}, {{CreditRefund}}) THEN ISNULL(p.fTipAmt, 0) ELSE 0 END,
                    CASE WHEN p.lPaymentType = {{Cash}}                               THEN ISNULL(p.fTipAmt, 0) ELSE 0 END
             FROM dbo.tblSalesDailyPmnts p
@@ -77,7 +89,7 @@ public static class TwoTouchProfile
         FeedSpecs.EwReportKey,
         """
         (
-            SELECT CAST(ISNULL(tc.dtmReportIn, tc.dtmClockIn) AS DATE)                      AS ShiftDate,
+            SELECT ISNULL(tc.dtmReportIn, tc.dtmClockIn)                                    AS ShiftDate,
                    LTRIM(RTRIM(ISNULL(u.szFirstName, '') + ' ' + ISNULL(u.szLastName, ''))) AS EmployeeName,
                    ISNULL(t.fTotalSales, 0)                                                 AS TotalSales,
                    ISNULL(t.fTotalTips, 0)                                                  AS TipsPaidOut,
@@ -98,7 +110,7 @@ public static class TwoTouchProfile
         FeedSpecs.ItemAuditKey,
         """
         (
-            SELECT CAST(d.dtmSalesDate AS DATE) AS SaleDate,
+            SELECT d.dtmSalesDate               AS SaleDate,
                    i.szDescription              AS ItemName,
                    ISNULL(c.szDescription, '')  AS CategoryName,
                    ISNULL(d.fQty, 0)            AS QtySold,
@@ -110,7 +122,7 @@ public static class TwoTouchProfile
             WHERE d.dtmSalesDate >= '{cutoff}'
               AND (d.szRefundFlg IS NULL OR d.szRefundFlg = 'S')
             UNION ALL
-            SELECT CAST(d.dtmSalesDate AS DATE), i.szDescription, ISNULL(c.szDescription, ''),
+            SELECT d.dtmSalesDate, i.szDescription, ISNULL(c.szDescription, ''),
                    ISNULL(d.fQty, 0), ISNULL(r.fNetAmt, 0)
             FROM dbo.tblSalesDailyDtl d
             JOIN dbo.tblSalesDailyRptCtg r ON r.uKeyID = d.uKeyID

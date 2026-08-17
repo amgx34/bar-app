@@ -80,7 +80,7 @@ export default function FlagsTab({ serverStats, populationMean, populationStdDev
       ) : (
         <div className="flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/10 p-4">
           <ShieldCheck className="h-5 w-5 text-green-500 flex-shrink-0" />
-          <p className="text-sm font-medium text-green-400">
+          <p className="text-sm font-medium text-green-700 dark:text-green-300">
             No bartenders flagged — all tip percentages within normal range
           </p>
         </div>
@@ -116,7 +116,7 @@ export default function FlagsTab({ serverStats, populationMean, populationStdDev
                 <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
                   ${s.totalSales.toFixed(2)}
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums text-cyan-400">
+                <td className="px-4 py-3 text-right tabular-nums text-cyan-700 dark:text-cyan-300">
                   ${s.totalTips.toFixed(2)}
                 </td>
                 <td className={`px-4 py-3 text-right tabular-nums font-semibold ${s.flagged ? 'text-yellow-400' : ''}`}>

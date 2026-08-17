@@ -202,15 +202,20 @@ export async function verifyAndCommit(
   if (!rec)            throw new Error('Verification session not found.');
   if (rec.is_used)     throw new Error('This code has already been used.');
   if (new Date(rec.expires_at) < new Date()) {
+    // admin-scope-ok: `rec` was fetched with .eq('organization_id', org.id) and
+    // the function throws when missing, so verificationId is always in-org.
     await admin.from('dd_verification_codes').update({ is_used: true }).eq('id', verificationId);
     throw new Error('Code expired. Request a new one.');
   }
   if (rec.attempts >= MAX_ATTEMPTS) {
+    // admin-scope-ok: `rec` was fetched with .eq('organization_id', org.id) and
+    // the function throws when missing, so verificationId is always in-org.
     await admin.from('dd_verification_codes').update({ is_used: true }).eq('id', verificationId);
     throw new Error('Maximum attempts exceeded. Request a new code.');
   }
 
   // Increment attempts BEFORE checking — prevents race-condition replay
+  // admin-scope-ok: reached only after the scoped `rec` lookup above succeeded.
   await admin.from('dd_verification_codes').update({ attempts: rec.attempts + 1 }).eq('id', verificationId);
 
   if (!verifyOTP(code, rec.code_salt, rec.code_hash)) {
@@ -222,50 +227,39 @@ export async function verifyAndCommit(
     throw new Error(`Incorrect code. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`);
   }
 
-  await admin.from('dd_verification_codes').update({ is_used: true, verified_at: new Date().toISOString() }).eq('id', verificationId);
-
+  // admin-scope-ok: reached only after the scoped `rec` lookup above succeeded.
   const { input, employeeId } =
     decryptJSON<{ input: AccountInput; employeeId: string }>(rec.intent_encrypted);
 
-  // Deactivate any existing account at the same priority slot
-  await admin
-    .from('direct_deposit_accounts')
-    .update({ is_active: false })
-    .eq('organization_id', org.id)
-    .eq('employee_id', employeeId)
-    .eq('priority', input.priority ?? 1)
-    .eq('is_active', true);
-
+  // Consuming the code, retiring the old account, inserting the replacement and
+  // writing the audit row all happen in one transaction. Run as separate
+  // statements, a failure partway left the employee with no active account and
+  // a code already spent — payroll would have had nowhere to pay them.
+  //
+  // Ciphertext is produced here; DD_ENCRYPTION_KEY never reaches the database.
   const { data: account, error } = await admin
-    .from('direct_deposit_accounts')
-    .insert({
-      organization_id:   org.id,
-      employee_id:       employeeId,
-      routing_encrypted: encrypt(input.routingNumber),
-      account_encrypted: encrypt(input.accountNumber),
-      account_last4:     maskAccount(input.accountNumber),
-      bank_name:         input.bankName.trim(),
-      account_type:      input.accountType,
-      deposit_type:      input.depositType,
-      deposit_value:     input.depositValue ?? null,
-      priority:          input.priority ?? 1,
-      // 'prenote_sent_at' column name preserved for DB compatibility, but this
-      // records ENROLLMENT date only — Rail does not send actual bank prenotes.
-      prenote_sent_at:   new Date().toISOString(),
-      consent_text:      CONSENT_TEXT,
+    .rpc('dd_commit_account', {
+      p_org_id:            org.id,
+      p_verification_id:   verificationId,
+      p_employee_id:       employeeId,
+      p_routing_encrypted: encrypt(input.routingNumber),
+      p_account_encrypted: encrypt(input.accountNumber),
+      p_account_last4:     maskAccount(input.accountNumber),
+      p_bank_name:         input.bankName.trim(),
+      p_account_type:      input.accountType,
+      p_deposit_type:      input.depositType,
+      p_deposit_value:     input.depositValue ?? null,
+      p_priority:          input.priority ?? 1,
+      p_consent_text:      CONSENT_TEXT,
+      p_audit_after: {
+        bank_name:     input.bankName,
+        account_last4: maskAccount(input.accountNumber),
+        account_type:  input.accountType,
+      },
     })
-    .select('id,employee_id,account_last4,bank_name,account_type,deposit_type,deposit_value,priority,is_active,prenote_sent_at,created_at')
     .single();
 
-  if (error || !account) throw new Error(`Failed to save account: ${error?.message}`);
-
-  await admin.from('dd_audit_log').insert({
-    organization_id: org.id,
-    employee_id:     employeeId,
-    action:          'ACCOUNT_ADDED',
-    after_state:     { bank_name: input.bankName, account_last4: maskAccount(input.accountNumber), account_type: input.accountType },
-    code_id:         verificationId,
-  });
+  if (error || !account) throw new Error(`Failed to save account: ${error?.message ?? 'unknown error'}`);
 
   // Non-critical confirmation — SMS if phone set, email otherwise
   const phone = ((org.bar_settings ?? {}) as Record<string, unknown>).admin_phone as string | undefined;
@@ -362,6 +356,7 @@ export async function verifyAndDelete(
   if (new Date(rec.expires_at) < new Date()) throw new Error('Code expired. Request a new one.');
   if (rec.attempts >= MAX_ATTEMPTS) throw new Error('Maximum attempts exceeded.');
 
+  // admin-scope-ok: reached only after the scoped `rec` lookup above succeeded.
   await admin.from('dd_verification_codes').update({ attempts: rec.attempts + 1 }).eq('id', verificationId);
 
   if (!verifyOTP(code, rec.code_salt, rec.code_hash)) {
@@ -369,21 +364,19 @@ export async function verifyAndDelete(
     throw new Error(`Incorrect code. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`);
   }
 
-  await admin.from('dd_verification_codes').update({ is_used: true, verified_at: new Date().toISOString() }).eq('id', verificationId);
-
-  const { accountId, employeeId, account_last4 } =
+  const { accountId, account_last4 } =
     decryptJSON<{ accountId: string; employeeId: string; account_last4: string }>(rec.intent_encrypted);
 
-  const { data: before } = await admin.from('direct_deposit_accounts').select('account_last4, bank_name').eq('id', accountId).single();
-  await admin.from('direct_deposit_accounts').update({ is_active: false }).eq('id', accountId).eq('organization_id', org.id);
-
-  await admin.from('dd_audit_log').insert({
-    organization_id: org.id,
-    employee_id:     employeeId,
-    action:          'ACCOUNT_DELETED',
-    before_state:    before,
-    code_id:         verificationId,
+  // One transaction: consume the code, deactivate the account, record the audit
+  // entry. Previously a failure after the deactivation left a removed account
+  // with no audit row — the exact record a payroll dispute turns on.
+  const { error: rpcError } = await admin.rpc('dd_delete_account', {
+    p_org_id:          org.id,
+    p_verification_id: verificationId,
+    p_account_id:      accountId,
   });
+
+  if (rpcError) throw new Error(`Failed to remove account: ${rpcError.message}`);
 
   const phone = ((org.bar_settings ?? {}) as Record<string, unknown>).admin_phone as string | undefined;
   if (phone) sendConfirmationSms(phone, 'delete', account_last4);

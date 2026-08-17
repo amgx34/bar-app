@@ -1,5 +1,6 @@
 'use server';
 
+import { assertParsableTextUpload } from '@/lib/uploads';
 import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentOrg } from '@/lib/org';
@@ -168,6 +169,8 @@ export async function adjustStock(raw: unknown) {
 
   const delta = newStock - currentStock;
 
+  // admin-scope-ok: `item` was fetched above with .eq('organization_id', org.id)
+  // and the function throws when it is missing, so this id is always in-org.
   const { error: updErr } = await supabase
     .from('inventory_items')
     .update({ current_stock: newStock })
@@ -228,6 +231,9 @@ export async function deleteCategory(categoryId: string) {
 export async function parseInventoryForImport(text: string): Promise<ReviewItem[]> {
   const { org, role } = await getCurrentOrg();
   if (!canEditInventory(role)) throw new Error('Not authorized');
+
+  // The picker's `accept` attribute is a client-side hint; this is the gate.
+  assertParsableTextUpload(text);
 
   const supabase = createAdminClient();
 

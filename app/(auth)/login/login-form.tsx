@@ -1,12 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { createClient } from '@/lib/supabase/browser';
+import { signInWithPassword, sendMagicLink } from './actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
+import { FormStatus } from '@/components/ui/form-status';
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from '@/components/ui/card';
@@ -20,42 +23,60 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [magicLoading, setMagicLoading] = useState(false);
+  // Inline state as well as the toast. A toast on a login failure vanishes
+  // before someone re-reading their password has finished, and on a phone it
+  // covers the field they are trying to correct.
+  const [status, setStatus] = useState<'idle' | 'error' | 'success'>('idle');
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  // Both flows go through server actions so they can be rate-limited and so
+  // Supabase's error text never reaches the browser. See ./actions.ts.
   async function handlePasswordLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setStatus('idle');
+    setStatusMessage(null);
+    const result = await signInWithPassword(email, password);
     setLoading(false);
 
-    if (error) {
-      toast.error(error.message);
+    if (!result.ok) {
+      setStatus('error');
+      setStatusMessage(result.message);
+      toast.error(result.message);
       return;
     }
+    setStatus('success');
+    setStatusMessage('Signed in — taking you to your dashboard.');
     router.push(next);
     router.refresh(); // forces server components to re-fetch with the new session
   }
 
   async function handleMagicLink() {
     if (!email) {
+      setStatus('error');
+      setStatusMessage('Enter your email first.');
       toast.error('Enter your email first');
       return;
     }
     setMagicLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
+    setStatus('idle');
+    setStatusMessage(null);
+    const result = await sendMagicLink(
       email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-      },
-    });
+      `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+    );
     setMagicLoading(false);
 
-    if (error) {
-      toast.error(error.message);
+    if (!result.ok) {
+      setStatus('error');
+      setStatusMessage(result.message);
+      toast.error(result.message);
       return;
     }
-    toast.success('Check your email for a login link');
+    // Same message whether or not the address has an account.
+    setStatus('success');
+    setStatusMessage('If that email has an account, a login link is on its way.');
+    toast.success('If that email has an account, a login link is on its way.');
   }
 
   return (
@@ -76,14 +97,22 @@ export function LoginForm() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="password" className="text-white/80">Password</Label>
-            <Input
-              id="password" type="password" autoComplete="current-password" required
+            <PasswordInput
+              id="password" autoComplete="current-password" required
               value={password} onChange={(e) => setPassword(e.target.value)}
               className="bg-white/10 border-white/20 text-white placeholder:text-white/30 focus-visible:ring-white/30"
+              toggleClassName="text-white/50 hover:text-white"
             />
           </div>
+          <FormStatus status={status} message={statusMessage} />
+
           <Button type="submit" className="w-full bg-white text-gray-900 hover:bg-white/90" disabled={loading}>
-            {loading ? 'Logging in…' : 'Log in'}
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                Logging in…
+              </>
+            ) : 'Log in'}
           </Button>
         </form>
 
@@ -101,7 +130,12 @@ export function LoginForm() {
           className="w-full border-white/20 text-white/80 bg-white/5 hover:bg-white/15 hover:text-white"
           onClick={handleMagicLink} disabled={magicLoading}
         >
-          {magicLoading ? 'Sending…' : 'Email me a magic link'}
+          {magicLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              Sending…
+            </>
+          ) : 'Email me a magic link'}
         </Button>
 
       </CardContent>

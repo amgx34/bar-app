@@ -12,6 +12,12 @@ function getCatName(raw: unknown): string {
 }
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+// Movements that ADD stock rather than consume it. `pos_reversal` only fires
+// when the POS restates a day downward, so counting it as consumption would
+// inflate velocity every time a void was corrected. `pos_sale` is deliberately
+// absent — a POS sale is consumption.
+const NON_CONSUMPTION_REASONS = new Set(['delivery', 'pos_reversal']);
+
 const SHRINKAGE_REASONS = new Set(['spillage', 'comp', 'staff_drink', 'recount']);
 const REASON_LABELS: Record<string, string> = {
   spillage:    'Spillage',
@@ -179,7 +185,7 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
   }
 
   for (const log of logs30 ?? []) {
-    if (log.reason === 'delivery') continue;
+    if (NON_CONSUMPTION_REASONS.has(log.reason)) continue;
     const info = itemMap.get(log.item_id);
     if (!info) continue;
     const entry = catMap.get(info.category);
@@ -192,7 +198,7 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
 
   const consumptionMap = new Map<string, number>();
   for (const log of logs30 ?? []) {
-    if (log.reason === 'delivery') continue;
+    if (NON_CONSUMPTION_REASONS.has(log.reason)) continue;
     consumptionMap.set(log.item_id, (consumptionMap.get(log.item_id) ?? 0) + (log.quantity ?? 0));
   }
 

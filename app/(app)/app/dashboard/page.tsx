@@ -48,7 +48,19 @@ const REASON_LABEL: Record<string, string> = {
   staff_drink: 'Staff drink',
   recount:     'Recount adj.',
   delivery:    'Delivery received',
+  pos_sale:     'POS sales',
+  pos_reversal: 'POS correction',
 };
+
+// Recent Activity is a feed of things PEOPLE did. POS depletion writes a row per
+// item per day on a five-minute cycle, so leaving it in would bury every
+// spillage, comp and recount under an unbroken wall of automated movements.
+// Deliveries have always been excluded here for the same reason.
+const ACTIVITY_FEED_EXCLUDED = '("delivery","pos_sale","pos_reversal")';
+
+// Consumption, by contrast, is exactly what a POS sale is — so `pos_sale` stays
+// in the 30-day total and only stock-ADDING movements are filtered out.
+const NON_CONSUMPTION_FILTER = '("delivery","pos_reversal")';
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -98,7 +110,7 @@ export default async function DashboardPage() {
     // No join — item_id used to look up name from items array below
     supabase.from('usage_logs')
       .select('item_id, quantity, reason, created_at')
-      .eq('organization_id', orgId).neq('reason', 'delivery')
+      .eq('organization_id', orgId).not('reason', 'in', ACTIVITY_FEED_EXCLUDED)
       .order('created_at', { ascending: false }).limit(8),
     // No join — rep_id used for lookup
     supabase.from('rep_orders')
@@ -106,7 +118,7 @@ export default async function DashboardPage() {
       .eq('organization_id', orgId).order('created_at', { ascending: false }).limit(4),
     supabase.from('usage_logs')
       .select('item_id, quantity')
-      .eq('organization_id', orgId).neq('reason', 'delivery')
+      .eq('organization_id', orgId).not('reason', 'in', NON_CONSUMPTION_FILTER)
       .gte('created_at', d30ago).limit(200),
     supabase.from('rep_orders')
       .select('id')
@@ -239,7 +251,7 @@ export default async function DashboardPage() {
           </p>
         </div>
         {org.pos_provider && (
-          <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 shrink-0">
+          <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300 shrink-0">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
@@ -355,7 +367,7 @@ export default async function DashboardPage() {
               )}
 
               {lowStockItems.length === 0 && (
-                <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2.5">
+                <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg px-3 py-2.5">
                   <CheckCircle className="h-4 w-4 shrink-0" />
                   <span className="text-sm font-medium">All items stocked above par</span>
                 </div>
@@ -427,7 +439,7 @@ export default async function DashboardPage() {
                     const isWarn = ['spillage', 'comp', 'recount'].includes(log.reason);
                     return (
                       <div key={i} className="flex items-start gap-3 px-4 py-3">
-                        <div className={`mt-0.5 p-1.5 rounded-lg shrink-0 ${isWarn ? 'bg-amber-100 text-amber-600' : 'bg-muted text-muted-foreground'}`}>
+                        <div className={`mt-0.5 p-1.5 rounded-lg shrink-0 ${isWarn ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-600' : 'bg-muted text-muted-foreground'}`}>
                           <Package className="h-3.5 w-3.5" />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -444,7 +456,7 @@ export default async function DashboardPage() {
                     const repName = repNameMap.get((order as Record<string, unknown>).rep_id as string) ?? 'Rep';
                     return (
                       <div key={order.id} className="flex items-start gap-3 px-4 py-3">
-                        <div className="mt-0.5 p-1.5 rounded-lg bg-violet-100 text-violet-600 shrink-0">
+                        <div className="mt-0.5 p-1.5 rounded-lg bg-violet-100 dark:bg-violet-900/40 text-violet-600 shrink-0">
                           <ShoppingCart className="h-3.5 w-3.5" />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -511,11 +523,11 @@ export default async function DashboardPage() {
           {/* Pending orders badge */}
           {pendingOrders > 0 && (
             <Link href="/app/reps" className="block">
-              <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 flex items-center justify-between hover:bg-violet-100 transition-colors">
+              <div className="rounded-xl border border-violet-200 bg-violet-50 dark:bg-violet-950/40 px-4 py-3 flex items-center justify-between hover:bg-violet-100 dark:bg-violet-900/40 transition-colors">
                 <div className="flex items-center gap-2.5">
                   <ShoppingCart className="h-4 w-4 text-violet-600" />
                   <div>
-                    <p className="text-sm font-semibold text-violet-800">{pendingOrders} pending order{pendingOrders > 1 ? 's' : ''}</p>
+                    <p className="text-sm font-semibold text-violet-800 dark:text-violet-200">{pendingOrders} pending order{pendingOrders > 1 ? 's' : ''}</p>
                     <p className="text-xs text-violet-600">Awaiting delivery confirmation</p>
                   </div>
                 </div>
@@ -575,12 +587,12 @@ export default async function DashboardPage() {
           <div className="grid sm:grid-cols-2 gap-4">
             {unconfiguredEmployees.length > 0 && (
               <Link href="/app/payroll?tab=employees">
-                <div className="rounded-xl border border-yellow-300/60 bg-yellow-50 px-4 py-3.5 hover:bg-yellow-100 transition-colors">
+                <div className="rounded-xl border border-yellow-300/60 bg-yellow-50 dark:bg-yellow-950/40 px-4 py-3.5 hover:bg-yellow-100 dark:bg-yellow-900/40 transition-colors">
                   <div className="flex items-center gap-2 mb-1">
-                    <Users className="h-4 w-4 text-yellow-700" />
-                    <span className="text-sm font-semibold text-yellow-800">Staff Setup Needed</span>
+                    <Users className="h-4 w-4 text-yellow-700 dark:text-yellow-300" />
+                    <span className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">Staff Setup Needed</span>
                   </div>
-                  <p className="text-xs text-yellow-700">
+                  <p className="text-xs text-yellow-700 dark:text-yellow-300">
                     {unconfiguredEmployees.length} employee{unconfiguredEmployees.length > 1 ? 's' : ''} missing role or hourly rate
                   </p>
                 </div>
@@ -589,12 +601,12 @@ export default async function DashboardPage() {
 
             {reorderGroups.map(({ rep, items: repItems }) => (
               <Link key={rep.id} href={`/app/reps?order=${rep.id}`}>
-                <div className="rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3.5 hover:bg-amber-100 transition-colors">
+                <div className="rounded-xl border border-amber-300/60 bg-amber-50 dark:bg-amber-950/40 px-4 py-3.5 hover:bg-amber-100 dark:bg-amber-900/40 transition-colors">
                   <div className="flex items-center gap-2 mb-1">
-                    <RefreshCw className="h-4 w-4 text-amber-700" />
-                    <span className="text-sm font-semibold text-amber-800">Reorder from {rep.name}</span>
+                    <RefreshCw className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+                    <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">Reorder from {rep.name}</span>
                   </div>
-                  <p className="text-xs text-amber-700">
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
                     {repItems.slice(0, 2).map((i) => i.name).join(', ')}
                     {repItems.length > 2 ? ` + ${repItems.length - 2} more` : ''}
                   </p>
@@ -614,15 +626,15 @@ export default async function DashboardPage() {
 type KpiStatus = 'good' | 'warn' | 'critical' | 'info';
 
 const STATUS_ICON_BG: Record<KpiStatus, string> = {
-  good:     'bg-emerald-100 text-emerald-600',
-  warn:     'bg-amber-100 text-amber-600',
-  critical: 'bg-red-100 text-red-600',
+  good:     'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600',
+  warn:     'bg-amber-100 dark:bg-amber-900/40 text-amber-600',
+  critical: 'bg-red-100 dark:bg-red-900/40 text-red-600',
   info:     'bg-primary/10 text-primary',
 };
 const STATUS_VALUE: Record<KpiStatus, string> = {
-  good:     'text-emerald-700',
-  warn:     'text-amber-700',
-  critical: 'text-red-700',
+  good:     'text-emerald-700 dark:text-emerald-300',
+  warn:     'text-amber-700 dark:text-amber-300',
+  critical: 'text-red-700 dark:text-red-300',
   info:     'text-foreground',
 };
 
@@ -646,9 +658,9 @@ function KpiCard({ label, value, sub, icon: Icon, status }: {
 
 const ACTION_STYLES: Record<string, { icon: string; border: string; label: string }> = {
   primary: { icon: 'bg-primary/10 text-primary group-hover:bg-primary/15',       border: 'hover:border-primary/30',   label: 'text-foreground' },
-  amber:   { icon: 'bg-amber-100 text-amber-600 group-hover:bg-amber-200',       border: 'hover:border-amber-300/60', label: 'text-foreground' },
-  violet:  { icon: 'bg-violet-100 text-violet-600 group-hover:bg-violet-200',    border: 'hover:border-violet-300/60',label: 'text-foreground' },
-  emerald: { icon: 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-200', border: 'hover:border-emerald-300/60',label: 'text-foreground' },
+  amber:   { icon: 'bg-amber-100 dark:bg-amber-900/40 text-amber-600 group-hover:bg-amber-200',       border: 'hover:border-amber-300/60', label: 'text-foreground' },
+  violet:  { icon: 'bg-violet-100 dark:bg-violet-900/40 text-violet-600 group-hover:bg-violet-200',    border: 'hover:border-violet-300/60',label: 'text-foreground' },
+  emerald: { icon: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 group-hover:bg-emerald-200', border: 'hover:border-emerald-300/60',label: 'text-foreground' },
 };
 
 function QuickAction({ label, sub, icon: Icon, href, color }: {

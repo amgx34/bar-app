@@ -171,19 +171,19 @@ export default function DaySplitTab() {
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Tips</p>
               <p className="text-2xl font-bold tabular-nums mt-1">${data.totalTips.toFixed(2)}</p>
             </div>
-            <div className="rounded-xl border bg-card p-4 border-l-4 border-l-emerald-400">
+            <div className="rounded-xl border bg-card p-4 border-l-4 border-l-emerald-600 dark:border-l-emerald-400">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Bartender Pool</p>
-              <p className="text-2xl font-bold tabular-nums mt-1 text-emerald-400">${bartenderPool.toFixed(2)}</p>
+              <p className="text-2xl font-bold tabular-nums mt-1 text-emerald-700 dark:text-emerald-300">${bartenderPool.toFixed(2)}</p>
               <p className="text-xs text-muted-foreground">{hasOpener ? '80%' : '85%'} of tips</p>
             </div>
-            <div className="rounded-xl border bg-card p-4 border-l-4 border-l-cyan-400">
+            <div className="rounded-xl border bg-card p-4 border-l-4 border-l-cyan-600 dark:border-l-cyan-400">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Barback Pool</p>
-              <p className="text-2xl font-bold tabular-nums mt-1 text-cyan-400">${barbackPool.toFixed(2)}</p>
+              <p className="text-2xl font-bold tabular-nums mt-1 text-cyan-700 dark:text-cyan-300">${barbackPool.toFixed(2)}</p>
               <p className="text-xs text-muted-foreground">15% of tips</p>
             </div>
-            <div className={`rounded-xl border bg-card p-4 border-l-4 ${hasOpener ? 'border-l-amber-400' : 'border-l-muted'}`}>
+            <div className={`rounded-xl border bg-card p-4 border-l-4 ${hasOpener ? 'border-l-amber-600 dark:border-l-amber-400' : 'border-l-muted'}`}>
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Opener Bonus</p>
-              <p className={`text-2xl font-bold tabular-nums mt-1 ${hasOpener ? 'text-amber-400' : 'text-muted-foreground'}`}>
+              <p className={`text-2xl font-bold tabular-nums mt-1 ${hasOpener ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}>
                 ${openerPool.toFixed(2)}
               </p>
               <p className="text-xs text-muted-foreground">5% of tips</p>
@@ -219,7 +219,7 @@ export default function DaySplitTab() {
                               <span className="ml-2 text-xs text-muted-foreground capitalize">({emp.role})</span>
                             )}
                             {isOpener && (
-                              <span className="ml-2 inline-flex items-center rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-medium text-amber-400">
+                              <span className="ml-2 inline-flex items-center rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
                                 Opener +5%
                               </span>
                             )}
@@ -283,7 +283,7 @@ export default function DaySplitTab() {
                           <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
                             {emp.hours.toFixed(2)}
                           </td>
-                          <td className="px-4 py-3 text-right tabular-nums font-semibold text-cyan-400">
+                          <td className="px-4 py-3 text-right tabular-nums font-semibold text-cyan-700 dark:text-cyan-300">
                             {active ? `$${(shares[emp.id] ?? 0).toFixed(2)}` : '—'}
                           </td>
                           <td className="px-4 py-3 text-center">

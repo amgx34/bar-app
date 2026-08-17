@@ -17,7 +17,7 @@ type State = 'idle' | 'parsing' | 'preview' | 'saving';
 
 const FORMAT_BADGE: Record<DetectedFormat, { icon: React.ElementType; label: string; className: string }> = {
   'text-report': { icon: FileText,        label: 'Text Report', className: 'bg-primary/15 text-primary' },
-  csv:           { icon: FileSpreadsheet, label: 'CSV',         className: 'bg-emerald-500/15 text-emerald-400' },
+  csv:           { icon: FileSpreadsheet, label: 'CSV',         className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' },
   ai:            { icon: Sparkles,        label: 'AI Parsed',   className: 'bg-violet-500/20 text-violet-300' },
 };
 
@@ -171,12 +171,12 @@ export default function EmployeeShiftsUpload() {
         return (
           <div className="space-y-3">
             <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5">
-              <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
+              <CheckCircle className="h-4 w-4 text-emerald-700 dark:text-emerald-300 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-emerald-300">
                   {summary.shifts} shift{summary.shifts !== 1 ? 's' : ''}, {summary.employees} employees
                 </p>
-                <p className="text-xs text-emerald-400/80">
+                <p className="text-xs text-emerald-700 dark:text-emerald-300/80">
                   {summary.dateFrom} → {summary.dateTo}
                 </p>
               </div>
@@ -204,7 +204,7 @@ export default function EmployeeShiftsUpload() {
                       <td className="px-3 py-1.5">{s.employeeName}</td>
                       <td className="px-3 py-1.5 tabular-nums">{s.shiftDate}</td>
                       <td className="px-3 py-1.5 text-right tabular-nums">{s.regularHours.toFixed(2)}</td>
-                      <td className="px-3 py-1.5 text-right tabular-nums text-amber-400">
+                      <td className="px-3 py-1.5 text-right tabular-nums text-amber-700 dark:text-amber-300">
                         {s.overtimeHours > 0 ? s.overtimeHours.toFixed(2) : '—'}
                       </td>
                     </tr>

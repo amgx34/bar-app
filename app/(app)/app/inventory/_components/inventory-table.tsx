@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useOptimistic, useState } from 'react';
 import { MoreHorizontal, Package, AlertTriangle } from 'lucide-react';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -63,7 +63,24 @@ export function InventoryTable({ items, categories, reps, role, defaultPourOz, b
   const [adjusting, setAdjusting] = useState<ItemRow | null>(null);
   const [deactivating, setDeactivating] = useState<ItemRow | null>(null);
 
-  if (items.length === 0) {
+  /**
+   * Stock counting is done in bursts — someone works down a shelf adjusting one
+   * item after another. Waiting for a server round trip and a revalidation
+   * before each number moves makes that feel broken, so the new figure is shown
+   * immediately and reconciled when the server responds.
+   *
+   * React discards the optimistic value automatically once the transition
+   * settles, so a failed action reverts the row without any rollback code here.
+   */
+  const [optimisticItems, applyOptimisticStock] = useOptimistic(
+    items,
+    (current: ItemRow[], adjustment: { id: string; newStock: number }) =>
+      current.map((row) =>
+        row.id === adjustment.id ? { ...row, current_stock: adjustment.newStock } : row,
+      ),
+  );
+
+  if (optimisticItems.length === 0) {
     return (
       <div className="border rounded-lg p-12 text-center space-y-2">
         <Package className="h-8 w-8 mx-auto text-muted-foreground" />
@@ -94,7 +111,7 @@ export function InventoryTable({ items, categories, reps, role, defaultPourOz, b
             </TableRow>
           </TableHeader>
           <TableBody>
-            {items.map((item) => {
+            {optimisticItems.map((item) => {
               const belowPar =
                 item.par_level !== null && item.current_stock < item.par_level;
               return (
@@ -188,6 +205,7 @@ export function InventoryTable({ items, categories, reps, role, defaultPourOz, b
           open={!!adjusting}
           onOpenChange={(open) => !open && setAdjusting(null)}
           item={adjusting}
+          onOptimisticStock={applyOptimisticStock}
         />
       )}
       {deactivating && (

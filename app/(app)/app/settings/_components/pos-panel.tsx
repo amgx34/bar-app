@@ -19,9 +19,9 @@ import {
 import type { Role } from '@/lib/permissions';
 
 const POS_META = {
-  clover:  { name: 'Clover',    icon: Leaf,    color: 'text-green-400',  badge: 'bg-green-400/15 text-green-400 border-green-400/30' },
-  toast:   { name: 'Toast',     icon: Flame,   color: 'text-orange-400', badge: 'bg-orange-400/15 text-orange-400 border-orange-400/30' },
-  '2touch':{ name: '2TouchPOS', icon: Monitor, color: 'text-blue-400',   badge: 'bg-blue-400/15 text-blue-400 border-blue-400/30' },
+  clover:  { name: 'Clover',    icon: Leaf,    color: 'text-green-700 dark:text-green-300',  badge: 'bg-green-400/15 text-green-700 dark:text-green-300 border-green-600 dark:border-green-400/30' },
+  toast:   { name: 'Toast',     icon: Flame,   color: 'text-orange-700 dark:text-orange-300', badge: 'bg-orange-400/15 text-orange-700 dark:text-orange-300 border-orange-600 dark:border-orange-400/30' },
+  '2touch':{ name: '2TouchPOS', icon: Monitor, color: 'text-blue-700 dark:text-blue-300',   badge: 'bg-blue-400/15 text-blue-700 dark:text-blue-300 border-blue-600 dark:border-blue-400/30' },
 } as const;
 
 interface Props {
@@ -63,7 +63,7 @@ function ToastConnectForm({ onConnected }: { onConnected: () => void }) {
   return (
     <div className="rounded-lg border border-dashed border-orange-500/30 bg-orange-500/5 p-4 space-y-4">
       <div className="flex items-center gap-2">
-        <KeyRound className="h-4 w-4 text-orange-400" />
+        <KeyRound className="h-4 w-4 text-orange-700 dark:text-orange-300" />
         <p className="text-sm font-medium">Connect Toast</p>
       </div>
       {/* Step-by-step instructions */}
@@ -144,6 +144,10 @@ function TwoTouchPanel({
   role: Role;
 }) {
   const existingSender = (posConfig.twotouch_sender_email as string | undefined) ?? '';
+  // Written by the ingest route from the X-Rail-Agent header, and only when it
+  // changes — see recordAgentVersion in app/api/2touch/ingest/route.ts.
+  const agentVersion = posConfig.agent_version as string | undefined;
+  const agentSeenAt  = posConfig.agent_seen_at as string | undefined;
   const [senderEmail, setSenderEmail] = useState(existingSender);
   const [saving,      setSaving]      = useState(false);
   const [polling,     setPolling]     = useState(false);
@@ -196,7 +200,7 @@ function TwoTouchPanel({
   return (
     <div className="rounded-xl border bg-card p-5 space-y-4">
       <div className="flex items-center gap-2">
-        <Monitor className="h-4 w-4 text-blue-400" />
+        <Monitor className="h-4 w-4 text-blue-700 dark:text-blue-300" />
         <h3 className="text-sm font-semibold">2TouchPOS</h3>
         <span className="text-xs text-muted-foreground">Email-based · auto-sync every 15 min</span>
         {isConnected && (
@@ -257,9 +261,27 @@ function TwoTouchPanel({
             {agentCreds.pairingCode}
           </p>
           <p className="text-[10px] text-muted-foreground">
-            On the POS server, double-click <span className="font-mono">rail-2touch-agent.exe</span> and paste this
+            On the POS server, double-click <span className="font-mono">rail-setup.exe</span> and paste this
             when it asks. The code carries this bar&apos;s unique token — never share it with another bar.
           </p>
+        </div>
+      )}
+
+      {/* Reported by the agent on every sync via X-Rail-Agent, so this is
+          evidence the agent is actually running — not just that it was
+          installed once. */}
+      {isConnected && agentVersion && (
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-lg border border-border bg-muted/30 px-3 py-2">
+          <span className="text-xs text-muted-foreground">Agent version</span>
+          <span className="font-mono text-xs font-medium">{agentVersion}</span>
+          {agentSeenAt && (
+            <span className="text-[11px] text-muted-foreground">
+              · last sync {new Date(agentSeenAt).toLocaleString()}
+            </span>
+          )}
+          <span className="w-full text-[10px] text-muted-foreground">
+            To update it, run <span className="font-mono">rail-update.exe</span> on the POS server.
+          </span>
         </div>
       )}
 
@@ -402,7 +424,7 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
                       {isConnected ? (
                         <><CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> Connected &amp; ready to sync</>
                       ) : (
-                        <><AlertTriangle className="h-3.5 w-3.5 text-amber-400" /> Selected — authorization required</>
+                        <><AlertTriangle className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" /> Selected — authorization required</>
                       )}
                     </p>
                   </div>
@@ -417,7 +439,7 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
           </div>
         ) : (
           <div className="flex items-center gap-3 text-muted-foreground">
-            <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0" />
+            <AlertTriangle className="h-5 w-5 text-amber-700 dark:text-amber-300 shrink-0" />
             <p className="text-sm">No POS connected. Choose a provider below.</p>
           </div>
         )}
@@ -427,7 +449,7 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
       {canManage && (provider === 'clover' || !isConnected) && (
         <div className="rounded-xl border bg-card p-5 space-y-4">
           <div className="flex items-center gap-2">
-            <Leaf className="h-4 w-4 text-green-400" />
+            <Leaf className="h-4 w-4 text-green-700 dark:text-green-300" />
             <h3 className="text-sm font-semibold">Clover</h3>
             <span className="text-xs text-muted-foreground">OAuth 2.0 — secure redirect</span>
           </div>
@@ -445,7 +467,7 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
                 </a>
               </div>
             ) : (
-              <p className="text-xs text-amber-400 flex items-center gap-1.5">
+              <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
                 <AlertTriangle className="h-3.5 w-3.5" />
                 CLOVER_CLIENT_ID and CLOVER_REDIRECT_URI must be set in .env.local
               </p>
@@ -480,7 +502,7 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
       {canManage && (provider === 'toast' || !isConnected) && (
         <div className="rounded-xl border bg-card p-5 space-y-4">
           <div className="flex items-center gap-2">
-            <Flame className="h-4 w-4 text-orange-400" />
+            <Flame className="h-4 w-4 text-orange-700 dark:text-orange-300" />
             <h3 className="text-sm font-semibold">Toast</h3>
             <span className="text-xs text-muted-foreground">API key credentials</span>
           </div>

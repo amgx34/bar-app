@@ -111,16 +111,16 @@ export default function DirectDepositTab({ employees, accountsByEmployee, adminP
 
       {/* ── Liability disclaimer — must be the first thing the user sees ── */}
       <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-5 py-4 space-y-2">
-        <p className="text-sm font-semibold text-amber-700 flex items-center gap-2">
+        <p className="text-sm font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           Important — Rail does not process payroll payments
         </p>
-        <p className="text-xs text-amber-700/80 leading-relaxed">
+        <p className="text-xs text-amber-700 dark:text-amber-300/80 leading-relaxed">
           This tool <strong>securely stores</strong> employee banking information only. Rail is not a
           payroll processor, payment processor, or financial institution. Rail does not initiate,
           originate, or guarantee any ACH direct deposit transactions.
         </p>
-        <p className="text-xs text-amber-700/80 leading-relaxed">
+        <p className="text-xs text-amber-700 dark:text-amber-300/80 leading-relaxed">
           To pay employees via direct deposit, you must provide this information to your{' '}
           <strong>bank, payroll provider (Gusto, ADP, Paychex, etc.), or accountant</strong> who
           is licensed to originate ACH transactions. Use the <em>Export for Payroll Provider</em>{' '}
@@ -141,7 +141,7 @@ export default function DirectDepositTab({ employees, accountsByEmployee, adminP
       {!localPhone ? (
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5 space-y-4">
           <div className="flex items-center gap-2">
-            <Phone className="h-4 w-4 text-amber-400" />
+            <Phone className="h-4 w-4 text-amber-700 dark:text-amber-300" />
             <p className="text-sm font-semibold text-amber-300">Phone number required</p>
           </div>
           <p className="text-xs text-amber-300/70 leading-relaxed">
@@ -223,7 +223,7 @@ export default function DirectDepositTab({ employees, accountsByEmployee, adminP
                     <div className="flex-1 min-w-[200px] space-y-1.5">
                       {!hasAccount ? (
                         <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" />
                           No direct deposit on file
                         </span>
                       ) : (
@@ -243,7 +243,7 @@ export default function DirectDepositTab({ employees, accountsByEmployee, adminP
                               </Badge>
                             )}
                             {acct.prenote_sent_at ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400">
+                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-300">
                                 <CheckCircle className="h-3 w-3" /> Recorded
                               </span>
                             ) : null}

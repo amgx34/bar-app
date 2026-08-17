@@ -6,6 +6,47 @@ import { getCurrentOrg } from '@/lib/org';
 
 const OZ_PER_ML = 0.033814;
 
+/**
+ * weigh_report_items carries no organization_id of its own — it inherits
+ * tenancy from its parent report. Since createAdminClient() bypasses RLS, every
+ * mutation has to walk that link by hand before touching a row, or a caller can
+ * pass any UUID and reach another bar's data.
+ *
+ * Both helpers throw rather than return null: a caller that forgets to check a
+ * return value would reintroduce exactly the hole these close.
+ */
+async function assertReportInOrg(
+  supabase: ReturnType<typeof createAdminClient>,
+  reportId: string,
+  orgId: string,
+): Promise<void> {
+  const { data } = await supabase
+    .from('weigh_reports')
+    .select('id')
+    .eq('id', reportId)
+    .eq('organization_id', orgId)
+    .maybeSingle();
+
+  // Same message whether the report is missing or belongs to someone else —
+  // distinguishing them would confirm the existence of another org's rows.
+  if (!data) throw new Error('Weigh report not found');
+}
+
+async function assertItemInOrg(
+  supabase: ReturnType<typeof createAdminClient>,
+  itemId: string,
+  orgId: string,
+): Promise<void> {
+  const { data } = await supabase
+    .from('weigh_report_items')
+    .select('id, weigh_reports!inner(organization_id)')
+    .eq('id', itemId)
+    .eq('weigh_reports.organization_id', orgId)
+    .maybeSingle();
+
+  if (!data) throw new Error('Weigh item not found');
+}
+
 function calcOzConsumed(item: {
   opening_level: number | null;
   closing_level: number | null;
@@ -84,6 +125,8 @@ export async function getWeighReports(): Promise<WeighReport[]> {
   const ids = data.map((r) => r.id);
   const { data: itemRows } = await supabase
     .from('weigh_report_items')
+    // admin-scope-ok: `ids` come from a weigh_reports query filtered by
+    // organization_id, so this .in() cannot reach another bar's rows.
     .select('weigh_report_id')
     .in('weigh_report_id', ids);
 
@@ -114,6 +157,8 @@ export async function getWeighReport(id: string): Promise<WeighReportDetail | nu
 
   const { data: rawItems } = await supabase
     .from('weigh_report_items')
+    // admin-scope-ok: the parent report was fetched above with
+    // .eq('organization_id', org.id) and the function returns null if absent.
     .select('id, weigh_report_id, inventory_item_id, item_name, bottle_size_ml, pour_size_oz, cost_price, opening_level, closing_level, full_bottles_opened, notes')
     .eq('weigh_report_id', id)
     .order('item_name');
@@ -166,6 +211,8 @@ export async function getPourAnalysis(startDate: string, endDate: string): Promi
 
   if (!reports || reports.length === 0) return [];
 
+  // admin-scope-ok: `reports` was fetched with .eq('organization_id', org.id),
+  // so this .in() can only match items under this bar's reports.
   const { data: items } = await supabase
     .from('weigh_report_items')
     .select('item_name, bottle_size_ml, pour_size_oz, cost_price, opening_level, closing_level, full_bottles_opened')
@@ -247,7 +294,14 @@ export async function addWeighItem(data: {
   full_bottles_opened?: number;
   notes?: string;
 }): Promise<void> {
+  const { org } = await getCurrentOrg();
   const supabase = createAdminClient();
+
+  // The report id comes straight from the client, so it is checked before use.
+  await assertReportInOrg(supabase, data.weigh_report_id, org.id);
+
+  // admin-scope-ok: assertReportInOrg() above throws unless the parent
+  // report belongs to the caller's org.
   const { error } = await supabase.from('weigh_report_items').insert({
     weigh_report_id:    data.weigh_report_id,
     inventory_item_id:  data.inventory_item_id  ?? null,
@@ -270,7 +324,13 @@ export async function updateWeighItem(id: string, data: {
   full_bottles_opened?: number;
   notes?: string;
 }): Promise<void> {
+  const { org } = await getCurrentOrg();
   const supabase = createAdminClient();
+
+  await assertItemInOrg(supabase, id, org.id);
+
+  // admin-scope-ok: assertItemInOrg() above throws unless the item's parent
+  // report belongs to the caller's org.
   const { error } = await supabase
     .from('weigh_report_items')
     .update({
@@ -285,8 +345,15 @@ export async function updateWeighItem(id: string, data: {
 }
 
 export async function deleteWeighItem(id: string): Promise<void> {
+  const { org } = await getCurrentOrg();
   const supabase = createAdminClient();
-  await supabase.from('weigh_report_items').delete().eq('id', id);
+
+  await assertItemInOrg(supabase, id, org.id);
+
+  // admin-scope-ok: assertItemInOrg() above throws unless the item's parent
+  // report belongs to the caller's org.
+  const { error } = await supabase.from('weigh_report_items').delete().eq('id', id);
+  if (error) throw new Error(error.message);
   revalidatePath('/app/inventory/weigh');
 }
 

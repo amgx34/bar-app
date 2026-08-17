@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { SITE_URL } from '@/lib/site';
+import { TERMS_UPDATED, EULA_UPDATED } from '@/lib/legal';
 
 /**
  * Generates /sitemap.xml.
@@ -17,6 +18,32 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 1,
+    },
+    // Policy pages are genuinely public and are the pages people look for when
+    // deciding whether to trust the product with employee data.
+    {
+      url: `${SITE_URL}/privacy`,
+      lastModified: new Date('2026-08-17'),
+      changeFrequency: 'yearly',
+      priority: 0.3,
+    },
+    {
+      url: `${SITE_URL}/terms`,
+      lastModified: new Date(TERMS_UPDATED),
+      changeFrequency: 'yearly',
+      priority: 0.3,
+    },
+    {
+      url: `${SITE_URL}/eula`,
+      lastModified: new Date(EULA_UPDATED),
+      changeFrequency: 'yearly',
+      priority: 0.2,
+    },
+    {
+      url: `${SITE_URL}/accessibility`,
+      lastModified: new Date('2026-08-17'),
+      changeFrequency: 'yearly',
+      priority: 0.3,
     },
   ];
 }

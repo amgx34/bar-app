@@ -16,8 +16,8 @@ export default async function CloverConnectPage() {
   const authUrl = buildCloverAuthUrl(org.id);
 
   return (
-    <main className="relative min-h-dvh flex items-center justify-center p-6 overflow-hidden bg-gray-950">
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-950 to-black" />
+    <main className="relative min-h-dvh flex items-center justify-center p-6 overflow-hidden bg-sidebar text-sidebar-foreground">
+      <div className="absolute inset-0 bg-gradient-to-br from-sidebar-accent via-sidebar to-background dark:to-black" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(74,222,128,0.06),transparent_60%)]" />
 
       <div className="relative z-10 w-full max-w-lg space-y-6">

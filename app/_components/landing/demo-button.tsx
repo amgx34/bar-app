@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { Loader2, PlayCircle } from 'lucide-react';
 
 interface Props {
@@ -11,10 +12,38 @@ interface Props {
 export function DemoButton({ size = 'default', className = '' }: Props) {
   const [loading, setLoading] = useState(false);
 
-  function handleClick() {
+  async function handleClick() {
     setLoading(true);
-    // Navigate to the demo route — it handles user creation, seeding, and sign-in
-    window.location.href = '/api/demo';
+    try {
+      // POST, not a navigation: the route provisions a user, an org and a
+      // seeded dataset, so it must not be reachable by prefetch or crawl.
+      const res = await fetch('/api/demo', { method: 'POST' });
+      const body = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        toast.error(
+          body?.error ??
+            (res.status === 429
+              ? 'Too many demo sessions from this address. Try again later.'
+              : 'Demo is unavailable right now.'),
+        );
+        setLoading(false);
+        return;
+      }
+
+      // Already signed in: the route deliberately provisioned nothing rather
+      // than replacing their session with a throwaway demo account. Say so,
+      // because otherwise landing on their own dashboard looks like the demo
+      // failed to load.
+      if (body?.alreadySignedIn) {
+        toast.info('You are already signed in — taking you to your own bar.');
+      }
+
+      window.location.href = body?.redirectTo ?? '/app/dashboard';
+    } catch {
+      toast.error('Could not reach the server. Check your connection and try again.');
+      setLoading(false);
+    }
   }
 
   const sizeClasses = {
@@ -27,7 +56,7 @@ export function DemoButton({ size = 'default', className = '' }: Props) {
     <button
       onClick={handleClick}
       disabled={loading}
-      className={`inline-flex items-center gap-2 font-semibold rounded-xl border-2 border-primary text-primary hover:bg-primary hover:text-white transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed ${sizeClasses} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 font-semibold rounded-lg border-2 border-primary text-primary cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed ${sizeClasses} ${className}`}
     >
       {loading ? (
         <>

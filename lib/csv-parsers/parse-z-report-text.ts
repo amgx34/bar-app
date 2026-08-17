@@ -1,3 +1,8 @@
+import {
+  businessDateFromParts,
+  DEFAULT_BUSINESS_DAY_CUTOFF_HOUR,
+} from '@/lib/business-date';
+
 export interface ParsedServerSales {
   name: string;
   totalSales: number;
@@ -5,7 +10,10 @@ export interface ParsedServerSales {
 }
 
 export interface ParsedZReportText {
-  /** YYYY-MM-DD derived from the "DATE/TIME RUN" line */
+  /**
+   * YYYY-MM-DD business date — derived from the "DATE/TIME RUN" line and
+   * rolled back a day when the Z was run before the business-day cutoff.
+   */
   reportDate: string;
   /** Grand total sales (from SERVER SALES BREAKDOWN TOTALS) */
   totalSales: number;
@@ -24,18 +32,39 @@ export interface ParsedZReportText {
  *  - Grand total sales
  *  - Per-server: name, Total Sales, Tips Paid Out
  */
-export function parseZReportText(content: string): ParsedZReportText {
+export function parseZReportText(
+  content: string,
+  cutoffHour: number = DEFAULT_BUSINESS_DAY_CUTOFF_HOUR,
+): ParsedZReportText {
   // ── Date ──────────────────────────────────────────────────────────────────
+  // DATE/TIME RUN is when the Z was *printed* — for a bar closing at 3am that
+  // is the morning after the session. Capture the time as well as the date so
+  // the business-day cutoff can roll it back to the night it belongs to;
+  // previously the time was discarded and every late close landed a day early.
   const runDateMatch = content.match(
-    /DATE\/TIME RUN:\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/
+    /DATE\/TIME RUN:\s+(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):\d{2}\s*(AM|PM)?)?/i
   );
   if (!runDateMatch) {
     throw new Error(
       'Could not find "DATE/TIME RUN" in the Z report. Make sure you uploaded the correct file.'
     );
   }
-  const [, m, d, y] = runDateMatch;
-  const reportDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  const [, m, d, y, rawHour, meridiem] = runDateMatch;
+
+  let runHour: number | null = null;
+  if (rawHour !== undefined) {
+    runHour = Number(rawHour);
+    if (meridiem) {
+      const isPm = meridiem.toUpperCase() === 'PM';
+      if (isPm && runHour < 12) runHour += 12;
+      if (!isPm && runHour === 12) runHour = 0;
+    }
+  }
+
+  const reportDate =
+    runHour === null
+      ? `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+      : businessDateFromParts(Number(y), Number(m), Number(d), runHour, cutoffHour);
 
   // ── Total tips ─────────────────────────────────────────────────────────────
   // The RECEIPTS section contains "Tips Paid Out   -1099.20" (negative = cash out).

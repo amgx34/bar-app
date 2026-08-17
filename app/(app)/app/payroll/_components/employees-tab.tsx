@@ -22,7 +22,7 @@ const ROLE_STYLES: Record<string, string> = {
   server: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
   manager: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
   security: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
-  other: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+  other: 'bg-muted text-muted-foreground',
 };
 
 const TIP_MODE_LABELS: Record<string, string> = {
@@ -207,7 +207,7 @@ export default function EmployeesTab({ employees: initialEmployees }: EmployeesT
                           Incomplete
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400">
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-300">
                           <UserCheck className="h-3.5 w-3.5" />
                           Active
                         </span>

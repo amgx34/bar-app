@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   Users, Plus, Trash2, UserCheck, AlertTriangle,
-  TrendingUp, Clock, Banknote, ChevronDown, ChevronUp,
+  TrendingUp, Clock, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,22 +15,26 @@ import EmployeeSetupDialog from '../../payroll/_components/employee-setup-dialog
 import { deleteEmployee } from '../../payroll/actions';
 import type { Employee, PayrollEntry } from '../../payroll/actions';
 
+// Role hues stay categorical — collapsing them into the brand navy would
+// destroy the distinction these badges exist to carry. The text steps are
+// darkened for light mode (a -400 step on a white card is ~2.6:1) and
+// lightened again under .dark.
 const ROLE_COLORS: Record<string, string> = {
-  bartender: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  barback:   'bg-orange-500/15 text-orange-400 border-orange-500/30',
-  server:    'bg-green-500/15 text-green-400 border-green-500/30',
-  manager:   'bg-violet-500/15 text-violet-400 border-violet-500/30',
-  security:  'bg-red-500/15 text-red-400 border-red-500/30',
-  other:     'bg-gray-500/15 text-gray-400 border-gray-500/30',
+  bartender: 'bg-blue-500/15 text-blue-800 dark:text-blue-300 border-blue-500/30',
+  barback:   'bg-orange-500/15 text-orange-800 dark:text-orange-300 border-orange-500/30',
+  server:    'bg-green-500/15 text-green-800 dark:text-green-300 border-green-500/30',
+  manager:   'bg-violet-500/15 text-violet-800 dark:text-violet-300 border-violet-500/30',
+  security:  'bg-red-500/15 text-red-800 dark:text-red-300 border-red-500/30',
+  other:     'bg-muted text-muted-foreground border-border-strong/40',
 };
 
 const AVATAR_COLORS: Record<string, string> = {
-  bartender: 'bg-blue-500/20 text-blue-400',
-  barback:   'bg-orange-500/20 text-orange-400',
-  server:    'bg-green-500/20 text-green-400',
-  manager:   'bg-violet-500/20 text-violet-400',
-  security:  'bg-red-500/20 text-red-400',
-  other:     'bg-gray-500/20 text-gray-400',
+  bartender: 'bg-blue-500/20 text-blue-800 dark:text-blue-300',
+  barback:   'bg-orange-500/20 text-orange-800 dark:text-orange-300',
+  server:    'bg-green-500/20 text-green-800 dark:text-green-300',
+  manager:   'bg-violet-500/20 text-violet-800 dark:text-violet-300',
+  security:  'bg-red-500/20 text-red-800 dark:text-red-300',
+  other:     'bg-muted text-muted-foreground',
 };
 
 const TIP_MODE_LABELS: Record<string, string> = {
@@ -102,10 +106,14 @@ export default function EmployeeRoster({ employees: initialEmployees, payroll }:
     }
   }
 
-  const SortIcon = ({ k }: { k: SortKey }) =>
-    sortKey === k
-      ? sortAsc ? <ChevronUp className="h-3 w-3 inline ml-0.5" /> : <ChevronDown className="h-3 w-3 inline ml-0.5" />
-      : null;
+  // Plain render helper rather than a component declared during render —
+  // a nested component identity changes every render and remounts its subtree.
+  function sortIcon(k: SortKey) {
+    if (sortKey !== k) return null;
+    return sortAsc
+      ? <ChevronUp className="h-3 w-3 inline ml-0.5" aria-hidden />
+      : <ChevronDown className="h-3 w-3 inline ml-0.5" aria-hidden />;
+  }
 
   const configured   = employees.filter((e) => e.role && e.hourly_rate !== null);
   const unconfigured = employees.filter((e) => !e.role || e.hourly_rate === null);
@@ -135,24 +143,24 @@ export default function EmployeeRoster({ employees: initialEmployees, payroll }:
           <p className="text-xs text-muted-foreground mt-0.5">
             {configured.length} configured
             {unconfigured.length > 0 && (
-              <span className="text-amber-400"> · {unconfigured.length} need setup</span>
+              <span className="text-amber-700 dark:text-amber-300"> · {unconfigured.length} need setup</span>
             )}
           </p>
         </div>
 
-        <div className="rounded-xl border border-l-4 border-l-emerald-400 bg-card px-5 py-4">
+        <div className="rounded-xl border border-l-4 border-l-emerald-600 dark:border-l-emerald-400 bg-card px-5 py-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">All-Time Payroll</span>
-            <TrendingUp className="h-4 w-4 text-emerald-400" />
+            <TrendingUp className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
           </div>
-          <p className="text-2xl font-bold tabular-nums text-emerald-400">{fmt(totalPaidOut)}</p>
+          <p className="text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{fmt(totalPaidOut)}</p>
           <p className="text-xs text-muted-foreground mt-0.5">wages + tips combined</p>
         </div>
 
-        <div className="rounded-xl border border-l-4 border-l-cyan-400 bg-card px-5 py-4">
+        <div className="rounded-xl border border-l-4 border-l-cyan-600 dark:border-l-cyan-400 bg-card px-5 py-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Hours Logged</span>
-            <Clock className="h-4 w-4 text-cyan-400" />
+            <Clock className="h-4 w-4 text-cyan-700 dark:text-cyan-300" />
           </div>
           <p className="text-2xl font-bold tabular-nums">{totalHours.toFixed(1)}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{fmt(totalTips)} in tips distributed</p>
@@ -181,27 +189,30 @@ export default function EmployeeRoster({ employees: initialEmployees, payroll }:
                   className="cursor-pointer select-none hover:text-foreground"
                   onClick={() => toggleSort('name')}
                 >
-                  Name <SortIcon k="name" />
+                  Name {sortIcon('name')}
                 </TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead
                   className="text-right cursor-pointer select-none hover:text-foreground"
                   onClick={() => toggleSort('totalHours')}
                 >
-                  Hours <SortIcon k="totalHours" />
+                  Hours {sortIcon('totalHours')}
                 </TableHead>
                 <TableHead className="text-right">Wage Pay</TableHead>
                 <TableHead
                   className="text-right cursor-pointer select-none hover:text-foreground"
                   onClick={() => toggleSort('tipAmount')}
                 >
-                  Tips <SortIcon k="tipAmount" />
+                  Tips {sortIcon('tipAmount')}
+                </TableHead>
+                <TableHead className="text-right" title="Base rate plus tips per hour worked">
+                  Eff. /hr
                 </TableHead>
                 <TableHead
                   className="text-right cursor-pointer select-none hover:text-foreground font-semibold"
                   onClick={() => toggleSort('totalCompensation')}
                 >
-                  Total Earned <SortIcon k="totalCompensation" />
+                  Total Earned {sortIcon('totalCompensation')}
                 </TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="pr-5 text-right">Actions</TableHead>
@@ -252,13 +263,26 @@ export default function EmployeeRoster({ employees: initialEmployees, payroll }:
                       {p && wagePay > 0 ? fmt(wagePay) : <span className="text-muted-foreground">—</span>}
                     </TableCell>
 
-                    <TableCell className="text-right tabular-nums text-cyan-400">
+                    <TableCell className="text-right tabular-nums text-cyan-700 dark:text-cyan-300">
                       {p && p.tipAmount > 0 ? fmt(p.tipAmount) : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+
+                    <TableCell className="text-right tabular-nums">
+                      {p && p.totalHours > 0 ? (
+                        <>
+                          <span className="font-medium">{fmt(p.effectiveHourlyRate)}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            +{fmt(p.tipsPerHour)} tips
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
 
                     <TableCell className="text-right">
                       {p && p.totalCompensation > 0 ? (
-                        <span className="font-semibold tabular-nums text-emerald-400">{fmt(p.totalCompensation)}</span>
+                        <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">{fmt(p.totalCompensation)}</span>
                       ) : (
                         <span className="text-muted-foreground text-sm">No data</span>
                       )}
@@ -266,11 +290,11 @@ export default function EmployeeRoster({ employees: initialEmployees, payroll }:
 
                     <TableCell>
                       {incomplete ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-400">
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300">
                           <AlertTriangle className="h-3.5 w-3.5" /> Incomplete
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
                           <UserCheck className="h-3.5 w-3.5" /> Active
                         </span>
                       )}

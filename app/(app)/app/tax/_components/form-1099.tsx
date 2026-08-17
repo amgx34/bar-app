@@ -223,7 +223,7 @@ export default function Form1099({ availableYears, employees, orgName }: Props) 
                   <td className="px-4 py-3 font-medium">{entry.employeeName}
                     <span className="ml-2 text-xs text-muted-foreground capitalize">{entry.role}</span>
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-emerald-400 font-semibold">{fmtMoney(entry.totalCompensation)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-emerald-700 dark:text-emerald-300 font-semibold">{fmtMoney(entry.totalCompensation)}</td>
                   <td className="px-4 py-3 text-right">
                     <Button size="sm" variant="outline" onClick={() => print1099(entry)} className="gap-1.5 text-xs h-7">
                       <Printer className="h-3 w-3" /> Print

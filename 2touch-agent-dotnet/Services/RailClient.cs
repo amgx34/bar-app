@@ -80,7 +80,12 @@ public class RailClient(IHttpClientFactory factory, IOptions<AgentConfig> cfg, I
         using var content = new StringContent(body, Encoding.UTF8, "application/json");
         using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
         request.Headers.TryAddWithoutValidation("X-Rail-Signature", signature);
-        request.Headers.TryAddWithoutValidation("X-Rail-Agent", "rail-2touch-agent/2.0-dotnet");
+        // Version reported on every sync so Rail can show which bars are running
+        // a stale agent. A header, not a payload field: the signature covers the
+        // raw body, and adding a field there would change the bytes every
+        // release for no benefit.
+        request.Headers.TryAddWithoutValidation(
+            "X-Rail-Agent", $"rail-2touch-agent/{Setup.AgentVersion.CurrentDisplay} (dotnet)");
 
         using var response = await http.SendAsync(request, ct);
         var text = await response.Content.ReadAsStringAsync(ct);

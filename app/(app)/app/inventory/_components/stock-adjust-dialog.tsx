@@ -25,6 +25,12 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item: ItemRow;
+  /**
+   * Reports the expected new stock so the table can show it immediately.
+   * Must be called inside the same transition as the server action, or React
+   * discards the optimistic value before the request even starts.
+   */
+  onOptimisticStock?: (adjustment: { id: string; newStock: number }) => void;
 };
 
 const REASONS = [
@@ -36,7 +42,7 @@ const REASONS = [
   { value: 'other',       label: 'Other' },
 ];
 
-export function StockAdjustDialog({ open, onOpenChange, item }: Props) {
+export function StockAdjustDialog({ open, onOpenChange, item, onOptimisticStock }: Props) {
   const [isPending, startTransition] = useTransition();
   const [mode, setMode] = useState<'set' | 'delta'>('delta');
 
@@ -60,7 +66,19 @@ export function StockAdjustDialog({ open, onOpenChange, item }: Props) {
   }
 
   function onSubmit(values: StockAdjustmentInput) {
+    // Mirrors the server's arithmetic in app/(app)/app/inventory/actions.ts.
+    // Only a prediction — the server remains the authority, and React reverts
+    // this automatically if the action throws.
+    const predicted =
+      values.mode === 'set'
+        ? values.quantity
+        : item.current_stock + values.quantity;
+
     startTransition(async () => {
+      // Inside the transition, so the optimistic value survives until the
+      // action settles rather than being dropped on the next render.
+      onOptimisticStock?.({ id: item.id, newStock: Math.max(predicted, 0) });
+
       try {
         await adjustStock(values);
         toast.success('Stock updated');

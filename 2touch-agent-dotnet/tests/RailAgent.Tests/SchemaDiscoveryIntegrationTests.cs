@@ -138,6 +138,7 @@ public class SchemaDiscoveryIntegrationTests
                 Date = Q("Date"), Sales = Q("Sales"), CcTips = Q("CcTips"), CashTips = Q("CashTips"),
             },
             lookbackDays: 30,
+            cutoffHour: Config.SyncConfig.DefaultBusinessDayCutoffHour,
             top: 5);
 
         await using var cmd = new SqlCommand(sql, conn);

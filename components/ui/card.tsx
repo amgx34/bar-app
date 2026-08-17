@@ -33,9 +33,21 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+/**
+ * Renders a real heading, not a styled div — card titles are the section
+ * headings of every dashboard page, and screen-reader users navigate by them.
+ *
+ * Defaults to `h2` so a page reads h1 (page title) → h2 (card titles) with no
+ * skipped level. Pass `as="h3"` for a card nested inside a section that already
+ * owns an h2, or `as="div"` for the rare decorative title that is not a section.
+ */
+function CardTitle({
+  className,
+  as: Comp = "h2",
+  ...props
+}: React.ComponentProps<"div"> & { as?: React.ElementType }) {
   return (
-    <div
+    <Comp
       data-slot="card-title"
       className={cn(
         "font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",

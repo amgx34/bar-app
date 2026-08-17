@@ -22,9 +22,9 @@ const fmtPct     = (n: number) => `${n.toFixed(1)}%`;
 const fmtDecimal = (n: number) => n.toFixed(3);
 
 const URGENCY_COLOR: Record<AlertItem['urgency'], string> = {
-  critical: 'bg-red-100 text-red-700 border-red-200',
-  high:     'bg-amber-100 text-amber-700 border-amber-200',
-  medium:   'bg-yellow-50 text-yellow-700 border-yellow-200',
+  critical: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border-red-200',
+  high:     'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-200',
+  medium:   'bg-yellow-50 dark:bg-yellow-950/40 text-yellow-700 dark:text-yellow-300 border-yellow-200',
 };
 const URGENCY_LABEL: Record<AlertItem['urgency'], string> = { critical: 'OUT', high: '< 3 days', medium: 'Low' };
 
@@ -35,9 +35,9 @@ export default async function InventoryAnalyticsPage() {
 
   const kpis = [
     { label: 'Inventory Value', value: fmtMoney(data.totalInventoryValue), sub: `${data.totalActiveItems} active items`, icon: Package, color: 'text-primary', bg: 'bg-primary/10' },
-    { label: 'Par Compliance',  value: fmtPct(data.parCompliancePct), sub: `${data.lowStockCount} below par · ${data.outOfStockCount} out`, icon: Scale, color: data.parCompliancePct >= 80 ? 'text-emerald-600' : data.parCompliancePct >= 60 ? 'text-amber-600' : 'text-destructive', bg: data.parCompliancePct >= 80 ? 'bg-emerald-100' : data.parCompliancePct >= 60 ? 'bg-amber-100' : 'bg-red-100' },
-    { label: 'Shrinkage (30d)', value: fmtMoney(data.totalShrinkageCost30d), sub: 'spillage + comps + staff', icon: AlertTriangle, color: 'text-rose-600', bg: 'bg-rose-100' },
-    { label: 'Avg Pour Cost',   value: data.avgPourCost > 0 ? `$${fmtDecimal(data.avgPourCost)}` : '—', sub: `across ${data.pourCosts.length} spirit SKUs`, icon: DollarSign, color: 'text-violet-600', bg: 'bg-violet-100' },
+    { label: 'Par Compliance',  value: fmtPct(data.parCompliancePct), sub: `${data.lowStockCount} below par · ${data.outOfStockCount} out`, icon: Scale, color: data.parCompliancePct >= 80 ? 'text-emerald-600' : data.parCompliancePct >= 60 ? 'text-amber-600' : 'text-destructive', bg: data.parCompliancePct >= 80 ? 'bg-emerald-100 dark:bg-emerald-900/40' : data.parCompliancePct >= 60 ? 'bg-amber-100 dark:bg-amber-900/40' : 'bg-red-100 dark:bg-red-900/40' },
+    { label: 'Shrinkage (30d)', value: fmtMoney(data.totalShrinkageCost30d), sub: 'spillage + comps + staff', icon: AlertTriangle, color: 'text-rose-600', bg: 'bg-rose-100 dark:bg-rose-900/40' },
+    { label: 'Avg Pour Cost',   value: data.avgPourCost > 0 ? `$${fmtDecimal(data.avgPourCost)}` : '—', sub: `across ${data.pourCosts.length} spirit SKUs`, icon: DollarSign, color: 'text-violet-600', bg: 'bg-violet-100 dark:bg-violet-900/40' },
   ];
 
   return (

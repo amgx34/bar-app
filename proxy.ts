@@ -23,7 +23,13 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user && request.nextUrl.pathname.startsWith('/app')) {
+  // Boundary-aware: a bare startsWith('/app') also matches /apple-icon, and
+  // would match /apply or /appointments if those ever existed — sending public
+  // routes to the login page purely because of a shared prefix.
+  const { pathname } = request.nextUrl;
+  const isAppRoute = pathname === '/app' || pathname.startsWith('/app/');
+
+  if (!user && isAppRoute) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
     loginUrl.searchParams.set('next', request.nextUrl.pathname);

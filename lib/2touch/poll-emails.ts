@@ -210,6 +210,8 @@ export async function poll2TouchEmails(): Promise<PollResult> {
           // Skip already-processed emails
           const { data: dup } = await supabase
             .from('bar_messages')
+            // admin-scope-ok: cron job with no user context. Deduplicates inbound mail
+            // by gmail_message_id across all orgs before it knows which org it is for.
             .select('id')
             .eq('gmail_message_id', messageId)
             .maybeSingle();
@@ -250,6 +252,8 @@ export async function poll2TouchEmails(): Promise<PollResult> {
               // Ensure employee exists
               const { data: emp } = await supabase
                 .from('employees')
+                // admin-scope-ok: cron job with no user context. Deduplicates inbound mail
+                // by gmail_message_id across all orgs before it knows which org it is for.
                 .select('id')
                 .eq('organization_id', matchingOrgId)
                 .ilike('name', shift.employee_name.trim())

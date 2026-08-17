@@ -148,12 +148,12 @@ export default function PayrollTab({
 
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Card className="border-l-4 border-l-indigo-400">
+        <Card className="border-l-4 border-l-indigo-600 dark:border-l-indigo-400">
           <CardHeader className="flex flex-row items-center justify-between pb-1 pt-4 px-4">
             <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Total Hours
             </CardTitle>
-            <Clock className="h-4 w-4 text-indigo-400" />
+            <Clock className="h-4 w-4 text-indigo-700 dark:text-indigo-300" />
           </CardHeader>
           <CardContent className="px-4 pb-4">
             <div className="text-2xl font-bold tabular-nums">{totals.totalHours.toFixed(1)}</div>
@@ -161,36 +161,36 @@ export default function PayrollTab({
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-emerald-400">
+        <Card className="border-l-4 border-l-emerald-600 dark:border-l-emerald-400">
           <CardHeader className="flex flex-row items-center justify-between pb-1 pt-4 px-4">
             <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Regular Pay
             </CardTitle>
-            <DollarSign className="h-4 w-4 text-emerald-400" />
+            <DollarSign className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
           </CardHeader>
           <CardContent className="px-4 pb-4">
             <div className="text-2xl font-bold tabular-nums">${totals.regularPay.toFixed(2)}</div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-amber-400">
+        <Card className="border-l-4 border-l-amber-600 dark:border-l-amber-400">
           <CardHeader className="flex flex-row items-center justify-between pb-1 pt-4 px-4">
             <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Overtime Pay
             </CardTitle>
-            <TrendingUp className="h-4 w-4 text-amber-400" />
+            <TrendingUp className="h-4 w-4 text-amber-700 dark:text-amber-300" />
           </CardHeader>
           <CardContent className="px-4 pb-4">
             <div className="text-2xl font-bold tabular-nums">${totals.overtimePay.toFixed(2)}</div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-cyan-400">
+        <Card className="border-l-4 border-l-cyan-600 dark:border-l-cyan-400">
           <CardHeader className="flex flex-row items-center justify-between pb-1 pt-4 px-4">
             <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Tips
             </CardTitle>
-            <Banknote className="h-4 w-4 text-cyan-400" />
+            <Banknote className="h-4 w-4 text-cyan-700 dark:text-cyan-300" />
           </CardHeader>
           <CardContent className="px-4 pb-4">
             <div className="text-2xl font-bold tabular-nums">${totals.tips.toFixed(2)}</div>

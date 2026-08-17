@@ -284,7 +284,7 @@ export default function W2Generator({ availableYears, employees, orgName }: Prop
                     <td className="px-5 py-3 font-medium">{entry.employeeName}
                       <span className="ml-2 text-xs text-muted-foreground capitalize">{entry.role}</span>
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-emerald-400 font-semibold">{fmtMoney(wages)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-emerald-700 dark:text-emerald-300 font-semibold">{fmtMoney(wages)}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{fmtMoney(ss)}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{fmtMoney(med)}</td>
                     <td className="px-4 py-3 text-right">

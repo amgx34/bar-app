@@ -59,6 +59,29 @@ public class SqlReader(IOptions<AgentConfig> cfg)
     private static string Cutoff(int lookbackDays)
         => DateTime.Today.AddDays(-Math.Abs(lookbackDays)).ToString("yyyy-MM-dd");
 
+    /// <summary>
+    /// Raw-timestamp filter boundary. When a business-day cutoff is active a
+    /// row's trading date can be one day earlier than its timestamp, so the raw
+    /// window is widened by a day — otherwise the oldest trading day in range
+    /// comes back missing its pre-cutoff hours. Re-sending a day is harmless:
+    /// ingest upserts on (organization_id, report_date).
+    /// </summary>
+    private static string RawCutoff(int lookbackDays, int cutoffHour)
+        => Cutoff(Math.Abs(lookbackDays) + (cutoffHour > 0 ? 1 : 0));
+
+    /// <summary>
+    /// Truncates a timestamp to the trading day it belongs to.
+    ///
+    /// With a cutoff of 4, a ticket rung at 01:40 on Sunday shifts to 21:40
+    /// Saturday and truncates to Saturday — the night it was actually part of.
+    /// A cutoff of 0 means the column is already a business date and is passed
+    /// through untouched.
+    /// </summary>
+    public static string BusinessDate(string column, int cutoffHour)
+        => cutoffHour > 0
+            ? $"CAST(DATEADD(HOUR, -{cutoffHour}, {column}) AS DATE)"
+            : $"CAST({column} AS DATE)";
+
     private static string Top(int? n) => n is null ? "" : $"TOP {n} ";
 
     /// <summary>Placeholder a table expression can use to filter on its own raw date column.</summary>
@@ -71,8 +94,8 @@ public class SqlReader(IOptions<AgentConfig> cfg)
     /// may push the same cutoff inside via {cutoff}, against the indexed
     /// datetime column. See Setup/TwoTouchProfile.cs.
     /// </summary>
-    private static string Source(string table, int lookbackDays)
-        => table.Replace(CutoffToken, Cutoff(lookbackDays), StringComparison.Ordinal);
+    private static string Source(string table, int lookbackDays, int cutoffHour)
+        => table.Replace(CutoffToken, RawCutoff(lookbackDays, cutoffHour), StringComparison.Ordinal);
 
     // ── Query text ────────────────────────────────────────────────────────────
     // Public and static so the setup wizard proves a candidate mapping with the
@@ -81,38 +104,38 @@ public class SqlReader(IOptions<AgentConfig> cfg)
     // config the wizard fills from INFORMATION_SCHEMA (bracket-quoted) — never
     // from request data.
 
-    public static string ZReportSql(string table, ZReportColumns c, int lookbackDays, int? top = null) => $"""
-        SELECT {Top(top)}CAST({c.Date} AS DATE) AS report_date,
+    public static string ZReportSql(string table, ZReportColumns c, int lookbackDays, int cutoffHour, int? top = null) => $"""
+        SELECT {Top(top)}{BusinessDate(c.Date, cutoffHour)} AS report_date,
                SUM({c.Sales})    AS total_sales,
                SUM({c.CcTips})   AS cc_tips,
                SUM({c.CashTips}) AS cash_tips
-        FROM {Source(table, lookbackDays)}
-        WHERE CAST({c.Date} AS DATE) >= '{Cutoff(lookbackDays)}'
-        GROUP BY CAST({c.Date} AS DATE)
+        FROM {Source(table, lookbackDays, cutoffHour)}
+        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'
+        GROUP BY {BusinessDate(c.Date, cutoffHour)}
         ORDER BY report_date DESC
         """;
 
-    public static string EwReportSql(string table, EwReportColumns c, int lookbackDays, int? top = null) => $"""
-        SELECT {Top(top)}CAST({c.Date} AS DATE)     AS shift_date,
+    public static string EwReportSql(string table, EwReportColumns c, int lookbackDays, int cutoffHour, int? top = null) => $"""
+        SELECT {Top(top)}{BusinessDate(c.Date, cutoffHour)}     AS shift_date,
                {c.EmployeeName}           AS employee_name,
                ISNULL({c.TotalSales}, 0)  AS total_sales,
                ISNULL({c.TipsPaidOut}, 0) AS tips_paid_out,
                ISNULL({c.RegularHours}, 0)  AS regular_hours,
                ISNULL({c.OvertimeHours}, 0) AS overtime_hours
-        FROM {Source(table, lookbackDays)}
-        WHERE CAST({c.Date} AS DATE) >= '{Cutoff(lookbackDays)}'
+        FROM {Source(table, lookbackDays, cutoffHour)}
+        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'
         ORDER BY shift_date DESC, employee_name
         """;
 
-    public static string ItemAuditSql(string table, ItemAuditColumns c, int lookbackDays, int? top = null) => $"""
-        SELECT {Top(top)}CAST({c.Date} AS DATE) AS sale_date,
+    public static string ItemAuditSql(string table, ItemAuditColumns c, int lookbackDays, int cutoffHour, int? top = null) => $"""
+        SELECT {Top(top)}{BusinessDate(c.Date, cutoffHour)} AS sale_date,
                {c.ItemName}           AS item_name,
                {c.Category}           AS category_name,
                SUM({c.QtySold})       AS qty_sold,
                SUM({c.NetSales})      AS net_sales
-        FROM {Source(table, lookbackDays)}
-        WHERE CAST({c.Date} AS DATE) >= '{Cutoff(lookbackDays)}'
-        GROUP BY CAST({c.Date} AS DATE), {c.ItemName}, {c.Category}
+        FROM {Source(table, lookbackDays, cutoffHour)}
+        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'
+        GROUP BY {BusinessDate(c.Date, cutoffHour)}, {c.ItemName}, {c.Category}
         ORDER BY sale_date DESC, net_sales DESC
         """;
 
@@ -122,7 +145,7 @@ public class SqlReader(IOptions<AgentConfig> cfg)
 
     public virtual async Task<List<ZReportRow>> QueryZReportsAsync(SqlConnection conn, int lookbackDays, CancellationToken ct)
     {
-        var sql = ZReportSql(_cfg.Tables.ZReport, _cfg.Columns.ZReport, lookbackDays);
+        var sql = ZReportSql(_cfg.Tables.ZReport, _cfg.Columns.ZReport, lookbackDays, _cfg.Sync.ResolvedCutoffHour);
 
         var rows = new List<ZReportRow>();
         await using var cmd = new SqlCommand(sql, conn);
@@ -140,7 +163,7 @@ public class SqlReader(IOptions<AgentConfig> cfg)
 
     public virtual async Task<List<EwReportRow>> QueryEwReportsAsync(SqlConnection conn, int lookbackDays, CancellationToken ct)
     {
-        var sql = EwReportSql(_cfg.Tables.EwReport, _cfg.Columns.EwReport, lookbackDays);
+        var sql = EwReportSql(_cfg.Tables.EwReport, _cfg.Columns.EwReport, lookbackDays, _cfg.Sync.ResolvedCutoffHour);
 
         var rows = new List<EwReportRow>();
         await using var cmd = new SqlCommand(sql, conn);
@@ -162,7 +185,7 @@ public class SqlReader(IOptions<AgentConfig> cfg)
 
     public virtual async Task<List<ItemAuditRow>> QueryItemAuditAsync(SqlConnection conn, int lookbackDays, CancellationToken ct)
     {
-        var sql = ItemAuditSql(_cfg.Tables.ItemAudit, _cfg.Columns.ItemAudit, lookbackDays);
+        var sql = ItemAuditSql(_cfg.Tables.ItemAudit, _cfg.Columns.ItemAudit, lookbackDays, _cfg.Sync.ResolvedCutoffHour);
 
         var rows = new List<ItemAuditRow>();
         await using var cmd = new SqlCommand(sql, conn);
