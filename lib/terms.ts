@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { cache } from 'react';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -15,8 +16,13 @@ import { TERMS_VERSION } from '@/lib/legal';
  * belongs to two bars, for an agreement they have already made.
  */
 
-/** True when this user has accepted the version currently published. */
-export async function hasAcceptedCurrentTerms(userId: string): Promise<boolean> {
+/**
+ * True when this user has accepted the version currently published.
+ *
+ * Memoized per request: this runs in the app layout on EVERY authenticated page
+ * load, and the answer cannot change mid-render.
+ */
+export const hasAcceptedCurrentTerms = cache(async (userId: string): Promise<boolean> => {
   const supabase = createAdminClient();
 
   // admin-scope-ok: terms_acceptances is keyed by user, not by organisation —
@@ -37,7 +43,7 @@ export async function hasAcceptedCurrentTerms(userId: string): Promise<boolean> 
   }
 
   return Boolean(data);
-}
+});
 
 /**
  * Records an acceptance of the current version.

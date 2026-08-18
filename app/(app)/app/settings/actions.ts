@@ -93,7 +93,7 @@ export async function updateGeneralInfo(data: {
 export async function updateTipPaySettings(data: {
   tip_split_percent:  number;
   barback_tip_pct:    number;
-  opener_bonus_type:  'none' | 'fixed' | 'percentage';
+  opener_bonus_type:  'none' | 'fixed' | 'percentage' | 'hours';
   opener_bonus_value: number;
   default_hourly_rate: number;
   hourly_rates:       HourlyRates;

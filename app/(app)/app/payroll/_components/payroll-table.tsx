@@ -1,5 +1,8 @@
 'use client';
 
+import { useState } from 'react';
+import { SlidersHorizontal } from 'lucide-react';
+import { AdjustDialog } from './adjust-dialog';
 import {
   Table,
   TableBody,
@@ -12,6 +15,11 @@ import { PayrollEntry } from '../actions';
 
 interface PayrollTableProps {
   entries: PayrollEntry[];
+  /** Period bounds, so an adjustment can only be dated inside what is shown. */
+  startDate?: string;
+  endDate?: string;
+  /** Hidden for roles that may not change pay. */
+  canAdjust?: boolean;
   totals: {
     totalHours: number;
     regularPay: number;
@@ -21,7 +29,97 @@ interface PayrollTableProps {
   };
 }
 
-export default function PayrollTable({ entries, totals }: PayrollTableProps) {
+/**
+ * Roles are paid on different terms and get reconciled separately — whoever is
+ * checking a run looks at the bartenders as a block, then the barbacks, then
+ * security. One flat list made that a manual exercise with a calculator.
+ *
+ * These three lead because they are the ones compared against each other.
+ * Anything else follows alphabetically, with unassigned last so it reads as the
+ * exception it is rather than hiding in the middle.
+ */
+const ROLE_ORDER = ['bartender', 'barback', 'security'] as const;
+
+const ROLE_LABEL: Record<string, string> = {
+  bartender: 'Bartenders',
+  barback: 'Barbacks',
+  security: 'Security',
+  server: 'Servers',
+  manager: 'Managers',
+  other: 'Other',
+};
+
+const UNASSIGNED = '__unassigned__';
+
+type Subtotal = {
+  regularHours: number;
+  overtimeHours: number;
+  totalHours: number;
+  regularPay: number;
+  overtimePay: number;
+  tips: number;
+  totalCompensation: number;
+};
+
+const EMPTY: Subtotal = {
+  regularHours: 0,
+  overtimeHours: 0,
+  totalHours: 0,
+  regularPay: 0,
+  overtimePay: 0,
+  tips: 0,
+  totalCompensation: 0,
+};
+
+function accumulate(into: Subtotal, e: PayrollEntry): Subtotal {
+  return {
+    regularHours: into.regularHours + e.regularHours,
+    overtimeHours: into.overtimeHours + e.overtimeHours,
+    totalHours: into.totalHours + e.totalHours,
+    regularPay: into.regularPay + e.regularPay,
+    overtimePay: into.overtimePay + e.overtimePay,
+    tips: into.tips + e.tipAmount,
+    totalCompensation: into.totalCompensation + e.totalCompensation,
+  };
+}
+
+/** Buckets entries by role, in the reading order described above. */
+function groupByRole(entries: PayrollEntry[]) {
+  const byRole = new Map<string, PayrollEntry[]>();
+
+  for (const entry of entries) {
+    // Normalised so "Bartender" and "bartender" are one group rather than two.
+    const key = entry.role?.trim().toLowerCase() || UNASSIGNED;
+    const bucket = byRole.get(key);
+    if (bucket) bucket.push(entry);
+    else byRole.set(key, [entry]);
+  }
+
+  const rank = (role: string) => {
+    const lead = ROLE_ORDER.indexOf(role as (typeof ROLE_ORDER)[number]);
+    if (lead >= 0) return lead;
+    if (role === UNASSIGNED) return 999;
+    return 100;
+  };
+
+  return [...byRole.entries()]
+    .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
+    .map(([role, rows]) => ({
+      role,
+      label: role === UNASSIGNED ? 'No role set' : (ROLE_LABEL[role] ?? role),
+      rows: [...rows].sort((x, y) => x.employeeName.localeCompare(y.employeeName)),
+      subtotal: rows.reduce(accumulate, EMPTY),
+    }));
+}
+
+export default function PayrollTable({
+  entries,
+  totals,
+  startDate,
+  endDate,
+  canAdjust = false,
+}: PayrollTableProps) {
+  const [adjusting, setAdjusting] = useState<PayrollEntry | null>(null);
   if (entries.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-14 text-center">
@@ -34,6 +132,16 @@ export default function PayrollTable({ entries, totals }: PayrollTableProps) {
   }
 
   const fmt = (n: number) => `$${n.toFixed(2)}`;
+  const groups = groupByRole(entries);
+
+  // Weighted, never a mean of the per-person figures: two hours must not move
+  // the number as much as forty.
+  const effective = (t: Subtotal) => (t.totalHours > 0 ? t.totalCompensation / t.totalHours : 0);
+  const tipsPerHour = (t: Subtotal) => (t.totalHours > 0 ? t.tips / t.totalHours : 0);
+
+  // The Role column is gone — every group is a single role, so repeating it on
+  // each row was noise. That leaves ten columns.
+  const COLUMNS = canAdjust ? 11 : 10;
 
   return (
     <div className="overflow-x-auto rounded-xl border">
@@ -41,7 +149,6 @@ export default function PayrollTable({ entries, totals }: PayrollTableProps) {
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">
             <TableHead className="pl-4">Employee</TableHead>
-            <TableHead>Role</TableHead>
             <TableHead className="text-right">Reg. Hrs</TableHead>
             <TableHead className="text-right">OT Hrs</TableHead>
             <TableHead className="text-right">Total Hrs</TableHead>
@@ -53,70 +160,141 @@ export default function PayrollTable({ entries, totals }: PayrollTableProps) {
               Eff. /hr
             </TableHead>
             <TableHead className="pr-4 text-right font-semibold">Total Pay</TableHead>
+            {canAdjust && <TableHead className="w-10"><span className="sr-only">Adjust</span></TableHead>}
           </TableRow>
         </TableHeader>
+
         <TableBody>
-          {entries.map((entry, i) => (
-            <TableRow
-              key={entry.employeeId}
-              className={i % 2 === 1 ? 'bg-muted/20' : ''}
-            >
-              <TableCell className="pl-4 font-medium">{entry.employeeName}</TableCell>
-              <TableCell className="capitalize text-sm text-muted-foreground">
-                {entry.role ?? <span className="italic">—</span>}
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {entry.regularHours.toFixed(2)}
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {entry.overtimeHours > 0 ? (
-                  <span className="font-medium text-amber-600 dark:text-amber-300">
-                    {entry.overtimeHours.toFixed(2)}
+          {groups.map((group) => (
+            <RoleBlock key={group.role}>
+              <TableRow className="bg-muted/60 hover:bg-muted/60">
+                <TableCell colSpan={COLUMNS} className="py-2 pl-4">
+                  <span className="font-heading text-xs font-semibold uppercase tracking-wider">
+                    {group.label}
                   </span>
-                ) : (
-                  <span className="text-muted-foreground">0.00</span>
-                )}
-              </TableCell>
-              <TableCell className="text-right tabular-nums font-medium">
-                {entry.totalHours.toFixed(2)}
-              </TableCell>
-              <TableCell className="text-right tabular-nums text-muted-foreground text-sm">
-                ${entry.hourlyRate.toFixed(2)}
-              </TableCell>
-              <TableCell className="text-right tabular-nums">{fmt(entry.regularPay)}</TableCell>
-              <TableCell className="text-right tabular-nums">
-                {entry.overtimePay > 0 ? (
-                  <span className="text-amber-600 dark:text-amber-300">{fmt(entry.overtimePay)}</span>
-                ) : (
-                  <span className="text-muted-foreground">$0.00</span>
-                )}
-              </TableCell>
-              <TableCell className="text-right tabular-nums text-cyan-700 dark:text-cyan-300">
-                {fmt(entry.tipAmount)}
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {entry.totalHours > 0 ? (
-                  <>
-                    <span className="font-medium">{fmt(entry.effectiveHourlyRate)}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      +{fmt(entry.tipsPerHour)} tips
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-muted-foreground">&mdash;</span>
-                )}
-              </TableCell>
-              <TableCell className="pr-4 text-right tabular-nums font-semibold text-primary">
-                {fmt(entry.totalCompensation)}
-              </TableCell>
-            </TableRow>
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {group.rows.length} {group.rows.length === 1 ? 'person' : 'people'}
+                  </span>
+                </TableCell>
+              </TableRow>
+
+              {group.rows.map((entry, i) => (
+                <TableRow
+                  key={entry.employeeId}
+                  className={i % 2 === 1 ? 'bg-muted/20' : ''}
+                >
+                  <TableCell className="pl-4 font-medium">{entry.employeeName}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {entry.regularHours.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {entry.overtimeHours > 0 ? (
+                      <span className="font-medium text-amber-600 dark:text-amber-300">
+                        {entry.overtimeHours.toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">0.00</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums font-medium">
+                    {entry.totalHours.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground text-sm">
+                    ${entry.hourlyRate.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{fmt(entry.regularPay)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {entry.overtimePay > 0 ? (
+                      <span className="text-amber-600 dark:text-amber-300">
+                        {fmt(entry.overtimePay)}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">$0.00</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-cyan-700 dark:text-cyan-300">
+                    {fmt(entry.tipAmount)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {entry.totalHours > 0 ? (
+                      <>
+                        <span className="font-medium">{fmt(entry.effectiveHourlyRate)}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          +{fmt(entry.tipsPerHour)} tips
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">&mdash;</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="pr-4 text-right tabular-nums font-semibold text-primary">
+                    {fmt(entry.totalCompensation)}
+                  </TableCell>
+                  {canAdjust && (
+                    <TableCell className="pr-2">
+                      <button
+                        type="button"
+                        onClick={() => setAdjusting(entry)}
+                        aria-label={`Adjust ${entry.employeeName}`}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors cursor-pointer"
+                      >
+                        <SlidersHorizontal className="h-4 w-4" aria-hidden />
+                      </button>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+
+              {/* Shown even for a single person, so every block reads the same
+                  way down the page. */}
+              <TableRow className="border-t bg-background hover:bg-background">
+                <TableCell className="pl-4 text-sm font-medium text-muted-foreground">
+                  {group.label} subtotal
+                </TableCell>
+                <TableCell className="text-right tabular-nums text-sm">
+                  {group.subtotal.regularHours.toFixed(2)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums text-sm text-amber-600 dark:text-amber-300">
+                  {group.subtotal.overtimeHours.toFixed(2)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums text-sm font-medium">
+                  {group.subtotal.totalHours.toFixed(2)}
+                </TableCell>
+                <TableCell />
+                <TableCell className="text-right tabular-nums text-sm">
+                  {fmt(group.subtotal.regularPay)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums text-sm text-amber-600 dark:text-amber-300">
+                  {fmt(group.subtotal.overtimePay)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums text-sm text-cyan-700 dark:text-cyan-300">
+                  {fmt(group.subtotal.tips)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums text-sm">
+                  {group.subtotal.totalHours > 0 ? (
+                    <>
+                      <span>{fmt(effective(group.subtotal))}</span>
+                      <span className="block text-xs font-normal text-muted-foreground">
+                        +{fmt(tipsPerHour(group.subtotal))} tips
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">&mdash;</span>
+                  )}
+                </TableCell>
+                <TableCell className="pr-4 text-right tabular-nums text-sm font-medium">
+                  {fmt(group.subtotal.totalCompensation)}
+                </TableCell>
+                {canAdjust && <TableCell />}
+              </TableRow>
+            </RoleBlock>
           ))}
 
-          {/* Totals row */}
+          {/* Grand total. Hours and pay come from the caller's own figures
+              rather than being re-derived here, so this row cannot disagree
+              with the numbers the rest of the page is built from. */}
           <TableRow className="border-t-2 bg-muted/40 font-semibold hover:bg-muted/40">
-            <TableCell className="pl-4" colSpan={2}>
-              Totals
-            </TableCell>
+            <TableCell className="pl-4">Totals</TableCell>
             <TableCell className="text-right tabular-nums">
               {entries.reduce((s, e) => s + e.regularHours, 0).toFixed(2)}
             </TableCell>
@@ -147,9 +325,32 @@ export default function PayrollTable({ entries, totals }: PayrollTableProps) {
             <TableCell className="pr-4 text-right tabular-nums text-primary">
               {fmt(totals.totalCompensation)}
             </TableCell>
+            {canAdjust && <TableCell />}
           </TableRow>
         </TableBody>
       </Table>
+
+      {/* Mounted only while open: the form holds its own state, and keeping one
+          instance per table would reset nothing and cost a render on every row
+          change. */}
+      {canAdjust && adjusting && (
+        <AdjustDialog
+          open={!!adjusting}
+          onOpenChange={(o) => !o && setAdjusting(null)}
+          entry={adjusting}
+          everyone={entries}
+          startDate={startDate ?? ''}
+          endDate={endDate ?? ''}
+        />
+      )}
     </div>
   );
+}
+
+/**
+ * Transparent wrapper so each role block is a single child of TableBody.
+ * A bare fragment would do; naming it makes the grouping legible in devtools.
+ */
+function RoleBlock({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
 }

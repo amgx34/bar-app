@@ -1,11 +1,11 @@
--- What has actually been applied, for migrations 20260817000002-4.
+-- What has actually been applied, for migrations 20260817000002-6.
 --
 -- Read-only. Run this after a migration aborts partway: the Supabase SQL editor
 -- reports only the first error, so a file that fails on statement 9 leaves you
 -- guessing which of the previous 8 landed.
 --
 -- Every row should read 'ok'. Anything reading 'MISSING' means re-running the
--- migration that creates it — all three are idempotent now.
+-- migration that creates it — they are all idempotent and safe to re-run.
 
 WITH expected(kind, name, migration) AS (
   VALUES
@@ -35,7 +35,15 @@ WITH expected(kind, name, migration) AS (
     -- 20260817000004 — terms acceptance
     ('table',    'terms_acceptances',                        '000004'),
     ('index',    'idx_terms_acceptances_user',               '000004'),
-    ('policy',   'users_read_own_terms_acceptances',         '000004')
+    ('policy',   'users_read_own_terms_acceptances',         '000004'),
+
+    -- 20260817000005 — demo request attribution (column, checked separately below)
+
+    -- 20260817000006 — payroll adjustments
+    ('table',    'payroll_adjustments',                      '000006'),
+    ('index',    'idx_payroll_adjustments_org_date',         '000006'),
+    ('index',    'idx_employee_shifts_opener',               '000006'),
+    ('policy',   'org_members_read_payroll_adjustments',     '000006')
 )
 SELECT
   e.migration,
@@ -70,7 +78,8 @@ JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE n.nspname = 'public'
   AND c.relname IN (
     'pos_excluded_items', 'pos_bundles', 'pos_bundle_components',
-    'pos_item_sales', 'pos_stock_applications', 'terms_acceptances'
+    'pos_item_sales', 'pos_stock_applications', 'terms_acceptances',
+    'payroll_adjustments'
   )
 ORDER BY c.relname;
 
@@ -95,3 +104,26 @@ FROM pg_enum e
 JOIN pg_type t      ON t.oid = e.enumtypid
 JOIN pg_namespace n ON n.oid = t.typnamespace
 WHERE n.nspname = 'public' AND t.typname = 'usage_reason';
+
+
+-- Columns added to pre-existing tables, which the object list above cannot see.
+SELECT
+  v.tbl || '.' || v.col AS column_name,
+  CASE WHEN c.column_name IS NULL THEN 'MISSING' ELSE 'ok (' || c.data_type || ')' END AS status
+FROM (VALUES
+  ('demo_requests',   'attribution', '000005'),
+  ('employee_shifts', 'is_opener',   '000006')
+) AS v(tbl, col, migration)
+LEFT JOIN information_schema.columns c
+  ON c.table_schema = 'public' AND c.table_name = v.tbl AND c.column_name = v.col;
+
+-- The two CHECK constraints that keep an adjustment row applicable. Without
+-- them a malformed row could be applied as though it were the other kind.
+SELECT
+  v.expected AS constraint_name,
+  CASE WHEN con.conname IS NULL THEN 'MISSING — re-run 000006' ELSE 'ok' END AS status
+FROM (VALUES
+  ('payroll_adjustments_shape'),
+  ('payroll_adjustments_distinct_parties')
+) AS v(expected)
+LEFT JOIN pg_constraint con ON con.conname = v.expected;

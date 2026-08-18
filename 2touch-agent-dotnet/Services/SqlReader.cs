@@ -82,6 +82,17 @@ public class SqlReader(IOptions<AgentConfig> cfg)
             ? $"CAST(DATEADD(HOUR, -{cutoffHour}, {column}) AS DATE)"
             : $"CAST({column} AS DATE)";
 
+    /// <summary>
+    /// The cutoff that may actually be applied to one feed.
+    ///
+    /// Zero whenever that feed's date column is already a rounded date — see
+    /// AgentConfig.DateHasTime. Resolving this per feed rather than once for the
+    /// whole agent is the difference between a correct trading day and every
+    /// shift being filed one day early.
+    /// </summary>
+    public static int FeedCutoff(bool dateHasTime, int configuredCutoff)
+        => dateHasTime ? configuredCutoff : 0;
+
     private static string Top(int? n) => n is null ? "" : $"TOP {n} ";
 
     /// <summary>Placeholder a table expression can use to filter on its own raw date column.</summary>
@@ -145,7 +156,8 @@ public class SqlReader(IOptions<AgentConfig> cfg)
 
     public virtual async Task<List<ZReportRow>> QueryZReportsAsync(SqlConnection conn, int lookbackDays, CancellationToken ct)
     {
-        var sql = ZReportSql(_cfg.Tables.ZReport, _cfg.Columns.ZReport, lookbackDays, _cfg.Sync.ResolvedCutoffHour);
+        var sql = ZReportSql(_cfg.Tables.ZReport, _cfg.Columns.ZReport, lookbackDays,
+            FeedCutoff(_cfg.Columns.ZReport.DateHasTime, _cfg.Sync.ResolvedCutoffHour));
 
         var rows = new List<ZReportRow>();
         await using var cmd = new SqlCommand(sql, conn);
@@ -163,7 +175,8 @@ public class SqlReader(IOptions<AgentConfig> cfg)
 
     public virtual async Task<List<EwReportRow>> QueryEwReportsAsync(SqlConnection conn, int lookbackDays, CancellationToken ct)
     {
-        var sql = EwReportSql(_cfg.Tables.EwReport, _cfg.Columns.EwReport, lookbackDays, _cfg.Sync.ResolvedCutoffHour);
+        var sql = EwReportSql(_cfg.Tables.EwReport, _cfg.Columns.EwReport, lookbackDays,
+            FeedCutoff(_cfg.Columns.EwReport.DateHasTime, _cfg.Sync.ResolvedCutoffHour));
 
         var rows = new List<EwReportRow>();
         await using var cmd = new SqlCommand(sql, conn);
@@ -185,7 +198,8 @@ public class SqlReader(IOptions<AgentConfig> cfg)
 
     public virtual async Task<List<ItemAuditRow>> QueryItemAuditAsync(SqlConnection conn, int lookbackDays, CancellationToken ct)
     {
-        var sql = ItemAuditSql(_cfg.Tables.ItemAudit, _cfg.Columns.ItemAudit, lookbackDays, _cfg.Sync.ResolvedCutoffHour);
+        var sql = ItemAuditSql(_cfg.Tables.ItemAudit, _cfg.Columns.ItemAudit, lookbackDays,
+            FeedCutoff(_cfg.Columns.ItemAudit.DateHasTime, _cfg.Sync.ResolvedCutoffHour));
 
         var rows = new List<ItemAuditRow>();
         await using var cmd = new SqlCommand(sql, conn);

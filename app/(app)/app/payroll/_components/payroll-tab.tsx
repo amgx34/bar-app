@@ -19,6 +19,8 @@ const WeeklyTrendChart = dynamic(() => import('./weekly-trend-chart'));
 interface PayrollTabProps {
   startDate: string;
   endDate: string;
+  /** Owner/manager may correct hours and move tips; others see the run read-only. */
+  canAdjust?: boolean;
   payrollEntries: PayrollEntry[];
   employees: Employee[];
   weeklyTrend: WeeklyPoint[];
@@ -49,6 +51,7 @@ export default function PayrollTab({
   payrollEntries,
   employees,
   weeklyTrend,
+  canAdjust = false,
 }: PayrollTabProps) {
   const router = useRouter();
   const [importOpen, setImportOpen] = useState(false);
@@ -212,7 +215,13 @@ export default function PayrollTab({
         </Card>
       </div>
 
-      <PayrollTable entries={payrollEntries} totals={totals} />
+      <PayrollTable
+        entries={payrollEntries}
+        totals={totals}
+        startDate={startDate}
+        endDate={endDate}
+        canAdjust={canAdjust}
+      />
 
       {/* ── Quick Import ──────────────────────────────────────────────────── */}
       <div className="rounded-xl border overflow-hidden">

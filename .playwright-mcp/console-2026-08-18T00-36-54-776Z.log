@@ -1,0 +1,4 @@
+[     945ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3900/_vercel/insights/script.js:0
+[     945ms] [ERROR] Refused to execute script from 'http://localhost:3900/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled. @ http://localhost:3900/:0
+[     946ms] [LOG] [Vercel Web Analytics] Failed to load script from /_vercel/insights/script.js. Be sure to enable Web Analytics for your project and deploy again. See https://vercel.com/docs/analytics/quickstart for more information. @ http://localhost:3900/_next/static/chunks/022ww7nkyjci9.js:0
+[    5132ms] [ERROR] Failed to load resource: the server responded with a status of 429 (Too Many Requests) @ http://localhost:3900/api/demo:0

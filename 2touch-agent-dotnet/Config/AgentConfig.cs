@@ -72,6 +72,26 @@ public sealed class ZReportColumns
     public string Sales { get; set; } = "NetSales";
     public string CcTips { get; set; } = "CreditCardTips";
     public string CashTips { get; set; } = "CashTips";
+
+    /// <summary>
+    /// Whether <see cref="Date"/> carries a time component.
+    ///
+    /// The trading-day cutoff may only be applied to a column that still holds
+    /// the hour something happened. Subtracting hours from a column that has
+    /// already been rounded to a date moves EVERY row back a day:
+    ///
+    ///   CAST(DATEADD(HOUR, -4, '2026-08-16 00:00:00') AS DATE) = 2026-08-15
+    ///
+    /// Per-feed, not global: the three feeds map to different columns on
+    /// different relations and are routinely different types. An earlier version
+    /// decided this once from the SALES column and applied the answer to all
+    /// three, which filed every shift a day early wherever the labour view
+    /// exposed a plain date.
+    ///
+    /// Defaults to true so an existing installation behaves as it did until
+    /// setup is re-run; the wizard sets it from INFORMATION_SCHEMA.
+    /// </summary>
+    public bool DateHasTime { get; set; } = true;
 }
 
 public sealed class EwReportColumns
@@ -82,6 +102,26 @@ public sealed class EwReportColumns
     public string TipsPaidOut { get; set; } = "TipsPaidOut";
     public string RegularHours { get; set; } = "RegularHours";
     public string OvertimeHours { get; set; } = "OvertimeHours";
+
+    /// <summary>
+    /// Whether <see cref="Date"/> carries a time component.
+    ///
+    /// The trading-day cutoff may only be applied to a column that still holds
+    /// the hour something happened. Subtracting hours from a column that has
+    /// already been rounded to a date moves EVERY row back a day:
+    ///
+    ///   CAST(DATEADD(HOUR, -4, '2026-08-16 00:00:00') AS DATE) = 2026-08-15
+    ///
+    /// Per-feed, not global: the three feeds map to different columns on
+    /// different relations and are routinely different types. An earlier version
+    /// decided this once from the SALES column and applied the answer to all
+    /// three, which filed every shift a day early wherever the labour view
+    /// exposed a plain date.
+    ///
+    /// Defaults to true so an existing installation behaves as it did until
+    /// setup is re-run; the wizard sets it from INFORMATION_SCHEMA.
+    /// </summary>
+    public bool DateHasTime { get; set; } = true;
 }
 
 public sealed class ItemAuditColumns
@@ -91,6 +131,26 @@ public sealed class ItemAuditColumns
     public string Category { get; set; } = "CategoryName";
     public string QtySold { get; set; } = "QuantitySold";
     public string NetSales { get; set; } = "NetSales";
+
+    /// <summary>
+    /// Whether <see cref="Date"/> carries a time component.
+    ///
+    /// The trading-day cutoff may only be applied to a column that still holds
+    /// the hour something happened. Subtracting hours from a column that has
+    /// already been rounded to a date moves EVERY row back a day:
+    ///
+    ///   CAST(DATEADD(HOUR, -4, '2026-08-16 00:00:00') AS DATE) = 2026-08-15
+    ///
+    /// Per-feed, not global: the three feeds map to different columns on
+    /// different relations and are routinely different types. An earlier version
+    /// decided this once from the SALES column and applied the answer to all
+    /// three, which filed every shift a day early wherever the labour view
+    /// exposed a plain date.
+    ///
+    /// Defaults to true so an existing installation behaves as it did until
+    /// setup is re-run; the wizard sets it from INFORMATION_SCHEMA.
+    /// </summary>
+    public bool DateHasTime { get; set; } = true;
 }
 
 public sealed class SyncConfig

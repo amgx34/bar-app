@@ -102,7 +102,7 @@ export function TipPayTab({ role, settings }: Props) {
   const [form, setForm] = useState({
     tip_split_percent:  settings.tip_split_percent  ?? 15,
     barback_tip_pct:    settings.barback_tip_pct    ?? 15,
-    opener_bonus_type:  (settings.opener_bonus_type  ?? 'none') as 'none' | 'fixed' | 'percentage',
+    opener_bonus_type:  (settings.opener_bonus_type  ?? 'none') as 'none' | 'fixed' | 'percentage' | 'hours',
     opener_bonus_value: settings.opener_bonus_value  ?? 0,
     default_hourly_rate: settings.default_hourly_rate ?? 15,
     hourly_rates: {
@@ -136,11 +136,15 @@ export function TipPayTab({ role, settings }: Props) {
 
   // Calculated preview
   const bartenderPool = 100 - form.barback_tip_pct;
+  // Says where the money comes from, because the three types are funded
+  // differently and that is the part operators get wrong.
   const openerNote = form.opener_bonus_type === 'none'
     ? 'No opener bonus'
     : form.opener_bonus_type === 'fixed'
-    ? `$${form.opener_bonus_value.toFixed(2)} flat bonus per opening shift`
-    : `${form.opener_bonus_value}% of the bartender pool extra`;
+    ? `$${form.opener_bonus_value.toFixed(2)} per opening shift, taken from the tip pool`
+    : form.opener_bonus_type === 'percentage'
+    ? `${form.opener_bonus_value}% of the tip pool, taken before it is shared`
+    : `${form.opener_bonus_value} extra paid hours at the opener's own rate, paid by the bar`;
 
   return (
     <form onSubmit={handleSave} className="space-y-6">
@@ -225,12 +229,17 @@ export function TipPayTab({ role, settings }: Props) {
                 <SelectItem value="none">No opener bonus</SelectItem>
                 <SelectItem value="fixed">Fixed dollar amount</SelectItem>
                 <SelectItem value="percentage">Percentage of bartender pool</SelectItem>
+                <SelectItem value="hours">Extra paid hours</SelectItem>
               </SelectContent>
             </Select>
           </div>
           {form.opener_bonus_type !== 'none' && (
             <div className="space-y-1.5">
-              <Label>{form.opener_bonus_type === 'fixed' ? 'Bonus Amount ($)' : 'Bonus Percentage (%)'}</Label>
+              <Label>{
+                form.opener_bonus_type === 'fixed'      ? 'Bonus Amount ($)'
+                : form.opener_bonus_type === 'percentage' ? 'Bonus Percentage (%)'
+                : 'Extra Hours'
+              }</Label>
               <div className="relative">
                 {form.opener_bonus_type === 'fixed' && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>}
                 <Input type="number" min={0} step={form.opener_bonus_type === 'fixed' ? '0.01' : '1'}
@@ -239,6 +248,7 @@ export function TipPayTab({ role, settings }: Props) {
                   onChange={(e) => setForm({ ...form, opener_bonus_value: Number(e.target.value) })}
                   className={form.opener_bonus_type === 'fixed' ? 'pl-7' : 'pr-8'} />
                 {form.opener_bonus_type === 'percentage' && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>}
+                {form.opener_bonus_type === 'hours' && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">hrs</span>}
               </div>
             </div>
           )}

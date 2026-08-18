@@ -44,17 +44,17 @@ export default function DashboardRevenueChart({ data, className = '' }: Props) {
     <div className={`w-full h-56 ${className}`}>
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={chartData} margin={{ top: 4, right: 20, left: -10, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+            tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
             axisLine={false}
             tickLine={false}
           />
           <YAxis
             yAxisId="dollars"
             orientation="left"
-            tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+            tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
             axisLine={false}
             tickLine={false}
             tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
@@ -62,7 +62,7 @@ export default function DashboardRevenueChart({ data, className = '' }: Props) {
           <YAxis
             yAxisId="pct"
             orientation="right"
-            tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+            tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
             axisLine={false}
             tickLine={false}
             tickFormatter={(v: number) => `${v}%`}
@@ -70,8 +70,8 @@ export default function DashboardRevenueChart({ data, className = '' }: Props) {
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: 'hsl(var(--card))',
-              border: '1px solid hsl(var(--border))',
+              backgroundColor: 'var(--card)',
+              border: '1px solid var(--border)',
               borderRadius: '8px',
               fontSize: 12,
             }}

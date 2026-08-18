@@ -45,16 +45,16 @@ export default function NightlyTipChart({ data, average }: Props) {
             <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
         <XAxis
           dataKey="date"
-          tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+          tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
           axisLine={false}
           tickLine={false}
           interval="preserveStartEnd"
         />
         <YAxis
-          tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+          tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
           axisLine={false}
           tickLine={false}
           tickFormatter={(v: number) => `${v}%`}
@@ -62,8 +62,8 @@ export default function NightlyTipChart({ data, average }: Props) {
         />
         <Tooltip
           contentStyle={{
-            backgroundColor: 'hsl(var(--card))',
-            border: '1px solid hsl(var(--border))',
+            backgroundColor: 'var(--card)',
+            border: '1px solid var(--border)',
             borderRadius: '8px',
             fontSize: 12,
           }}
@@ -71,14 +71,14 @@ export default function NightlyTipChart({ data, average }: Props) {
         />
         <ReferenceLine
           y={avgPct}
-          stroke="hsl(var(--muted-foreground))"
+          stroke="var(--muted-foreground)"
           strokeDasharray="5 4"
           strokeWidth={1}
           label={{
             value: `avg ${avgPct}%`,
             position: 'insideTopRight',
             fontSize: 10,
-            fill: 'hsl(var(--muted-foreground))',
+            fill: 'var(--muted-foreground)',
           }}
         />
         <Area

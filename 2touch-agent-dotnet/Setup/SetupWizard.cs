@@ -554,7 +554,10 @@ public sealed class SetupWizard(string[] args, Unattended? unattended = null)
 
             // The built-in feeds expose the raw ticket timestamp on purpose —
             // 2Touch has no business-date column. See TwoTouchProfile's date note.
-            if (feed.FeedKey == FeedSpecs.ZReportKey) _zDateType = "datetime";
+            // All three carry a time, so all three may take the cutoff.
+            if (feed.FeedKey == FeedSpecs.ZReportKey)       { _zDateType = "datetime";  _cfg.Columns.ZReport.DateHasTime   = true; }
+            else if (feed.FeedKey == FeedSpecs.EwReportKey) { _ewDateType = "datetime"; _cfg.Columns.EwReport.DateHasTime  = true; }
+            else if (feed.FeedKey == FeedSpecs.ItemAuditKey){ _iaDateType = "datetime"; _cfg.Columns.ItemAudit.DateHasTime = true; }
 
             var spec = FeedSpecs.All.Single(f => f.Key == feed.FeedKey);
             var error = await ProveAsync(spec, conn, ct);
@@ -582,6 +585,8 @@ public sealed class SetupWizard(string[] args, Unattended? unattended = null)
     /// Null when the Z-report feed was skipped.
     /// </summary>
     private string? _zDateType;
+    private string? _ewDateType;
+    private string? _iaDateType;
 
     /// <summary>
     /// Settles which hour separates one trading day from the next.
@@ -632,6 +637,39 @@ public sealed class SetupWizard(string[] args, Unattended? unattended = null)
         ConsoleUi.Ok(hour == 0
             ? "No trading-day cutoff — calendar dates will be used as-is."
             : $"Trading day starts at {hour:00}:00.");
+
+        ReportPerFeedCutoff(hour);
+    }
+
+    /// <summary>
+    /// Says which feeds the cutoff will actually reach.
+    ///
+    /// The cutoff is one number but it is applied per feed, and only to feeds
+    /// whose date column still carries a time. A feed mapped to a plain `date`
+    /// is passed through untouched — subtracting hours from a column that is
+    /// already midnight would move every one of its rows back a day. Labour is
+    /// called out by name because that failure pays people for the wrong shift.
+    /// </summary>
+    private void ReportPerFeedCutoff(int hour)
+    {
+        if (hour == 0) return;
+
+        (string Label, string? Type, bool HasTime)[] feeds =
+        [
+            ("Sales",      _zDateType,  _cfg.Columns.ZReport.DateHasTime),
+            ("Labour",     _ewDateType, _cfg.Columns.EwReport.DateHasTime),
+            ("Item audit", _iaDateType, _cfg.Columns.ItemAudit.DateHasTime),
+        ];
+
+        foreach (var (label, type, hasTime) in feeds)
+        {
+            if (type is null) continue;
+
+            if (hasTime)
+                ConsoleUi.Info($"  {label,-11} '{type}' — cutoff applied");
+            else
+                ConsoleUi.Warn($"  {label,-11} '{type}' already holds a rounded date — cutoff NOT applied to it");
+        }
     }
 
     /// <summary>Propose, let the operator adjust, then prove with a TOP 5 query.</summary>
@@ -733,6 +771,7 @@ public sealed class SetupWizard(string[] args, Unattended? unattended = null)
                 // Drives the business-day cutoff: a datetime still holds the hour
                 // the ticket was rung, a plain date has already been rounded.
                 _zDateType = mapping["Date"].DataType;
+                _cfg.Columns.ZReport.DateHasTime = SqlTypes.CarriesTime(_zDateType);
                 break;
 
             case FeedSpecs.EwReportKey:
@@ -742,6 +781,11 @@ public sealed class SetupWizard(string[] args, Unattended? unattended = null)
                     Date = Q("Date"), EmployeeName = Q("EmployeeName"), TotalSales = Q("TotalSales"),
                     TipsPaidOut = Q("TipsPaidOut"), RegularHours = Q("RegularHours"), OvertimeHours = Q("OvertimeHours"),
                 };
+                // Recorded separately from the sales column. These are different
+                // columns on different relations and are routinely different
+                // types; assuming they match is what filed every shift a day early.
+                _ewDateType = mapping["Date"].DataType;
+                _cfg.Columns.EwReport.DateHasTime = SqlTypes.CarriesTime(_ewDateType);
                 break;
 
             case FeedSpecs.ItemAuditKey:
@@ -751,6 +795,8 @@ public sealed class SetupWizard(string[] args, Unattended? unattended = null)
                     Date = Q("Date"), ItemName = Q("ItemName"), Category = Q("Category"),
                     QtySold = Q("QtySold"), NetSales = Q("NetSales"),
                 };
+                _iaDateType = mapping["Date"].DataType;
+                _cfg.Columns.ItemAudit.DateHasTime = SqlTypes.CarriesTime(_iaDateType);
                 break;
         }
     }

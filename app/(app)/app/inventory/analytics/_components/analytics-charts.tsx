@@ -4,8 +4,8 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import type { CategoryBreakdown, VelocityItem, TopValueItem, ShrinkageRow, MonthlyShrinkage, PourCostItem } from '../actions';
 
 const PALETTE = ['#0d9488','#f59e0b','#10b981','#0ea5e9','#8b5cf6','#e11d48','#f97316','#84cc16','#ec4899'];
-const tooltipStyle = { backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: 12 };
-const tickStyle = { fontSize: 11, fill: 'hsl(var(--muted-foreground))' };
+const tooltipStyle = { backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: 12 };
+const tickStyle = { fontSize: 11, fill: 'var(--muted-foreground)' };
 function fmtDollar(v: number) { return `$${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}`; }
 
 export function CategoryValuePie({ data }: { data: CategoryBreakdown[] }) {
@@ -52,7 +52,7 @@ export function FastMoversChart({ data }: { data: VelocityItem[] }) {
     <div className="w-full h-72">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 40, left: 4, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
           <XAxis type="number" tick={tickStyle} axisLine={false} tickLine={false} tickFormatter={(v: number) => v.toFixed(2)} />
           <YAxis type="category" dataKey="name" tick={tickStyle} axisLine={false} tickLine={false} width={130} />
           <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${(v as number).toFixed(3)} units/day`, 'Daily Usage']} />
@@ -70,7 +70,7 @@ export function TopValueChart({ data }: { data: TopValueItem[] }) {
     <div className="w-full h-72">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 60, left: 4, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
           <XAxis type="number" tick={tickStyle} axisLine={false} tickLine={false} tickFormatter={fmtDollar} />
           <YAxis type="category" dataKey="name" tick={tickStyle} axisLine={false} tickLine={false} width={130} />
           <Tooltip contentStyle={tooltipStyle} formatter={(v) => [fmtDollar(v as number), 'Stock Value']} />
@@ -104,7 +104,7 @@ export function MonthlyShrinkageChart({ data }: { data: MonthlyShrinkage[] }) {
     <div className="w-full h-52">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
           <XAxis dataKey="month" tick={tickStyle} axisLine={false} tickLine={false} />
           <YAxis tick={tickStyle} axisLine={false} tickLine={false} tickFormatter={fmtDollar} />
           <Tooltip contentStyle={tooltipStyle} formatter={(v, name) => [name === 'estimatedCost' ? fmtDollar(v as number) : `${(v as number).toFixed(2)} units`, name === 'estimatedCost' ? 'Est. Cost' : 'Quantity']} />
@@ -122,7 +122,7 @@ export function PourCostChart({ data }: { data: PourCostItem[] }) {
     <div className="w-full h-72">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 60, left: 4, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
           <XAxis type="number" tick={tickStyle} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${v.toFixed(2)}`} />
           <YAxis type="category" dataKey="name" tick={tickStyle} axisLine={false} tickLine={false} width={130} />
           <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`$${(v as number).toFixed(3)}`, 'Cost / Pour']} />

@@ -3,6 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
+import {
+  applyTipTransfers,
+  openerBonus,
+  openerBonusFromSettings,
+  type TipTransfer,
+} from '@/lib/payroll/adjustments';
 import { ParsedEmployeeShift, parseDate } from '@/lib/csv-parsers/parse-employee-shifts';
 import { ParsedZReport } from '@/lib/csv-parsers/parse-z-reports';
 import { ParsedZReportText } from '@/lib/csv-parsers/parse-z-report-text';
@@ -493,6 +499,10 @@ export async function computePayroll(
   const barbackFrac = barbackPct / 100;
   const poolFrac    = 1 - barbackFrac;
 
+  // Configurable since the app was built, but never applied to anything until
+  // now — see lib/payroll/adjustments.ts for how each type is funded.
+  const openerCfg = openerBonusFromSettings(org.bar_settings ?? {});
+
   try {
     // Fetch all employees for the organization
     const { data: employees, error: empError } = await supabase
@@ -585,6 +595,26 @@ export async function computePayroll(
     // Barbacks: 15% of daily tips split equally by headcount on that day.
     // Regular pool (tip_mode='pool', non-barback/security/manager): 85% split
     //   by hours worked that day. When no barbacks worked, pool gets 100%.
+    // Opener bonus paid as hours rather than tips. Kept separate from the tip
+    // map because it is the bar's money, not the pool's, and must not be
+    // reported as tips on a pay stub.
+    const openerBonusHours = new Map<string, number>();
+
+    // Manual reallocations for this period, applied after the split.
+    const { data: adjustmentRows } = await supabase
+      .from('payroll_adjustments')
+      .select('employee_id, counterparty_employee_id, amount')
+      .eq('organization_id', org.id)
+      .eq('kind', 'tip_transfer')
+      .gte('shift_date', startDate)
+      .lte('shift_date', endDate);
+
+    const tipTransfers: TipTransfer[] = (adjustmentRows ?? []).map((r) => ({
+      fromEmployeeId: r.employee_id as string,
+      toEmployeeId: r.counterparty_employee_id as string,
+      amount: Number(r.amount) || 0,
+    }));
+
     const employeeTipAmounts = new Map<string, number>(
       payrollEmployees.map((e) => [e.id, 0])
     );
@@ -634,10 +664,33 @@ export async function computePayroll(
         0
       );
 
+      // The opener's cut comes off the pool BEFORE it is shared, so the rest
+      // of the bartenders split what is left. Taking it afterwards would pay
+      // the bonus out of thin air and leave the night's tips over-allocated.
+      const openerShiftToday = dayShifts.find((s) => s.is_opener);
+      const bonus = openerShiftToday
+        ? openerBonus(openerCfg, poolTips)
+        : { bonusTips: 0, bonusHours: 0, fundedFromPool: 0 };
+
+      if (openerShiftToday && bonus.bonusTips > 0) {
+        employeeTipAmounts.set(
+          openerShiftToday.employee_id,
+          (employeeTipAmounts.get(openerShiftToday.employee_id) || 0) + bonus.bonusTips
+        );
+      }
+      if (openerShiftToday && bonus.bonusHours > 0) {
+        openerBonusHours.set(
+          openerShiftToday.employee_id,
+          (openerBonusHours.get(openerShiftToday.employee_id) || 0) + bonus.bonusHours
+        );
+      }
+
+      const shareablePool = Math.max(0, poolTips - bonus.fundedFromPool);
+
       if (poolHoursToday > 0) {
         poolShiftsToday.forEach((s) => {
           const hrs = (s.regular_hours || 0) + (s.overtime_hours || 0);
-          const tip = (hrs / poolHoursToday) * poolTips;
+          const tip = (hrs / poolHoursToday) * shareablePool;
           employeeTipAmounts.set(
             s.employee_id,
             (employeeTipAmounts.get(s.employee_id) || 0) + tip
@@ -672,6 +725,11 @@ export async function computePayroll(
         }
       }
     }
+
+    // Manual transfers land last, on top of the finished split. They conserve
+    // the total (see lib/payroll/adjustments.ts), so the night still reconciles
+    // against the Z report — only the holder changes.
+    const adjustedTips = applyTipTransfers(employeeTipAmounts, tipTransfers);
     // ────────────────────────────────────────────────────────────────────────
 
     // Build payroll entries
@@ -698,9 +756,15 @@ export async function computePayroll(
       const regularPay = regularHours * hourlyRate;
       const overtimePay = overtimeHours * hourlyRate * 1.5;
 
-      const tipAmount = employeeTipAmounts.get(employee.id) || 0;
+      const tipAmount = adjustedTips.get(employee.id) || 0;
 
-      const totalCompensation = regularPay + overtimePay + tipAmount;
+      // Opener bonus hours are paid by the bar at the employee's own rate, on
+      // top of the hours they actually worked, and never as overtime — they
+      // compensate setup time, not a long shift.
+      const bonusHours = openerBonusHours.get(employee.id) || 0;
+      const bonusPay = bonusHours * hourlyRate;
+
+      const totalCompensation = regularPay + overtimePay + bonusPay + tipAmount;
 
       // What the shift was actually worth per hour. Bartenders judge a night by
       // this rather than by the base rate, and it is the number that shows a

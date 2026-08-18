@@ -362,6 +362,40 @@ ail-update.exe --rollback
 Restores `rail-2touch-agent.exe.bak` and restarts the service. The backup is the
 version that was running before the last successful update.
 
+### The cutoff is applied per feed
+
+One cutoff hour, but it is only valid on a column that still carries a time.
+Each feed records whether its own date column does:
+
+```json
+"Columns": {
+  "ZReport":   { "Date": "[dtmTicketDate]", "DateHasTime": true  },
+  "EwReport":  { "Date": "[WorkDate]",      "DateHasTime": false },
+  "ItemAudit": { "Date": "[dtmSalesDate]",  "DateHasTime": true  }
+}
+```
+
+A feed with `DateHasTime: false` is passed through as `CAST(col AS DATE)` with no
+arithmetic. Shifting a column that is already midnight moves **every** row back a
+day:
+
+```sql
+CAST(DATEADD(HOUR, -4, '2026-08-16 00:00:00') AS DATE)  -- = 2026-08-15
+```
+
+This used to be decided once from the **sales** column and applied to all three
+feeds. Where a bar's labour view exposed a plain `date`, every shift was filed
+one day early — so hours, and pay, landed on the wrong night. Setup now reads
+each feed's type from `INFORMATION_SCHEMA` and prints which feeds the cutoff
+reaches.
+
+**Existing installations default to `true`** so an upgrade cannot silently
+re-date a bar's history. To pick up the correction, re-run `rail-setup.exe
+--setup`, or set `DateHasTime` by hand in `appsettings.local.json` and restart
+the service. Check which columns you are mapped to before assuming you are
+affected — the built-in 2Touch mapping uses raw timestamps for all three feeds
+and is unaffected.
+
 ### Configuration layering
 
 Lowest priority first:

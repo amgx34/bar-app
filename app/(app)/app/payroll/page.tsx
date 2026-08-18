@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { computePayroll, Employee } from './actions';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
+import { canManagePayroll } from '@/lib/permissions';
 import PayrollTab from './_components/payroll-tab';
 import EmployeesTab from './_components/employees-tab';
 import DaySplitTab from './_components/day-split-tab';
@@ -23,7 +24,7 @@ export default async function PayrollPage({
   const startDate = (params.startDate as string) || getDefaultStartDate();
   const endDate = (params.endDate as string) || getDefaultEndDate();
 
-  const { org } = await getCurrentOrg();
+  const { org, role } = await getCurrentOrg();
   if (!org?.id) {
     return <div>Organization not found</div>;
   }
@@ -110,6 +111,7 @@ export default async function PayrollPage({
               payrollEntries={payrollEntries}
               employees={employees || []}
               weeklyTrend={weeklyTrend}
+              canAdjust={canManagePayroll(role)}
             />
           </Suspense>
         )}

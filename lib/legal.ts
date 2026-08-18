@@ -43,10 +43,10 @@ export const LEGAL_CONTACT_EMAIL = 'railsystemspos@gmail.com';
  *
  * FILL IN before launch, e.g. { state: 'Texas', venue: 'Harris County, Texas' }.
  */
-export const GOVERNING_LAW: { state: string; venue: string } | null = null;
+export const GOVERNING_LAW: { state: 'Ohio'; venue: 'Hamilton County, Ohio' } | null = null;
 
 /**
  * Legal entity name. Null until incorporated — the Terms fall back to the
  * product name, which is honest for a sole operator and wrong for a company.
  */
-export const LEGAL_ENTITY_NAME: string | null = null;
+export const LEGAL_ENTITY_NAME: 'Rail Pos Systems' | null = null;

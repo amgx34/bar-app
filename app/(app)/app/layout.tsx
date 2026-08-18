@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getCurrentOrg } from '@/lib/org';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthUser, getCurrentOrg } from '@/lib/org';
 import { hasAcceptedCurrentTerms } from '@/lib/terms';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/app/(app)/app/_components/app-sidebar';
@@ -10,17 +9,26 @@ import { MobileFab } from '@/app/(app)/app/_components/mobile-fab';
 import { RouteFocus } from '@/app/(app)/app/_components/route-focus';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const { org } = await getCurrentOrg();
+  // getAuthUser and getCurrentOrg are both memoized per request (lib/org.ts),
+  // so this resolves the session once and the page below reuses it rather than
+  // re-querying Supabase for the same two answers.
+  const user = await getAuthUser();
+
+  // Run concurrently: the org lookup and the consent check are independent, and
+  // awaiting them in sequence put two network round trips in front of every
+  // authenticated page for no reason.
+  const [{ org }, accepted] = await Promise.all([
+    getCurrentOrg(),
+    user ? hasAcceptedCurrentTerms(user.id) : Promise.resolve(true),
+  ]);
 
   // Consent gate. Every /app route passes through this layout, which is what
   // makes it the one place a teammate provisioned by an owner — who never sees
   // /setup and its checkbox — can be asked to agree.
   //
-  // One indexed lookup on a user id, and it fails open: see lib/terms.ts for
-  // why a database hiccup must not wall everyone out of their own bar.
-  if (user && !(await hasAcceptedCurrentTerms(user.id))) {
+  // Fails open: see lib/terms.ts for why a database hiccup must not wall
+  // everyone out of their own bar.
+  if (user && !accepted) {
     redirect('/accept-terms');
   }
 

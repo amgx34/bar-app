@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
@@ -22,8 +23,9 @@ export type BarSettings = {
 
   // ── Tip configuration ─────────────────────────────────────────────────
   barback_tip_pct?:     number;              // % of nightly tip pool to barbacks (default 15)
-  opener_bonus_type?:   'none' | 'fixed' | 'percentage';
-  opener_bonus_value?:  number;              // dollars (fixed) or % (percentage)
+  opener_bonus_type?:   'none' | 'fixed' | 'percentage' | 'hours';
+  /** Dollars (fixed), percent of the pool (percentage), or hours (hours). */
+  opener_bonus_value?:  number;
 
   // ── Per-role hourly rates ─────────────────────────────────────────────
   hourly_rates?: HourlyRates;
@@ -69,9 +71,35 @@ export type CurrentOrgResult = {
  * Returns the current user's active org + their role + all their memberships.
  * If the user has no memberships, redirects to /setup.
  */
-export async function getCurrentOrg(): Promise<CurrentOrgResult> {
+/**
+ * The authenticated user, memoized for the current request.
+ *
+ * `supabase.auth.getUser()` is NOT a cookie read — it calls the Supabase Auth
+ * API over the network to verify the JWT. It was being called three times per
+ * page render (the app layout, getCurrentOrg inside that layout, and
+ * getCurrentOrg again inside the page), which is three sequential network hops
+ * for one answer that cannot change mid-render.
+ *
+ * React's cache() dedupes for the lifetime of a single request, so all three
+ * now resolve from the first call.
+ */
+export const getAuthUser = cache(async () => {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  return user;
+});
+
+/**
+ * Memoized per request for the same reason: the app layout and the page it
+ * renders both call this, and the membership query behind it is identical both
+ * times. Without cache() every authenticated page paid for it twice.
+ *
+ * A redirect() thrown inside is memoized as a rejected promise and re-thrown on
+ * the second call, which is the behaviour we want — the caller still redirects.
+ */
+export const getCurrentOrg = cache(async (): Promise<CurrentOrgResult> => {
+  const supabase = await createClient();
+  const user = await getAuthUser();
   if (!user) redirect('/login');
 
   const { data: raw, error } = await supabase
@@ -94,4 +122,4 @@ export async function getCurrentOrg(): Promise<CurrentOrgResult> {
     role: active.role,
     allMemberships: memberships,
   };
-}
+});
