@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentOrg } from '@/lib/org';
+import { posItemMatchKey } from '@/lib/pos/excluded-items';
+import { computeVelocity } from '@/lib/pos/velocity';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const RevenueChart = dynamicImport(() => import('./_components/DashBoardRevenueChart'));
@@ -74,7 +76,8 @@ export default async function DashboardPage() {
   const supabase = createAdminClient();
   const orgId = org.id;
 
-  // 30-day window for usage (seed logs all have created_at = seed time, not per-day)
+  // 30-day window for usage. usage_logs timestamps its rows `logged_at`, not
+  // `created_at` — querying the wrong name returns an error, not an empty set.
   const d30ago = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   // ── Flat queries — NO embedded joins (joins fail silently when FK isn't detected)
@@ -88,6 +91,7 @@ export default async function DashboardPage() {
     { data: recentOrders },
     { data: recentUsage },
     { data: pendingOrdersData },
+    { data: posSales30 },
   ] = await Promise.all([
     supabase.from('z_report_days')
       .select('report_date, total_sales, cash_tips, cc_tips')
@@ -109,20 +113,28 @@ export default async function DashboardPage() {
       .eq('organization_id', orgId).eq('is_active', true),
     // No join — item_id used to look up name from items array below
     supabase.from('usage_logs')
-      .select('item_id, quantity, reason, created_at')
+      .select('item_id, quantity, reason, logged_at')
       .eq('organization_id', orgId).not('reason', 'in', ACTIVITY_FEED_EXCLUDED)
-      .order('created_at', { ascending: false }).limit(8),
+      .order('logged_at', { ascending: false }).limit(8),
     // No join — rep_id used for lookup
     supabase.from('rep_orders')
       .select('id, status, created_at, rep_id')
       .eq('organization_id', orgId).order('created_at', { ascending: false }).limit(4),
     supabase.from('usage_logs')
-      .select('item_id, quantity')
+      // `reason` is selected because computeVelocity needs it to drop `pos_sale`
+      // rows, which describe the same units as the POS sales feed below.
+      .select('item_id, quantity, reason')
       .eq('organization_id', orgId).not('reason', 'in', NON_CONSUMPTION_FILTER)
-      .gte('created_at', d30ago).limit(200),
+      .gte('logged_at', d30ago).limit(200),
     supabase.from('rep_orders')
       .select('id')
       .eq('organization_id', orgId).in('status', ['sent', 'confirmed']),
+    // What sold. Top Movers was reading usage_logs alone and therefore showed
+    // nothing for a bar that syncs a POS but never hand-logs spillage.
+    supabase.from('pos_item_sales')
+      .select('match_key, qty_sold, net_sales, sale_date')
+      .eq('organization_id', orgId)
+      .gte('sale_date', d30ago.split('T')[0]),
   ]);
 
   // ── Metrics ───────────────────────────────────────────────────────────────
@@ -198,14 +210,28 @@ export default async function DashboardPage() {
     (e) => !EXCLUDED.has(e.name.toLowerCase()) && (!e.role || e.hourly_rate === null),
   );
 
-  // Fast movers — last 30 days, names from lookup map
-  const fastMoverMap = new Map<string, { name: string; qty: number }>();
-  for (const log of recentUsage ?? []) {
-    const name = itemNameMap.get(log.item_id) ?? 'Unknown item';
-    const prev = fastMoverMap.get(log.item_id) ?? { name, qty: 0 };
-    fastMoverMap.set(log.item_id, { name, qty: prev.qty + (log.quantity ?? 0) });
-  }
-  const fastMovers = [...fastMoverMap.values()].sort((a, b) => b.qty - a.qty).slice(0, 5);
+  // Top movers — what SOLD plus what was logged as lost, over the last 30 days.
+  //
+  // This read usage_logs alone, which is why it was permanently empty for any
+  // bar that syncs a POS but does not hand-log spillage: nothing writes a usage
+  // log in that case, while pos_item_sales fills up nightly. Stock level was
+  // never an input, so having plenty on the shelf changed nothing.
+  const movers = computeVelocity(
+    items.map((i) => ({ id: i.id, name: i.name, matchKey: posItemMatchKey(i.name) })),
+    (posSales30 ?? []).map((s) => ({
+      matchKey: s.match_key,
+      qtySold: Number(s.qty_sold) || 0,
+      netSales: Number(s.net_sales) || 0,
+      saleDate: s.sale_date,
+    })),
+    (recentUsage ?? []).map((l) => ({
+      itemId: l.item_id,
+      quantity: Number(l.quantity) || 0,
+      reason: l.reason,
+    })),
+    30,
+  );
+  const fastMovers = movers.slice(0, 5).map((m) => ({ name: m.name, qty: m.unitsMoved }));
 
   // Reorder suggestions — use the separately-fetched repAssignMap
   const reorderItems = items.filter((i) => {
@@ -390,7 +416,9 @@ export default async function DashboardPage() {
             <CardContent>
               {fastMovers.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-6">
-                  No usage data in the last 30 days. Log stock adjustments to see movers.
+                  Nothing has moved in the last 30 days. This counts what sold through
+                  the POS plus anything logged as spilled or comped — not what is on
+                  the shelf, so stock levels will not change it.
                 </p>
               ) : (
                 <div className="space-y-3">
@@ -447,7 +475,7 @@ export default async function DashboardPage() {
                           <p className="text-xs text-muted-foreground">{label} · {log.quantity} units</p>
                         </div>
                         <span className="text-xs text-muted-foreground shrink-0 mt-0.5 whitespace-nowrap">
-                          {timeAgo(log.created_at as string)}
+                          {timeAgo(log.logged_at as string)}
                         </span>
                       </div>
                     );

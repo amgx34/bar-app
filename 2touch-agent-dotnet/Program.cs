@@ -77,7 +77,10 @@ if (!isService)
         Console.WriteLine("  To update it                 run rail-update.exe");
         Console.WriteLine("  To remove it                 run rail-uninstall.exe");
         Console.WriteLine();
-        ConsoleUi.PauseIfInteractive();
+        // Bounded, never blocking. This binary is the one most likely to be
+        // launched by automation with no arguments, and an unbounded wait here
+        // would hang that process forever with nobody to press a key.
+        ConsoleUi.PauseBounded();
         return 0;
     }
 }

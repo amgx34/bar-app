@@ -1,5 +1,6 @@
 'use server';
 
+import { z } from 'zod';
 import { assertParsableTextUpload } from '@/lib/uploads';
 import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -208,6 +209,35 @@ export async function createCategory(raw: unknown) {
 
   if (error) throw new Error(error.message);
   revalidatePath('/app/inventory');
+}
+
+/**
+ * Sets how a category's purchases are treated in the P&L.
+ *
+ * Category-level rather than per item: a bar has a handful of categories and
+ * hundreds of items, and the classification is a property of the KIND of thing,
+ * not of each bottle. See lib/books/cost-structure.ts for what each type does.
+ */
+export async function updateCategoryCostType(categoryId: string, costType: string) {
+  const { org, role } = await getCurrentOrg();
+  if (!canManageCategories(role)) throw new Error('Not authorized');
+
+  const parsed = z
+    .enum(['beverage_cogs', 'food_cogs', 'supplies', 'excluded'])
+    .parse(costType);
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from('inventory_categories')
+    .update({ cost_type: parsed })
+    .eq('id', categoryId)
+    .eq('organization_id', org.id);
+
+  if (error) throw new Error(error.message);
+
+  // The books read this on every load, so both surfaces need refreshing.
+  revalidatePath('/app/inventory');
+  revalidatePath('/app/books');
 }
 
 export async function deleteCategory(categoryId: string) {

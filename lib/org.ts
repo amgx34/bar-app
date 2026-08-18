@@ -41,6 +41,16 @@ export type BarSettings = {
   bar_state?:   string;
   bar_phone?:   string;
 
+  // ── Sales tax ─────────────────────────────────────────────────────────────
+  /** Percentage, e.g. 8.25. Unset means the books show no tax split at all. */
+  sales_tax_rate?:          number;
+  /**
+   * Whether POS sales figures already contain tax. Cannot be inferred — a POS
+   * "Net Sales" column means net of discounts, which says nothing about tax,
+   * and the two readings differ by the whole tax amount.
+   */
+  pos_prices_include_tax?:  boolean;
+
   // ── ACH / NACHA payroll ───────────────────────────────────────────────────
   nacha_routing_number?: string;             // ODFI routing (bar's bank), 9 digits
   nacha_company_ein?:    string;             // 9-digit EIN without dashes

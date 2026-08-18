@@ -21,14 +21,17 @@ export type SetupInput = {
 };
 
 // ── Default inventory categories seeded for every new org ─────────────────────
-const DEFAULT_CATEGORIES = [
-  'Spirits',
-  'Beer',
-  'Wine',
-  'Mixers & Sodas',
-  'Coolers & Seltzers',
-  'Supplies',
-  'Garnishes & Food',
+// Each carries its cost classification from the start. Seeding a "Supplies"
+// category without one is how napkins end up inside pour cost — the exact bug
+// migration 20260818000000 had to go back and repair.
+const DEFAULT_CATEGORIES: { name: string; cost_type: string }[] = [
+  { name: 'Spirits',            cost_type: 'beverage_cogs' },
+  { name: 'Beer',               cost_type: 'beverage_cogs' },
+  { name: 'Wine',               cost_type: 'beverage_cogs' },
+  { name: 'Mixers & Sodas',     cost_type: 'beverage_cogs' },
+  { name: 'Coolers & Seltzers', cost_type: 'beverage_cogs' },
+  { name: 'Supplies',           cost_type: 'supplies' },
+  { name: 'Garnishes & Food',   cost_type: 'food_cogs' },
 ];
 
 // ── Default reps seeded as examples (user can edit/delete) ────────────────────
@@ -98,7 +101,7 @@ export async function createOrgWithSettings(data: SetupInput) {
 
   // ── Seed default categories (best-effort, non-blocking) ───────────────────
   await admin.from('inventory_categories').insert(
-    DEFAULT_CATEGORIES.map((name) => ({ organization_id: org.id, name }))
+    DEFAULT_CATEGORIES.map((c) => ({ organization_id: org.id, ...c }))
   );
 
   // ── Seed example reps (best-effort) ───────────────────────────────────────

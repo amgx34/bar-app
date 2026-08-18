@@ -47,7 +47,16 @@ export function CategoryValuePie({ data }: { data: CategoryBreakdown[] }) {
 
 export function FastMoversChart({ data }: { data: VelocityItem[] }) {
   const chartData = data.map((d) => ({ name: d.name.length > 22 ? d.name.slice(0, 21) + '…' : d.name, value: parseFloat(d.dailyUsage.toFixed(2)) }));
-  if (chartData.length === 0) return <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">No usage data in last 30 days</div>;
+  // Says what the measure IS, because "no usage data" sent people looking at
+  // stock levels — which are not an input to this chart at all.
+  if (chartData.length === 0) {
+    return (
+      <div className="h-48 flex items-center justify-center px-6 text-center text-sm text-muted-foreground">
+        Nothing moved in the last 30 days. This tracks POS sales and logged losses,
+        not stock on hand.
+      </div>
+    );
+  }
   return (
     <div className="w-full h-72">
       <ResponsiveContainer width="100%" height="100%">

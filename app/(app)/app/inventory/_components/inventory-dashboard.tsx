@@ -11,7 +11,8 @@ export type DashboardUsageLog = {
   quantity: number;
   reason: string;
   note: string | null;
-  created_at: string;
+  /** usage_logs stores this as `logged_at`, not `created_at`. */
+  logged_at: string;
   inventory_items: { name: string } | null;
 };
 
@@ -85,12 +86,12 @@ export function InventoryDashboard({
   const { latestShipmentDate, latestShipmentItems } = useMemo(() => {
     const deliveries = usageLogs.filter(l => l.reason === 'delivery');
     if (deliveries.length === 0) return { latestShipmentDate: null, latestShipmentItems: [] };
-    // Sort deliveries by created_at descending to get the latest
-    const sortedDeliveries = [...deliveries].sort((a, b) => b.created_at.localeCompare(a.created_at));
-    const latestDay = sortedDeliveries[0].created_at.slice(0, 10);
-    const sameDay = sortedDeliveries.filter(l => l.created_at.slice(0, 10) === latestDay);
+    // Sort deliveries newest first to find the latest delivery day
+    const sortedDeliveries = [...deliveries].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
+    const latestDay = sortedDeliveries[0].logged_at.slice(0, 10);
+    const sameDay = sortedDeliveries.filter(l => l.logged_at.slice(0, 10) === latestDay);
     return {
-      latestShipmentDate: sortedDeliveries[0].created_at,
+      latestShipmentDate: sortedDeliveries[0].logged_at,
       latestShipmentItems: sameDay.map(l => ({
         name: l.inventory_items?.name ?? 'Unknown',
         quantity: l.quantity,

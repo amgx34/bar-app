@@ -58,6 +58,10 @@ export async function updateGeneralInfo(data: {
   nacha_company_ein?:    string;
   nacha_bank_name?:      string;
   nacha_company_name?:   string;
+  // Sales tax. Both are needed before the books can split tax from profit —
+  // see lib/books/sales-tax.ts for why neither can be inferred.
+  sales_tax_rate?:         number;
+  pos_prices_include_tax?: boolean;
 }) {
   const { org, role } = await getCurrentOrg();
   assertEditor(role);
@@ -85,6 +89,8 @@ export async function updateGeneralInfo(data: {
     nacha_company_ein:    data.nacha_company_ein    ?? undefined,
     nacha_bank_name:      data.nacha_bank_name      ?? undefined,
     nacha_company_name:   data.nacha_company_name   ?? undefined,
+    sales_tax_rate:          data.sales_tax_rate ?? undefined,
+    pos_prices_include_tax:  data.pos_prices_include_tax ?? undefined,
   });
 }
 
@@ -94,6 +100,8 @@ export async function updateTipPaySettings(data: {
   tip_split_percent:  number;
   barback_tip_pct:    number;
   opener_bonus_type:  'none' | 'fixed' | 'percentage' | 'hours';
+  sales_tax_rate?:         number;
+  pos_prices_include_tax?: boolean;
   opener_bonus_value: number;
   default_hourly_rate: number;
   hourly_rates:       HourlyRates;

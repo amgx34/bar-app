@@ -123,14 +123,14 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
       .order('name'),
     supabase
       .from('usage_logs')
-      .select('item_id, quantity, reason, created_at')
+      .select('item_id, quantity, reason, logged_at')
       .eq('organization_id', orgId)
-      .gte('created_at', d30.toISOString()),
+      .gte('logged_at', d30.toISOString()),
     supabase
       .from('usage_logs')
-      .select('item_id, quantity, reason, created_at')
+      .select('item_id, quantity, reason, logged_at')
       .eq('organization_id', orgId)
-      .gte('created_at', d90.toISOString()),
+      .gte('logged_at', d90.toISOString()),
   ]);
 
   const items = rawItems ?? [];
@@ -281,7 +281,7 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
     reasonMap.get(label)!.quantity      += qty;
     reasonMap.get(label)!.estimatedCost += cost;
 
-    const dt  = new Date(log.created_at as string);
+    const dt  = new Date(log.logged_at as string);
     const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
     if (!monthMap.has(key)) monthMap.set(key, { month: '', quantity: 0, estimatedCost: 0 });
     monthMap.get(key)!.quantity      += qty;

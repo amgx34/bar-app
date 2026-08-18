@@ -8,8 +8,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 // ── Static seed tables ─────────────────────────────────────────────────────
 
-const CATEGORIES = [
-  'Spirits', 'Beer & Seltzers', 'Wine', 'Mixers & Non-Alcoholic', 'Supplies',
+// Classified from the start, so the demo shows a correct pour cost rather than
+// one inflated by its own bar supplies.
+const CATEGORIES: { name: string; cost_type: string }[] = [
+  { name: 'Spirits',                cost_type: 'beverage_cogs' },
+  { name: 'Beer & Seltzers',        cost_type: 'beverage_cogs' },
+  { name: 'Wine',                   cost_type: 'beverage_cogs' },
+  { name: 'Mixers & Non-Alcoholic', cost_type: 'beverage_cogs' },
+  { name: 'Supplies',               cost_type: 'supplies' },
 ];
 
 const REPS = [
@@ -231,7 +237,7 @@ export async function seedDemoOrg(admin: SupabaseClient, userId: string): Promis
   // ── 3. Categories ────────────────────────────────────────────────────────
   const { data: catRows } = await admin
     .from('inventory_categories')
-    .insert(CATEGORIES.map(name => ({ organization_id: orgId, name })))
+    .insert(CATEGORIES.map(c => ({ organization_id: orgId, ...c })))
     .select('id, name');
   const catMap = new Map((catRows ?? []).map(c => [c.name as string, c.id as string]));
 

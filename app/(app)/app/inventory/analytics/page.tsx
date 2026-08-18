@@ -5,6 +5,8 @@ import { TrendingUp, Package, AlertTriangle, DollarSign, Zap, Turtle, ShoppingCa
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { getAnalyticsData } from './actions';
+import { getDealsAnalytics } from './deals-actions';
+import { DealsPanel } from './_components/deals-panel';
 import type { AlertItem } from './actions';
 import { InventoryNav } from '../_components/inventory-nav';
 
@@ -31,7 +33,8 @@ const URGENCY_LABEL: Record<AlertItem['urgency'], string> = { critical: 'OUT', h
 export const metadata: Metadata = { title: 'Inventory Analytics' };
 
 export default async function InventoryAnalyticsPage() {
-  const data = await getAnalyticsData();
+  // Independent queries, so they run together rather than one after the other.
+  const [data, deals] = await Promise.all([getAnalyticsData(), getDealsAnalytics()]);
 
   const kpis = [
     { label: 'Inventory Value', value: fmtMoney(data.totalInventoryValue), sub: `${data.totalActiveItems} active items`, icon: Package, color: 'text-primary', bg: 'bg-primary/10' },
@@ -72,6 +75,12 @@ export default async function InventoryAnalyticsPage() {
           );
         })}
       </div>
+
+      {/* Deals sit directly under the KPIs rather than at the foot of the page.
+          A deal is a pricing decision the operator can change tomorrow, which
+          makes it more actionable than most of what follows — and it was
+          previously invisible outside a settings tab. */}
+      <DealsPanel data={deals} />
 
       {/* Category Value + Fast Movers */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
@@ -114,7 +123,9 @@ export default async function InventoryAnalyticsPage() {
         <Card className="md:col-span-1 lg:col-span-3">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2"><Zap className="h-4 w-4 text-amber-500" /><CardTitle className="text-sm font-semibold">Fast Movers</CardTitle></div>
-            <p className="text-xs text-muted-foreground">Highest average daily usage, last 30 days</p>
+            <p className="text-xs text-muted-foreground">
+              Fastest moving over 30 days — POS sales plus logged losses. Stock on hand is not part of it.
+            </p>
           </CardHeader>
           <CardContent><FastMoversChart data={data.fastMovers} /></CardContent>
         </Card>

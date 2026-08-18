@@ -122,6 +122,34 @@ async function resolveOrgAndVerify(
 }
 
 /**
+ * Stores the last sync time and any errors from it on the org.
+ *
+ * Written on every sync rather than only on failure, so "last sync succeeded at
+ * 21:05" is a positive signal and not merely the absence of a bad one. Errors
+ * are truncated: this is a status line, not a log store.
+ */
+async function recordSyncOutcome(
+  orgId: string,
+  posConfig: Record<string, unknown>,
+  errors: string[],
+): Promise<void> {
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from('organizations')
+    .update({
+      pos_config: {
+        ...posConfig,
+        last_sync_at: new Date().toISOString(),
+        last_sync_errors: errors.slice(0, 5).map((e) => e.slice(0, 300)),
+      },
+    })
+    .eq('id', orgId);
+
+  // Never fail an otherwise-good ingest because the status line would not save.
+  if (error) console.warn('[2touch] could not record sync outcome:', error.message);
+}
+
+/**
  * Records the agent version reported in X-Rail-Agent.
  *
  * Written only when it actually changes. A sync runs every five minutes per
@@ -489,6 +517,19 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  console.log(`[2touch/ingest] org=${resolvedOrgId}`, result);
+  // Record the outcome on the org so a failing sync is visible in the app.
+  //
+  // This exists because pos_apply_item_sales failed on every single sync for
+  // days without anyone noticing: the route deliberately collects RPC errors
+  // and carries on so one bad day cannot block the rest, but "carries on" also
+  // meant the only trace was a server log nobody reads. The POS settings panel
+  // now shows the last sync and anything that went wrong on it.
+  await recordSyncOutcome(resolvedOrgId, posConfig, result.errors);
+
+  if (result.errors.length) {
+    console.error(`[2touch/ingest] org=${resolvedOrgId} FAILED`, result.errors);
+  } else {
+    console.log(`[2touch/ingest] org=${resolvedOrgId}`, result);
+  }
   return NextResponse.json(result);
 }

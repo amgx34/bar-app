@@ -2,6 +2,8 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentOrg } from '@/lib/org';
+import { posItemMatchKey } from '@/lib/pos/excluded-items';
+import { computeVelocity } from '@/lib/pos/velocity';
 
 const OZ_PER_ML = 0.033814;
 
@@ -51,10 +53,14 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
   const d30 = new Date(now); d30.setDate(now.getDate() - 30);
   const d90 = new Date(now); d90.setDate(now.getDate() - 90);
 
-  const [{ data: rawItems }, { data: logs30 }, { data: logs90 }] = await Promise.all([
+  const [{ data: rawItems }, { data: logs30 }, { data: logs90 }, { data: posSales30 }] = await Promise.all([
     supabase.from('inventory_items').select('id, name, unit, current_stock, par_level, cost_price, bottle_size_ml, pour_size_oz, inventory_categories(name)').eq('organization_id', orgId).eq('is_active', true).order('name'),
-    supabase.from('usage_logs').select('item_id, quantity, reason, created_at').eq('organization_id', orgId).gte('created_at', d30.toISOString()),
-    supabase.from('usage_logs').select('item_id, quantity, reason, created_at').eq('organization_id', orgId).gte('created_at', d90.toISOString()),
+    supabase.from('usage_logs').select('item_id, quantity, reason, logged_at').eq('organization_id', orgId).gte('logged_at', d30.toISOString()),
+    supabase.from('usage_logs').select('item_id, quantity, reason, logged_at').eq('organization_id', orgId).gte('logged_at', d90.toISOString()),
+    // What actually SOLD. Velocity used to read usage_logs alone, so a bar that
+    // syncs its POS but does not hand-log spillage had no movers at all — the
+    // sales sat unused in pos_item_sales. See lib/pos/velocity.ts.
+    supabase.from('pos_item_sales').select('match_key, qty_sold, net_sales, sale_date').eq('organization_id', orgId).gte('sale_date', d30.toISOString().split('T')[0]),
   ]);
 
   const items = rawItems ?? [];
@@ -86,12 +92,27 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
   }
   const categoryBreakdown = [...catMap.values()].sort((a, b) => b.totalValue - a.totalValue);
 
-  const consumptionMap = new Map<string, number>();
-  for (const log of logs30 ?? []) { if (log.reason !== 'delivery') consumptionMap.set(log.item_id, (consumptionMap.get(log.item_id) ?? 0) + (log.quantity ?? 0)); }
+  // Sold + lost, with pos_sale logs excluded from the loss side so a sold unit
+  // is never counted twice once depletion is running.
+  const velocity = computeVelocity(
+    items.map((i) => ({ id: i.id, name: i.name, matchKey: posItemMatchKey(i.name) })),
+    (posSales30 ?? []).map((s) => ({
+      matchKey: s.match_key,
+      qtySold: Number(s.qty_sold) || 0,
+      netSales: Number(s.net_sales) || 0,
+      saleDate: s.sale_date,
+    })),
+    (logs30 ?? []).map((l) => ({
+      itemId: l.item_id,
+      quantity: Number(l.quantity) || 0,
+      reason: l.reason,
+    })),
+    30,
+  );
+  const velocityByItem = new Map(velocity.map((v) => [v.itemId, v]));
 
   const velocityItems: VelocityItem[] = items.map((item) => {
-    const consumed = consumptionMap.get(item.id) ?? 0;
-    const dailyUsage = consumed / 30;
+    const dailyUsage = velocityByItem.get(item.id)?.dailyUsage ?? 0;
     const currentStock = item.current_stock ?? 0;
     const parLevel = item.par_level ?? null;
     const daysRemaining = dailyUsage > 0 ? Math.floor(currentStock / dailyUsage) : null;
@@ -114,7 +135,7 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
     const label = REASON_LABELS[log.reason] ?? log.reason;
     if (!reasonMap.has(label)) reasonMap.set(label, { reason: label, quantity: 0, estimatedCost: 0 });
     reasonMap.get(label)!.quantity += qty; reasonMap.get(label)!.estimatedCost += cost;
-    const dt = new Date(log.created_at as string);
+    const dt = new Date(log.logged_at as string);
     const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
     if (!monthMap.has(key)) monthMap.set(key, { month: '', quantity: 0, estimatedCost: 0 });
     monthMap.get(key)!.quantity += qty; monthMap.get(key)!.estimatedCost += cost;

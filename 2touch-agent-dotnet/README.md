@@ -284,6 +284,13 @@ Exit code is 0 when nothing failed, 1 otherwise.
 .\rail-2touch-agent.exe --days 7 --test   # override the lookback window
 ```
 
+**`rail-2touch-agent.exe` never waits for input.** It runs unattended and is the
+binary most likely to be started by a Scheduled Task, so every path either does
+its work and exits or runs the service loop. A double-click prints where to find
+the installer and closes itself after 20 seconds rather than sitting on a "press
+any key" that nobody is there to answer. Prompts live only in `rail-setup.exe`,
+which is interactive by design. Enforced by tests in `AgentNonInteractiveTests`.
+
 The setup, diagnose and uninstall flags used to live on `rail-2touch-agent.exe`.
 Passing one of them to the agent now prints the executable that took it over and
 exits non-zero rather than doing nothing — a `--uninstall` that silently no-ops

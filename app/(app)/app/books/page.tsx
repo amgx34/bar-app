@@ -3,10 +3,15 @@ import dynamicImport from 'next/dynamic';
 import Link from 'next/link';
 import {
   BookOpen, TrendingUp, TrendingDown,
-  DollarSign, Users, Calculator,
+  DollarSign, Users, Calculator, Percent,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getBooksData } from './actions';
+import { listExpenses } from './expense-actions';
+import { ExpensesPanel } from './_components/expenses-panel';
+import { getCurrentOrg } from '@/lib/org';
+import { canEditInventory } from '@/lib/permissions';
+import { BENCHMARKS, judgeAgainstBenchmark } from '@/lib/books/cost-structure';
 
 const MonthlyChart = dynamicImport(
   () => import('./_components/books-charts').then((m) => ({ default: m.MonthlyChart })),
@@ -64,7 +69,12 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
     ? { start: params.start, end: params.end }
     : getDateRange(preset);
 
-  const data = await getBooksData(start, end);
+  // Independent of each other, so they run together.
+  const [data, expenses, { role }] = await Promise.all([
+    getBooksData(start, end),
+    listExpenses(start, end),
+    getCurrentOrg(),
+  ]);
 
   const PRESETS = [
     { label: 'This Month', value: 'month' },
@@ -75,11 +85,33 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
 
   const kpis = [
     {
-      label: 'Revenue',
+      label: data.taxConfigured ? 'Net Revenue' : 'Revenue',
       value: fmtMoney(data.revenue),
-      sub:   `+${fmtMoney(data.tips)} tips`,
+      // Says explicitly whether tax has been taken out, so the number is never
+      // ambiguous about what it represents.
+      sub: data.taxConfigured
+        ? `after ${fmtMoney(data.salesTax ?? 0)} sales tax · +${fmtMoney(data.tips)} tips`
+        : `+${fmtMoney(data.tips)} tips · tax not configured`,
       icon:  TrendingUp,
       color: 'text-primary',
+    },
+    {
+      // Pour cost is the ratio a bar is benchmarked on, so it gets a KPI slot of
+      // its own rather than being buried in the statement. The band is context,
+      // not a grade — a dive bar and a cocktail bar sit in different parts of it
+      // legitimately.
+      label: 'Pour Cost',
+      value: data.pourCostPct === null ? '—' : `${data.pourCostPct.toFixed(1)}%`,
+      sub: data.pourCostPct === null
+        ? 'no revenue in this period'
+        : `${fmtMoney(data.beverageCogs)} beverage · target under ${BENCHMARKS.pourCost.good}%`,
+      icon: Percent,
+      color:
+        judgeAgainstBenchmark(data.pourCostPct, BENCHMARKS.pourCost) === 'good'
+          ? 'text-emerald-600 dark:text-emerald-400'
+          : judgeAgainstBenchmark(data.pourCostPct, BENCHMARKS.pourCost) === 'watch'
+            ? 'text-amber-600 dark:text-amber-400'
+            : 'text-destructive',
     },
     {
       label: 'COGS',
@@ -111,11 +143,31 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
     },
   ];
 
+  // Sales tax comes off the top, above COGS. It is not a cost of doing
+  // business — it is money the bar never owned, so it must leave the statement
+  // before any margin is calculated from what remains.
   const summaryRows = [
-    { label: 'Revenue',       value: data.revenue,         indent: false, border: false },
-    { label: '− COGS',        value: -data.cogs,           indent: true,  border: false },
+    ...(data.taxConfigured && data.grossTakings !== null
+      ? [
+          { label: 'Gross takings', value: data.grossTakings, indent: false, border: false },
+          { label: '− Sales tax (held for the state)', value: -(data.salesTax ?? 0), indent: true, border: false },
+        ]
+      : []),
+    { label: data.taxConfigured ? 'Net Revenue' : 'Revenue', value: data.revenue, indent: false, border: data.taxConfigured },
+    { label: '− Beverage cost', value: -data.beverageCogs, indent: true, border: false },
+    ...(data.foodCogs > 0
+      ? [{ label: '− Food cost', value: -data.foodCogs, indent: true, border: false }]
+      : []),
     { label: 'Gross Profit',  value: data.grossProfit,     indent: false, border: true  },
+    // Below gross profit on purpose: these are real costs, but folding them in
+    // above would corrupt pour cost, which is the whole point of the split.
+    ...(data.supplies > 0
+      ? [{ label: '− Operating supplies', value: -data.supplies, indent: true, border: false }]
+      : []),
     { label: '− Labor',       value: -data.totalLabor,     indent: true,  border: false },
+    ...(data.operatingExpenses > 0
+      ? [{ label: '− Operating expenses', value: -data.operatingExpenses, indent: true, border: false }]
+      : []),
     { label: '− Losses',      value: -data.totalLosses,    indent: true,  border: false },
     { label: 'Net Operating', value: data.netOperating,    indent: false, border: true  },
   ];
@@ -229,6 +281,17 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">P&amp;L Summary</CardTitle>
+            {!data.taxConfigured && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Sales tax is not configured, so these figures are your POS totals as
+                reported. If those include tax, the profit shown is higher than what you
+                keep.{' '}
+                <Link href="/app/settings?tab=general" className="text-primary hover:underline">
+                  Set your tax rate
+                </Link>{' '}
+                to split it out.
+              </p>
+            )}
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -259,6 +322,14 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
           </CardContent>
         </Card>
       </div>
+
+      {/* Below the statement it feeds: you read the P&L, notice the overheads
+          line, and the entries behind it are the next thing on the page. */}
+      <ExpensesPanel
+        expenses={expenses}
+        periodStart={start}
+        canEdit={canEditInventory(role)}
+      />
     </main>
   );
 }

@@ -140,6 +140,44 @@ public static class ConsoleUi
         Console.ReadLine();
     }
 
+    /// <summary>
+    /// Waits for a keypress, but never longer than <paramref name="seconds"/>.
+    ///
+    /// For binaries that must be safe to launch from automation. An unbounded
+    /// Console.ReadLine() in a process a Scheduled Task might start with no
+    /// arguments hangs forever holding the process open, and nothing is there to
+    /// press a key. This still gives a person time to read the message, and
+    /// always returns on its own.
+    /// </summary>
+    public static void PauseBounded(int seconds = 20)
+    {
+        // Redirected stdin means a script, not a person — there is nobody to wait for.
+        if (Console.IsInputRedirected || !Environment.UserInteractive) return;
+
+        Console.WriteLine();
+        Console.Write($"    Closing in {seconds}s — press any key to close now…");
+
+        var deadline = DateTime.UtcNow.AddSeconds(seconds);
+        try
+        {
+            while (DateTime.UtcNow < deadline)
+            {
+                if (Console.KeyAvailable)
+                {
+                    Console.ReadKey(intercept: true);
+                    break;
+                }
+                Thread.Sleep(100);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // No console attached after all. Nothing to wait for, nothing to do.
+        }
+
+        Console.WriteLine();
+    }
+
     private static void Line(ConsoleColor colour, string marker, string message)
     {
         Write(colour, marker);

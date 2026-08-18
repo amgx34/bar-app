@@ -203,12 +203,28 @@ ALTER TYPE usage_reason ADD VALUE IF NOT EXISTS 'pos_reversal';
 -- One function rather than a loop of statements from the route: a half-applied
 -- day would leave the ledger disagreeing with the stock it is supposed to
 -- describe, and there would be no way to tell which rows had landed.
+-- CREATE OR REPLACE cannot rename OUT parameters: Postgres treats the OUT row
+-- type as part of the signature and refuses with
+--
+--   42P13: cannot change return type of existing function
+--
+-- so the old definition has to go first. Nothing depends on this function — no
+-- view, trigger or policy references it, only the ingest route calls it over
+-- RPC — so the drop is safe, and running both statements in one transaction
+-- leaves no window where the function is missing.
+DROP FUNCTION IF EXISTS pos_apply_item_sales(UUID, DATE, JSONB);
+
 CREATE OR REPLACE FUNCTION pos_apply_item_sales(
   p_org        UUID,
   p_sale_date  DATE,
   p_components JSONB
 )
-RETURNS TABLE (inventory_item_id UUID, delta NUMERIC)
+-- OUT parameters are deliberately NOT named after the columns they describe.
+-- A RETURNS TABLE column becomes a PL/pgSQL variable in scope for the whole
+-- body, so naming one `inventory_item_id` made the ON CONFLICT target below
+-- ambiguous (42702) and every call failed. The ingest route swallowed that into
+-- result.errors, so depletion silently did nothing for days.
+RETURNS TABLE (moved_item_id UUID, moved_delta NUMERIC)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
@@ -272,8 +288,8 @@ BEGIN
     ON CONFLICT (organization_id, sale_date, inventory_item_id)
     DO UPDATE SET applied_qty = EXCLUDED.applied_qty, updated_at = NOW();
 
-    inventory_item_id := rec.item_id;
-    delta             := v_delta;
+    moved_item_id := rec.item_id;
+    moved_delta   := v_delta;
     RETURN NEXT;
   END LOOP;
 END;
