@@ -1,0 +1,4 @@
+C:\Users\notug\bar-app\2touch-agent-dotnet\apps\RailUpdate\bin\Release\net9.0-windows\win-x64\publish\rail-update.pdb
+C:\Users\notug\bar-app\2touch-agent-dotnet\apps\RailUpdate\bin\Release\net9.0-windows\win-x64\publish\rail-2touch-agent.runtimeconfig.json
+C:\Users\notug\bar-app\2touch-agent-dotnet\apps\RailUpdate\bin\Release\net9.0-windows\win-x64\publish\rail-2touch-agent.pdb
+C:\Users\notug\bar-app\2touch-agent-dotnet\apps\RailUpdate\bin\Release\net9.0-windows\win-x64\publish\rail-update.exe
