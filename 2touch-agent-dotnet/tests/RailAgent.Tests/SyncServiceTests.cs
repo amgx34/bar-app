@@ -32,7 +32,7 @@ public class SyncServiceTests
         public override Task<List<ZReportRow>> QueryZReportsAsync(SqlConnection c, int days, CancellationToken ct)
         {
             Queried.Add("z");
-            return Task.FromResult(new List<ZReportRow> { new("2026-08-06", 100m, 10m, 5m) });
+            return Task.FromResult(new List<ZReportRow> { new("2026-08-06", 100m, 10m, 5m, 60m, 40m) });
         }
 
         public override Task<List<EwReportRow>> QueryEwReportsAsync(SqlConnection c, int days, CancellationToken ct)

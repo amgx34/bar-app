@@ -316,7 +316,10 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <QuickAction icon={Package}     label="Adjust Stock"    sub="Update levels"       href="/app/inventory"                color="primary"  />
           <QuickAction icon={Users}       label="New Rep Order"   sub="Place with supplier" href="/app/reps"                      color="amber"    />
-          <QuickAction icon={FlaskConical} label="Pour Report"    sub="Weigh bottles"       href="/app/inventory/weigh"           color="violet"   />
+          {/* Replaced the Pour Report shortcut: weighing bottles is a weekly
+              job, logging the jar is a nightly one, and until it is entered
+              every tip split for that night is short by the cash. */}
+          <QuickAction icon={Banknote}     label="Log Cash Tips" sub="End of night"        href="/app/payroll?tab=split"         color="violet"   />
           <QuickAction icon={Plus}        label="Add Item"        sub="New inventory SKU"   href="/app/inventory"                color="emerald"  />
         </div>
       </div>

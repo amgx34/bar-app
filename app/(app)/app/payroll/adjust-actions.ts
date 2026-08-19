@@ -69,6 +69,11 @@ async function assertEmployeesInOrg(
  * The shift row is updated in place and the previous figure is copied into the
  * log first, so the original stays recoverable. Repeated corrections each get
  * their own row rather than overwriting the last.
+ *
+ * Creates the shift when none exists. It used to throw "No shift recorded for
+ * that employee on that date", which meant it could only ever edit rows the POS
+ * had already produced — so somebody who never clocked in could not be paid at
+ * all, and the failure looked like a bug rather than a missing row.
  */
 export async function adjustShiftHours(raw: unknown): Promise<void> {
   const { org, role } = await getCurrentOrg();
@@ -88,23 +93,31 @@ export async function adjustShiftHours(raw: unknown): Promise<void> {
     .eq('shift_date', input.shiftDate)
     .maybeSingle();
 
-  if (!shift) throw new Error('No shift recorded for that employee on that date');
-
-  const before = (Number(shift.regular_hours) || 0) + (Number(shift.overtime_hours) || 0);
+  // Absent is a legitimate starting point, not an error: somebody who forgot to
+  // clock in has no row at all, and that is exactly when a correction is needed.
+  const before = shift
+    ? (Number(shift.regular_hours) || 0) + (Number(shift.overtime_hours) || 0)
+    : 0;
   const after = input.regularHours + input.overtimeHours;
 
-  // admin-scope-ok: `shift` was fetched above with .eq('organization_id', org.id)
-  // and the function throws when it is missing, so this id is always in-org.
-  const { error: updateErr } = await supabase
+  // Upsert on the table's own uniqueness (organization_id, employee_id,
+  // shift_date), so this both edits an existing shift and creates a missing one
+  // without a read-then-branch that could race the agent's next sync.
+  const { error: writeErr } = await supabase
     .from('employee_shifts')
-    .update({
-      regular_hours: input.regularHours,
-      overtime_hours: input.overtimeHours,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', shift.id);
+    .upsert(
+      {
+        organization_id: org.id,
+        employee_id: input.employeeId,
+        shift_date: input.shiftDate,
+        regular_hours: input.regularHours,
+        overtime_hours: input.overtimeHours,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'organization_id,employee_id,shift_date' },
+    );
 
-  if (updateErr) throw new Error(`Could not update those hours: ${updateErr.message}`);
+  if (writeErr) throw new Error(`Could not save those hours: ${writeErr.message}`);
 
   const { error: logErr } = await supabase.from('payroll_adjustments').insert({
     organization_id: org.id,
@@ -260,5 +273,121 @@ export async function listAdjustments(
     amount: r.amount === null ? null : Number(r.amount),
     reason: r.reason,
     created_at: r.created_at,
+  }));
+}
+
+const removeSchema = z.object({
+  employeeId: z.string().uuid(),
+  shiftDate: isoDate,
+  reason,
+});
+
+/**
+ * Takes someone off a night without deleting the record of it.
+ *
+ * Hours go to zero and the row stays. A hard delete would look tidier and be
+ * wrong twice over: the agent re-sends a two-day window every five minutes, so
+ * the POS would simply recreate the row and undo the correction; and the fact
+ * that a shift was recorded and then removed is exactly what somebody disputing
+ * their pay needs to see.
+ *
+ * Zeroed rather than flagged because every consumer of employee_shifts already
+ * sums hours — one that forgot to check an `excluded` column would quietly pay
+ * the bad shift anyway.
+ */
+export async function removeFromShift(raw: unknown): Promise<void> {
+  const { org, role } = await getCurrentOrg();
+  if (!canManagePayroll(role)) throw new Error('Not authorized');
+
+  const input = removeSchema.parse(raw);
+  const user = await getAuthUser();
+  const supabase = createAdminClient();
+
+  await assertEmployeesInOrg(supabase, org.id, [input.employeeId]);
+
+  const { data: shift } = await supabase
+    .from('employee_shifts')
+    .select('id, regular_hours, overtime_hours')
+    .eq('organization_id', org.id)
+    .eq('employee_id', input.employeeId)
+    .eq('shift_date', input.shiftDate)
+    .maybeSingle();
+
+  if (!shift) throw new Error('That employee has no shift on that date');
+
+  const before = (Number(shift.regular_hours) || 0) + (Number(shift.overtime_hours) || 0);
+  if (before === 0) throw new Error('That shift is already zeroed');
+
+  // admin-scope-ok: `shift` was fetched above with .eq('organization_id', org.id)
+  // and the function throws when it is missing, so this id is always in-org.
+  const { error: writeErr } = await supabase
+    .from('employee_shifts')
+    .update({ regular_hours: 0, overtime_hours: 0, updated_at: new Date().toISOString() })
+    .eq('id', shift.id);
+
+  if (writeErr) throw new Error(`Could not remove that shift: ${writeErr.message}`);
+
+  const { error: logErr } = await supabase.from('payroll_adjustments').insert({
+    organization_id: org.id,
+    shift_date: input.shiftDate,
+    kind: 'hours',
+    employee_id: input.employeeId,
+    hours_before: before,
+    hours_after: 0,
+    reason: input.reason,
+    created_by: user?.id ?? null,
+  });
+
+  if (logErr) throw new Error(`Shift was zeroed but the audit record failed: ${logErr.message}`);
+
+  revalidatePath('/app/payroll');
+}
+
+export type RosterEntry = {
+  employeeId: string;
+  name: string;
+  role: string | null;
+  hours: number;
+  /** True when a shift row exists for the date, even at zero hours. */
+  onShift: boolean;
+};
+
+/**
+ * Everyone on the team, with whatever they are recorded for on one date.
+ *
+ * Returns the whole team rather than only those already on the night, because
+ * the case this exists for is somebody who never clocked in — they are, by
+ * definition, not in the shift list yet.
+ */
+export async function getShiftRoster(shiftDate: string): Promise<RosterEntry[]> {
+  const { org } = await getCurrentOrg();
+  const supabase = createAdminClient();
+
+  const [{ data: employees }, { data: shifts }] = await Promise.all([
+    supabase
+      .from('employees')
+      .select('id, name, role')
+      .eq('organization_id', org.id)
+      .order('name'),
+    supabase
+      .from('employee_shifts')
+      .select('employee_id, regular_hours, overtime_hours')
+      .eq('organization_id', org.id)
+      .eq('shift_date', shiftDate),
+  ]);
+
+  const byEmployee = new Map(
+    (shifts ?? []).map((s) => [
+      s.employee_id as string,
+      (Number(s.regular_hours) || 0) + (Number(s.overtime_hours) || 0),
+    ]),
+  );
+
+  return (employees ?? []).map((e) => ({
+    employeeId: e.id,
+    name: e.name,
+    role: e.role,
+    hours: byEmployee.get(e.id) ?? 0,
+    onShift: byEmployee.has(e.id),
   }));
 }

@@ -1232,7 +1232,7 @@
           "lib/netcoreapp2.1/_._": {}
         }
       },
-      "rail-2touch-agent/1.0.0": {
+      "rail-2touch-agent/1.1.0": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v9.0",
         "dependencies": {
@@ -3265,7 +3265,7 @@
         "version.txt"
       ]
     },
-    "rail-2touch-agent/1.0.0": {
+    "rail-2touch-agent/1.1.0": {
       "type": "project",
       "path": "../../RailAgent.csproj",
       "msbuildProject": "../../RailAgent.csproj"
@@ -3273,7 +3273,7 @@
   },
   "projectFileDependencyGroups": {
     "net9.0-windows7.0": [
-      "rail-2touch-agent >= 1.0.0"
+      "rail-2touch-agent >= 1.1.0"
     ]
   },
   "packageFolders": {

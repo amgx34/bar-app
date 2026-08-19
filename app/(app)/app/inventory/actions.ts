@@ -240,6 +240,36 @@ export async function updateCategoryCostType(categoryId: string, costType: strin
   revalidatePath('/app/books');
 }
 
+/**
+ * Sets the default pour for a category.
+ *
+ * Category-level so "spirits pour 1.5oz" is stated once rather than on each of
+ * several hundred synced items. Items override it individually; see
+ * lib/pos/pour.ts for the item -> category -> organisation chain.
+ *
+ * Null clears it, which is not the same as zero — zero would be a pour of
+ * nothing, and the resolver treats it as unset anyway.
+ */
+export async function updateCategoryPour(categoryId: string, pourOz: number | null) {
+  const { org, role } = await getCurrentOrg();
+  if (!canManageCategories(role)) throw new Error('Not authorized');
+
+  // A gallon is 128oz. Anything beyond that is a typo, and a typo here changes
+  // every deduction in the category at once.
+  const parsed = z.number().positive().max(128).nullable().parse(pourOz);
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from('inventory_categories')
+    .update({ default_pour_oz: parsed })
+    .eq('id', categoryId)
+    .eq('organization_id', org.id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/app/inventory');
+}
+
 export async function deleteCategory(categoryId: string) {
   const { org, role } = await getCurrentOrg();
   if (!canManageCategories(role)) throw new Error('Not authorized');

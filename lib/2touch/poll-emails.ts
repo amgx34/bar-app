@@ -234,12 +234,31 @@ export async function poll2TouchEmails(): Promise<PollResult> {
 
           // ── Z Report → z_report_days ──────────────────────────────────────
           if (parsed.report_type === 'z_report' && parsed.report_date && parsed.total_sales != null) {
+            // Cash tips are only written when the report actually stated them
+            // AND nobody has counted the jar by hand for that night. Omitting
+            // the key leaves the stored value alone on conflict, which is the
+            // difference between "the email didn't say" and "it was zero".
+            const { data: existing } = await supabase
+              .from('z_report_days')
+              .select('cash_tips_source')
+              .eq('organization_id', matchingOrgId)
+              .eq('report_date', parsed.report_date)
+              .maybeSingle();
+
+            const keepManual = existing?.cash_tips_source === 'manual';
+            const cashTips = parsed.cash_tips == null || keepManual
+              ? {}
+              : {
+                  cash_tips: Math.round(parsed.cash_tips * 100) / 100,
+                  cash_tips_source: 'pos',
+                };
+
             await supabase.from('z_report_days').upsert({
               organization_id: matchingOrgId,
               report_date:     parsed.report_date,
               total_sales:     Math.round((parsed.total_sales ?? 0) * 100) / 100,
               cc_tips:         Math.round((parsed.cc_tips    ?? 0) * 100) / 100,
-              cash_tips:       Math.round((parsed.cash_tips  ?? 0) * 100) / 100,
+              ...cashTips,
             }, { onConflict: 'organization_id,report_date' });
             result.zReports++;
           }

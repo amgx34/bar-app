@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { PayrollEntry, Employee } from '../actions';
 import PayrollTable from './payroll-table';
+import { AddToShiftDialog } from './add-to-shift-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
-import { Clock, DollarSign, TrendingUp, Banknote, Wallet, ChevronLeft, ChevronRight, AlertTriangle, BarChart2, ChevronDown, Upload } from 'lucide-react';
+import { Clock, DollarSign, TrendingUp, Banknote, Wallet, ChevronLeft, ChevronRight, AlertTriangle, BarChart2, ChevronDown, Upload, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { WeeklyPoint } from './weekly-trend-chart';
@@ -55,6 +56,7 @@ export default function PayrollTab({
 }: PayrollTabProps) {
   const router = useRouter();
   const [importOpen, setImportOpen] = useState(false);
+  const [addShiftOpen, setAddShiftOpen] = useState(false);
 
   const unconfiguredEmployees = employees.filter((e) => !e.role || e.hourly_rate === null);
 
@@ -215,6 +217,17 @@ export default function PayrollTab({
         </Card>
       </div>
 
+      {canAdjust && (
+        <div className="flex justify-end">
+          {/* Somebody who never clocked in has no payroll row, so there is no
+              row-level control that could reach them. */}
+          <Button variant="outline" size="sm" onClick={() => setAddShiftOpen(true)} className="gap-1.5">
+            <UserPlus className="h-4 w-4" aria-hidden />
+            Add someone to a shift
+          </Button>
+        </div>
+      )}
+
       <PayrollTable
         entries={payrollEntries}
         totals={totals}
@@ -222,6 +235,15 @@ export default function PayrollTab({
         endDate={endDate}
         canAdjust={canAdjust}
       />
+
+      {canAdjust && addShiftOpen && (
+        <AddToShiftDialog
+          open={addShiftOpen}
+          onOpenChange={setAddShiftOpen}
+          startDate={startDate}
+          endDate={endDate}
+        />
+      )}
 
       {/* ── Quick Import ──────────────────────────────────────────────────── */}
       <div className="rounded-xl border overflow-hidden">

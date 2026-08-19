@@ -13,6 +13,7 @@
  */
 
 import { posItemMatchKey } from './excluded-items';
+import { componentUnits, unitsPerSale, type PourItem } from './pour';
 
 /** One line of the POS item audit, as the agent sends it. */
 export type AuditRow = {
@@ -26,6 +27,12 @@ export type AuditRow = {
 export type BundleComponent = {
   inventory_item_id: string;
   quantity: number;
+  /**
+   * 'each' = whole stock units. 'oz' = a measured pour, converted through the
+   * component item's bottle size. Defaults to 'each' so recipes written before
+   * pour tracking keep meaning exactly what they did.
+   */
+  unit?: 'each' | 'oz';
 };
 
 export type BundleRecipe = {
@@ -74,11 +81,27 @@ export type ResolvedSales = {
  * Callers build it from the org's own items — the same normalisation the
  * exclusion list uses, so "Bud Light" and "bud  light" are one item here too.
  */
+/**
+ * An inventory item, with everything needed to convert a sale into stock.
+ *
+ * Carries the category default so the pour can be resolved without a second
+ * lookup per row — this runs over every item-audit line on every sync.
+ */
+export type InventoryRef = PourItem & {
+  id: string;
+  categoryPourOz: number | null;
+};
+
 export function resolveSales(
   rows: AuditRow[],
   bundles: BundleRecipe[],
-  inventoryIdByMatchKey: Map<string, string>,
+  inventoryByMatchKey: Map<string, InventoryRef>,
+  orgPourOz: number | null = null,
 ): ResolvedSales {
+  // Components reference items by id, direct sales by name.
+  const byId = new Map<string, InventoryRef>();
+  for (const ref of inventoryByMatchKey.values()) byId.set(ref.id, ref);
+
   const recipeByKey = new Map(bundles.map((b) => [b.match_key, b]));
 
   const factByKey = new Map<string, SalesFact>();
@@ -129,7 +152,15 @@ export function resolveSales(
     if (recipe) {
       bundleKeys.add(matchKey);
       for (const component of recipe.components) {
-        const units = component.quantity * qty;
+        const componentItem = byId.get(component.inventory_item_id);
+        // An 'oz' component needs the item's bottle size to mean anything, and
+        // componentUnits returns 0 rather than guessing when it is missing.
+        const perSale = componentUnits(
+          component.quantity,
+          component.unit ?? 'each',
+          componentItem ?? { bottleSizeMl: null, pourSizeOz: null },
+        );
+        const units = perSale * qty;
         if (units === 0) continue;
         dayMap.set(
           component.inventory_item_id,
@@ -139,12 +170,19 @@ export function resolveSales(
       continue;
     }
 
-    const itemId = inventoryIdByMatchKey.get(matchKey);
-    if (!itemId) {
+    const item = inventoryByMatchKey.get(matchKey);
+    if (!item) {
       unresolved.add(name);
       continue;
     }
-    dayMap.set(itemId, (dayMap.get(itemId) ?? 0) + qty);
+
+    // The conversion that stops 185 shots removing 185 bottles. Items not sold
+    // by the pour return a factor of 1 and behave exactly as before.
+    const units = qty * unitsPerSale(item, {
+      categoryPourOz: item.categoryPourOz,
+      orgPourOz,
+    });
+    dayMap.set(item.id, (dayMap.get(item.id) ?? 0) + units);
   }
 
   // A day whose every line was a void or an unknown item leaves an empty map;

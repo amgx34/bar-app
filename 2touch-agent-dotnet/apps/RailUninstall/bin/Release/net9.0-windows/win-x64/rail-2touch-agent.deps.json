@@ -7,7 +7,7 @@
   "targets": {
     ".NETCoreApp,Version=v9.0": {},
     ".NETCoreApp,Version=v9.0/win-x64": {
-      "rail-2touch-agent/1.0.0": {
+      "rail-2touch-agent/1.1.0": {
         "dependencies": {
           "Microsoft.Data.SqlClient": "5.2.2",
           "Microsoft.Extensions.Hosting": "9.0.0",
@@ -1473,7 +1473,7 @@
     }
   },
   "libraries": {
-    "rail-2touch-agent/1.0.0": {
+    "rail-2touch-agent/1.1.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

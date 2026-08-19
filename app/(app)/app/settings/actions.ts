@@ -197,7 +197,10 @@ export async function syncCloverSales(days = 7): Promise<{ upserted: number }> {
     report_date,
     total_sales: Math.round(sales * 100) / 100,
     cc_tips:     Math.round(tips * 100) / 100,
-    cash_tips:   0,
+    // cash_tips is deliberately absent. Clover reports card tips; it has no
+    // view of the jar. Sending a hard 0 overwrote whatever was there on every
+    // sync — including a manager's counted figure. Omitted, an existing row
+    // keeps its value and a new one takes the column default of 0.
   }));
 
   const { error } = await admin

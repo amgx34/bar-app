@@ -25,9 +25,9 @@ type Props = {
   canEdit: boolean;
 };
 
-type DraftComponent = { inventory_item_id: string; quantity: string };
+type DraftComponent = { inventory_item_id: string; quantity: string; unit: 'each' | 'oz' };
 
-const EMPTY_COMPONENT: DraftComponent = { inventory_item_id: '', quantity: '1' };
+const EMPTY_COMPONENT: DraftComponent = { inventory_item_id: '', quantity: '1', unit: 'each' };
 
 export function BundlesPanel({ bundles, options, canEdit }: Props) {
   const [isPending, startTransition] = useTransition();
@@ -54,6 +54,7 @@ export function BundlesPanel({ bundles, options, canEdit }: Props) {
       bundle.components.map((c) => ({
         inventory_item_id: c.inventory_item_id,
         quantity: String(c.quantity),
+        unit: c.unit,
       })),
     );
   }
@@ -70,6 +71,7 @@ export function BundlesPanel({ bundles, options, canEdit }: Props) {
       .map((c) => ({
         inventory_item_id: c.inventory_item_id,
         quantity: Number(c.quantity),
+        unit: c.unit,
       }));
 
     if (!name.trim()) {
@@ -133,10 +135,13 @@ export function BundlesPanel({ bundles, options, canEdit }: Props) {
           Deals &amp; bundles
         </CardTitle>
         <CardDescription>
-          A deal rings up as one item but empties several. Tell Rail what
-          &ldquo;Bucket of 5 Domestic&rdquo; is made of and every sale will draw down the
-          real stock instead of creating a phantom item. Use this instead of excluding
-          the deal — an excluded item is ignored entirely, so nothing gets depleted.
+          A deal or a mixed drink rings up as one item but empties several. Tell Rail
+          what it is made of and every sale draws down the real stock instead of
+          creating a phantom item. Use <span className="font-medium">each</span> for
+          whole units — a bucket of five bottles — and{' '}
+          <span className="font-medium">oz</span>{' '}for a measured pour, which is
+          converted through the item&rsquo;s bottle size. Use this instead of excluding
+          the deal: an excluded item is ignored entirely, so nothing gets depleted.
         </CardDescription>
       </CardHeader>
 
@@ -159,7 +164,11 @@ export function BundlesPanel({ bundles, options, canEdit }: Props) {
                     {bundle.components.length === 0
                       ? 'No components — this deal depletes nothing'
                       : bundle.components
-                          .map((c) => `${c.quantity} × ${c.item_name}`)
+                          .map((c) =>
+                            c.unit === 'oz'
+                              ? `${c.quantity}oz ${c.item_name}`
+                              : `${c.quantity} × ${c.item_name}`,
+                          )
                           .join(', ')}
                   </span>
                 </span>
@@ -234,6 +243,26 @@ export function BundlesPanel({ bundles, options, canEdit }: Props) {
                         onChange={(e) => setComponent(index, { quantity: e.target.value })}
                       />
                     </div>
+                    <div className="w-24 shrink-0 space-y-1.5">
+                      <Label htmlFor={`bundle-unit-${index}`} className="text-xs">
+                        Unit
+                      </Label>
+                      <Select
+                        value={component.unit}
+                        onValueChange={(v) =>
+                          setComponent(index, { unit: (v ?? 'each') as 'each' | 'oz' })
+                        }
+                      >
+                        <SelectTrigger id={`bundle-unit-${index}`} className="w-full h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="each">each</SelectItem>
+                          <SelectItem value="oz">oz</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     <div className="flex-1 min-w-0 space-y-1.5">
                       <Label htmlFor={`bundle-item-${index}`} className="text-xs">
                         Item
@@ -245,7 +274,15 @@ export function BundlesPanel({ bundles, options, canEdit }: Props) {
                         }
                       >
                         <SelectTrigger id={`bundle-item-${index}`} className="w-full h-9">
-                          <SelectValue placeholder="Choose an item" />
+                          {/* Base UI renders the raw value unless given a
+                              formatter, and these values are UUIDs — without
+                              this the trigger reads
+                              "8321a518-2964-43d8-8f83-569a3296636d". */}
+                          <SelectValue placeholder="Choose an item">
+                            {(value) =>
+                              (value ? nameById.get(value as string) : null) ?? 'Choose an item'
+                            }
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {options.map((o) => (

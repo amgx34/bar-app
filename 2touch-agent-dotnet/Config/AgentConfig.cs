@@ -6,6 +6,14 @@ namespace RailAgent.Config;
 /// </summary>
 public sealed class AgentConfig
 {
+    /// <summary>
+    /// Set when <see cref="Setup.ProfileMigration"/> upgraded a pre-1.1 schema
+    /// mapping at startup. Runtime state, never read from or written to JSON —
+    /// it exists so the log can say the mapping was substituted rather than
+    /// leaving an operator wondering why the columns changed on their own.
+    /// </summary>
+    public bool ProfileUpgraded { get; set; }
+
     public SqlConfig Sql { get; set; } = new();
     public RailConfig Rail { get; set; } = new();
     public TablesConfig Tables { get; set; } = new();
@@ -72,6 +80,20 @@ public sealed class ZReportColumns
     public string Sales { get; set; } = "NetSales";
     public string CcTips { get; set; } = "CreditCardTips";
     public string CashTips { get; set; } = "CashTips";
+
+    /// <summary>
+    /// How the night's takings were tendered.
+    ///
+    /// These default to the literal <c>0</c>, not to a column name, and that is
+    /// deliberate. They are interpolated straight into the Z query, so a default
+    /// naming a column that a given schema does not have would make the whole
+    /// statement fail — losing that bar's sales and tips to gain a split. A
+    /// literal zero is valid SQL against any relation and reads downstream as
+    /// "not reported". The 2Touch profile fills in the real expressions; a
+    /// hand-mapped schema keeps reporting zero until someone maps them.
+    /// </summary>
+    public string CashSales { get; set; } = "0";
+    public string CardSales { get; set; } = "0";
 
     /// <summary>
     /// Whether <see cref="Date"/> carries a time component.

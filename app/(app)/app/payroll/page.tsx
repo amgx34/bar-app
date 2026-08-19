@@ -124,7 +124,7 @@ export default async function PayrollPage({
 
         {tab === 'split' && (
           <Suspense fallback={<div>Loading...</div>}>
-            <DaySplitTab />
+            <DaySplitTab canEdit={canManagePayroll(role)} />
           </Suspense>
         )}
 

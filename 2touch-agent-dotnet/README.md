@@ -448,6 +448,48 @@ faithful copy of the real schema) have been run — see `testdata/README.md`.
 | EW Report  | `employee_shifts`, `z_report_server_tips` | Payroll, per-server tips |
 | Item Audit | `inventory_items`, `inventory_categories` | Inventory, analytics     |
 
+### Cash vs card (1.1.0)
+
+The Z feed also reports how the night was tendered, from the payments tables:
+
+```
+cash sales = SUM(fAmount - fCashPaidBack)  WHERE lPaymentType = cash
+card sales = SUM(fAmount)                  WHERE lPaymentType IN (credit, credit refund)
+```
+
+`fCashPaidBack` matters. `fAmount` on a cash payment is what the customer handed
+over, so a $20 note against a $12 tab is a $20 row with $8 of change — counting
+it whole would overstate the drawer every night. Rail shows *cash sales less
+cash tips* as what should be in the till at close.
+
+`SyncService.TenderWarning` logs a line when the split lands far from net sales
+(below 0.8x or above 1.6x). The band is wide on purpose: payments carry tax and
+tips that net sales does not, so the two are never equal — it is watching for a
+schema where those payment fields mean something else, not auditing arithmetic.
+
+**An upgraded install picks this up on its own.** The column map — and for a
+2Touch box the entire derived table — lives in `appsettings.local.json`, which
+`rail-update.exe` does not touch: it replaces the binary, nothing else. Left
+alone, every upgraded box would keep running its old four-column Z query and
+report no split until somebody drove to that POS.
+
+So `Setup/ProfileMigration.cs` recognises the exact Z source that setup wrote up
+to 1.0.0 and substitutes the current one at startup, in memory. The file on disk
+is not rewritten — it holds the agent token and SQL credentials, and a service
+editing it to gain a column mapping is a poor trade. Each start re-derives it,
+and the sync log says so.
+
+The match is against the whole text, not a keyword. A config that was hand-mapped
+to another schema, or a profile someone has since edited — which the section above
+invites — is never replaced. Those, and any config whose mapping simply has no
+entry for the split, fall back to the literal `0`: valid SQL against any relation,
+reading downstream as "not reported". That default is deliberately not a column
+name, because a name some schema lacks would fail the entire Z query and lose that
+bar's sales and tips to gain a split.
+
+Re-running `rail-setup.exe` still makes it permanent, and is the only way to get
+the split onto a hand-mapped schema.
+
 ### The trading day
 
 A bar open 17:00–03:00 trades across two calendar dates. 2Touch records only

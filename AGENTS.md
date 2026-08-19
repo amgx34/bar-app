@@ -80,6 +80,19 @@ against `pos_stock_applications` — never subtract what the POS reports, subtra
 the difference from what was already applied. `pos_apply_item_sales()` does this
 atomically; see `supabase/migrations/20260817000003_*.sql`.
 
+**Cash tips entered by a person outrank the POS.** `z_report_days.cash_tips` has
+two writers: the agent's Z feed and the payroll close screen
+(`app/(app)/app/payroll/cash-actions.ts`). The agent re-sends a two-day window
+every 5 minutes and 2Touch reports 0 cash tips for nearly every bar, so an
+unguarded upsert erases a manager's jar count minutes after it is entered.
+`cash_tips_source = 'manual'` freezes the figure; every POS writer — ingest,
+`lib/2touch/poll-emails.ts`, the Clover sync — must honour it.
+
+`z_report_days.cash_sales` / `card_sales` are **nullable with no default**, and
+NULL means "the POS did not report the split" — not "the night took no cash".
+Older agents, emailed Z reports and pre-1.1.0 configs all send nothing. The UI
+shows the drawer panel only when the figure is non-null.
+
 Deals ("Bucket of 5 Domestic") are recipes in `pos_bundles` + `pos_bundle_components`,
 resolved by `lib/pos/bundles.ts`. Exclusions (`pos_excluded_items`) are filtered
 BEFORE bundles are resolved, so an item that is both is never expanded —

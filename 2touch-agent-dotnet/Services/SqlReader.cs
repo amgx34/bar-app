@@ -117,9 +117,11 @@ public class SqlReader(IOptions<AgentConfig> cfg)
 
     public static string ZReportSql(string table, ZReportColumns c, int lookbackDays, int cutoffHour, int? top = null) => $"""
         SELECT {Top(top)}{BusinessDate(c.Date, cutoffHour)} AS report_date,
-               SUM({c.Sales})    AS total_sales,
-               SUM({c.CcTips})   AS cc_tips,
-               SUM({c.CashTips}) AS cash_tips
+               SUM({c.Sales})     AS total_sales,
+               SUM({c.CcTips})    AS cc_tips,
+               SUM({c.CashTips})  AS cash_tips,
+               SUM({c.CashSales}) AS cash_sales,
+               SUM({c.CardSales}) AS card_sales
         FROM {Source(table, lookbackDays, cutoffHour)}
         WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'
         GROUP BY {BusinessDate(c.Date, cutoffHour)}
@@ -168,7 +170,9 @@ public class SqlReader(IOptions<AgentConfig> cfg)
                 DateStr(r["report_date"]),
                 Dec(r["total_sales"]),
                 Dec(r["cc_tips"]),
-                Dec(r["cash_tips"])));
+                Dec(r["cash_tips"]),
+                Dec(r["cash_sales"]),
+                Dec(r["card_sales"])));
         }
         return rows;
     }

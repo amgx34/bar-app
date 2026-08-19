@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { Clock, ArrowLeftRight, Sunrise } from 'lucide-react';
+import { Clock, ArrowLeftRight, Sunrise, UserMinus } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -13,10 +13,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { FormStatus } from '@/components/ui/form-status';
-import { adjustShiftHours, transferTips, setOpener } from '../adjust-actions';
+import { adjustShiftHours, transferTips, setOpener, removeFromShift } from '../adjust-actions';
 import type { PayrollEntry } from '../actions';
 
-type Mode = 'hours' | 'transfer' | 'opener';
+type Mode = 'hours' | 'transfer' | 'opener' | 'remove';
 
 /**
  * Manual corrections to one person's pay.
@@ -109,6 +109,14 @@ export function AdjustDialog({
       return;
     }
 
+    if (mode === 'remove') {
+      run(
+        () => removeFromShift({ employeeId: entry.employeeId, shiftDate, reason }),
+        `${entry.employeeName} removed from that night`,
+      );
+      return;
+    }
+
     run(
       () => setOpener({ employeeId: entry.employeeId, shiftDate }),
       `${entry.employeeName} marked as opener`,
@@ -119,6 +127,7 @@ export function AdjustDialog({
     { key: 'hours', label: 'Hours', icon: Clock },
     { key: 'transfer', label: 'Move tips', icon: ArrowLeftRight },
     { key: 'opener', label: 'Opener', icon: Sunrise },
+    { key: 'remove', label: 'Remove', icon: UserMinus },
   ];
 
   return (
@@ -226,6 +235,15 @@ export function AdjustDialog({
             </>
           )}
 
+          {mode === 'remove' && (
+            <p className="text-sm text-muted-foreground">
+              Sets {entry.employeeName}&rsquo;s hours to zero for that night — for a
+              missed clock-out, or a shift the POS logged against the wrong person.
+              The row stays with your reason attached, so the next POS sync cannot
+              quietly put the hours back.
+            </p>
+          )}
+
           {mode === 'opener' && (
             <p className="text-sm text-muted-foreground">
               Marks {entry.employeeName} as the opener for that night. Only one
@@ -250,7 +268,7 @@ export function AdjustDialog({
 
           <div className="flex items-center gap-2 pt-1">
             <Button onClick={submit} disabled={isPending}>
-              {isPending ? 'Saving…' : 'Save change'}
+              {isPending ? 'Saving…' : mode === 'remove' ? 'Remove from shift' : 'Save change'}
             </Button>
             <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isPending}>
               Cancel

@@ -14,9 +14,9 @@ import {
 import {
   COST_TYPE_LABEL, COST_TYPE_HELP, type CostType,
 } from '@/lib/books/cost-structure';
-import { createCategory, deleteCategory, updateCategoryCostType } from '../actions';
+import { createCategory, deleteCategory, updateCategoryCostType, updateCategoryPour } from '../actions';
 
-type Category = { id: string; name: string; cost_type?: string | null };
+type Category = { id: string; name: string; cost_type?: string | null; default_pour_oz?: number | null };
 
 type Props = {
   open: boolean;
@@ -61,6 +61,27 @@ export function CategoriesDialog({ open, onOpenChange, categories }: Props) {
         toast.success('Category removed');
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Could not remove that category');
+      }
+    });
+  }
+
+  function handlePour(category: Category, raw: string) {
+    const trimmed = raw.trim();
+    const pour = trimmed === '' ? null : Number(trimmed);
+    if (pour !== null && (!Number.isFinite(pour) || pour <= 0)) {
+      toast.error('Enter a pour size greater than zero, or leave it blank');
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await updateCategoryPour(category.id, pour);
+        toast.success(
+          pour === null
+            ? `${category.name} no longer has a default pour`
+            : `${category.name} pours ${pour}oz`,
+        );
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Could not update that pour size');
       }
     });
   }
@@ -124,7 +145,12 @@ export function CategoriesDialog({ open, onOpenChange, categories }: Props) {
                           className="h-8 w-[9.5rem]"
                           aria-label={`How ${c.name} is counted`}
                         >
-                          <SelectValue />
+                          {/* Without a formatter this reads "beverage_cogs"
+                              rather than "Beverage" — Base UI renders the raw
+                              value, not the chosen item's label. */}
+                          <SelectValue>
+                            {(value) => SHORT_LABEL[value as CostType] ?? SHORT_LABEL[costType]}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {COST_TYPES.map((t) => (
@@ -132,6 +158,24 @@ export function CategoriesDialog({ open, onOpenChange, categories }: Props) {
                           ))}
                         </SelectContent>
                       </Select>
+
+                      {/* Only offered for cost-of-sales categories: a pour size
+                          on napkins would be meaningless, and an input that does
+                          nothing is worse than no input. */}
+                      {(costType === 'beverage_cogs' || costType === 'food_cogs') && (
+                        <Input
+                          type="number" min="0" step="0.25" inputMode="decimal"
+                          defaultValue={c.default_pour_oz ?? ''}
+                          onBlur={(e) => {
+                            const next = e.target.value.trim();
+                            const current = c.default_pour_oz == null ? '' : String(c.default_pour_oz);
+                            if (next !== current) handlePour(c, next);
+                          }}
+                          aria-label={`Default pour for ${c.name}, in ounces`}
+                          placeholder="oz"
+                          className="h-8 w-[4.5rem] shrink-0"
+                        />
+                      )}
 
                       <button
                         type="button"
@@ -167,6 +211,13 @@ export function CategoriesDialog({ open, onOpenChange, categories }: Props) {
               })}
             </ul>
           )}
+
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Pour (oz)</span> is what one
+            sale takes out of a container. A 1.5oz pour from a 750ml bottle deducts a
+            seventeenth of it, instead of a whole bottle. Leave blank for anything sold
+            as a whole unit, like bottled beer.
+          </p>
 
           <p className="text-xs text-muted-foreground">
             Changes apply to the Books page immediately, including past periods —

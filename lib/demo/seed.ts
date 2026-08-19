@@ -274,12 +274,20 @@ export async function seedDemoOrg(admin: SupabaseClient, userId: string): Promis
     const reportDate = dateStr(night.offset);
 
     // z_report_days
+    //
+    // The tender split is seeded so a demo bar sees the drawer figure the real
+    // feature produces. A third in cash is about right for a neighbourhood bar;
+    // the rest on cards. Rounded to cents because the column is NUMERIC(12,2)
+    // and an unrounded float would be silently truncated anyway.
+    const cashSales = Math.round(night.sales * 0.34 * 100) / 100;
     await admin.from('z_report_days').upsert({
       organization_id: orgId,
       report_date: reportDate,
       total_sales: night.sales,
       cash_tips: 0,
       cc_tips: night.ccTips,
+      cash_sales: cashSales,
+      card_sales: Math.round((night.sales - cashSales) * 100) / 100,
     }, { onConflict: 'organization_id,report_date' });
 
     // z_report_server_tips

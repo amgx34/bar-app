@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHmac }                from 'crypto';
 import { createAdminClient }         from '@/lib/supabase/admin';
 import { buildExclusionSet, isExcluded, posItemMatchKey } from '@/lib/pos/excluded-items';
-import { resolveSales, toRpcComponents, type BundleRecipe } from '@/lib/pos/bundles';
+import { resolveSales, toRpcComponents, type BundleRecipe, type InventoryRef } from '@/lib/pos/bundles';
 
 export const runtime     = 'nodejs';
 export const maxDuration = 30;
@@ -29,6 +29,10 @@ type ZReportRow = {
   total_sales: number;
   cc_tips:     number;
   cash_tips:   number;
+  // Tender split. Absent from agents older than 1.1 — undefined is stored as
+  // NULL ("not reported"), never coerced to 0 ("took no cash").
+  cash_sales?: number;
+  card_sales?: number;
 };
 
 type EWReportRow = {
@@ -90,26 +94,34 @@ async function resolveOrgAndVerify(
   body:    string,
   sig:     string,
   orgId:   string,
-): Promise<{ valid: boolean; orgId: string | null; posConfig: Record<string, unknown> }> {
+): Promise<{
+  valid: boolean;
+  orgId: string | null;
+  posConfig: Record<string, unknown>;
+  barSettings: Record<string, unknown>;
+}> {
   const supabase = createAdminClient();
 
   // Fetch the specific org — never scan all orgs
   const { data: org } = await supabase
     .from('organizations')
-    .select('id, pos_provider, pos_config')
+    // bar_settings comes along for the org-wide pour default, the last step of
+    // the item -> category -> org chain in lib/pos/pour.ts.
+    .select('id, pos_provider, pos_config, bar_settings')
     .eq('id', orgId)
     .eq('pos_provider', '2touch')
     .single();
 
-  if (!org) return { valid: false, orgId: null, posConfig: {} };
+  if (!org) return { valid: false, orgId: null, posConfig: {}, barSettings: {} };
 
   const cfg         = (org.pos_config ?? {}) as Record<string, unknown>;
+  const settings    = (org.bar_settings ?? {}) as Record<string, unknown>;
   const agentToken  = cfg.agent_token as string | null;
 
   // If no token stored yet, fall back to the global TWOTOUCH_INGEST_SECRET
   // (backwards-compat for initial setup before per-org tokens existed)
   const secret = agentToken ?? process.env.TWOTOUCH_INGEST_SECRET;
-  if (!secret) return { valid: false, orgId: null, posConfig: cfg };
+  if (!secret) return { valid: false, orgId: null, posConfig: cfg, barSettings: settings };
 
   // Sign the RAW request body bytes — never a re-serialized copy.
   // The agent signs exactly the bytes it sends, so the signature is identical
@@ -118,7 +130,7 @@ async function resolveOrgAndVerify(
   // and .NET's System.Text.Json). Backward-compatible with the Node agent,
   // which already signs the exact string it POSTs.
   const expected = createHmac('sha256', secret).update(body).digest('hex');
-  return { valid: expected === sig, orgId: org.id, posConfig: cfg };
+  return { valid: expected === sig, orgId: org.id, posConfig: cfg, barSettings: settings };
 }
 
 /**
@@ -194,7 +206,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { valid, orgId: resolvedOrgId, posConfig } = await resolveOrgAndVerify(body, sig, orgId);
+  const { valid, orgId: resolvedOrgId, posConfig, barSettings } = await resolveOrgAndVerify(body, sig, orgId);
   if (!valid || !resolvedOrgId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -221,15 +233,47 @@ export async function POST(req: NextRequest) {
   // ── Z Reports → z_report_days ─────────────────────────────────────────────
 
   if (data.zReports?.length) {
-    const rows = data.zReports
-      .filter(r => r.report_date && r.total_sales >= 0)
-      .map(r => ({
+    const incoming = data.zReports.filter(r => r.report_date && r.total_sales >= 0);
+
+    // Cash tips a person counted are protected from being overwritten.
+    //
+    // This endpoint receives a rolling two-day window every five minutes, and
+    // 2Touch reports 0 cash tips for nearly every bar because nobody rings them
+    // in. Left alone, the sync would erase a manager's jar count minutes after
+    // it was entered, silently, every night. Rows marked 'manual' keep the
+    // figure they were given; see the migration for the reasoning.
+    const manualCashTips = new Map<string, number>();
+    if (incoming.length) {
+      const { data: existing } = await supabase
+        .from('z_report_days')
+        .select('report_date, cash_tips, cash_tips_source')
+        .eq('organization_id', resolvedOrgId)
+        .eq('cash_tips_source', 'manual')
+        .in('report_date', incoming.map(r => r.report_date));
+
+      for (const row of existing ?? []) {
+        manualCashTips.set(row.report_date, Number(row.cash_tips) || 0);
+      }
+    }
+
+    const money = (n: number) => Math.round(n * 100) / 100;
+
+    const rows = incoming.map(r => {
+      const manual = manualCashTips.get(r.report_date);
+      return {
         organization_id: resolvedOrgId,
         report_date:     r.report_date,
-        total_sales:     Math.round(r.total_sales  * 100) / 100,
-        cc_tips:         Math.round((r.cc_tips   ?? 0) * 100) / 100,
-        cash_tips:       Math.round((r.cash_tips ?? 0) * 100) / 100,
-      }));
+        total_sales:     money(r.total_sales),
+        cc_tips:         money(r.cc_tips ?? 0),
+        cash_tips:       manual ?? money(r.cash_tips ?? 0),
+        cash_tips_source: manual === undefined ? 'pos' : 'manual',
+        // Undefined stays NULL. An older agent that cannot report the split is
+        // saying "I don't know", and writing 0 would turn that into a claim
+        // that the night was card-only.
+        cash_sales:      r.cash_sales === undefined ? null : money(r.cash_sales),
+        card_sales:      r.card_sales === undefined ? null : money(r.card_sales),
+      };
+    });
 
     if (rows.length) {
       const { error } = await supabase
@@ -371,7 +415,7 @@ export async function POST(req: NextRequest) {
     // inventory item — that is the phantom-stock problem this exists to end.
     const { data: bundleRows, error: bundleErr } = await supabase
       .from('pos_bundles')
-      .select('id, match_key, pos_bundle_components(inventory_item_id, quantity)')
+      .select('id, match_key, pos_bundle_components(inventory_item_id, quantity, unit)')
       .eq('organization_id', resolvedOrgId)
       .eq('is_active', true);
 
@@ -386,6 +430,7 @@ export async function POST(req: NextRequest) {
       components: (b.pos_bundle_components ?? []).map((c) => ({
         inventory_item_id: c.inventory_item_id,
         quantity: Number(c.quantity),
+        unit: (c.unit === 'oz' ? 'oz' : 'each') as 'each' | 'oz',
       })),
     }));
     const bundleKeySet = new Set(bundles.map((b) => b.match_key));
@@ -451,17 +496,33 @@ export async function POST(req: NextRequest) {
     // is most of them on every sync after the first.
     const { data: allItems, error: itemsErr } = await supabase
       .from('inventory_items')
-      .select('id, name')
+      .select('id, name, bottle_size_ml, pour_size_oz, inventory_categories(default_pour_oz)')
       .eq('organization_id', resolvedOrgId);
 
     if (itemsErr) result.errors.push(`inventory_items lookup: ${itemsErr.message}`);
 
-    const idByMatchKey = new Map<string, string>();
+    // Pour figures travel with the item so depletion can convert a shot into a
+    // fraction of a bottle. Without this a spirit sold 185 times removed 185
+    // bottles. See lib/pos/pour.ts.
+    const itemsByMatchKey = new Map<string, InventoryRef>();
     for (const item of allItems ?? []) {
-      idByMatchKey.set(posItemMatchKey(item.name), item.id);
+      const cat = item.inventory_categories as unknown;
+      const catObj = Array.isArray(cat) ? cat[0] : cat;
+      itemsByMatchKey.set(posItemMatchKey(item.name), {
+        id: item.id,
+        bottleSizeMl: item.bottle_size_ml === null ? null : Number(item.bottle_size_ml),
+        pourSizeOz: item.pour_size_oz === null ? null : Number(item.pour_size_oz),
+        categoryPourOz:
+          (catObj as { default_pour_oz?: number | null } | undefined)?.default_pour_oz ?? null,
+      });
     }
 
-    const resolved = resolveSales(data.itemAudit, bundles, idByMatchKey);
+    // Org-wide fallback, the last step of the item -> category -> org chain.
+    const orgPourOz = Number(
+      (barSettings as { default_pour_oz?: number }).default_pour_oz,
+    ) || null;
+
+    const resolved = resolveSales(data.itemAudit, bundles, itemsByMatchKey, orgPourOz);
     result.bundlesExpanded = resolved.bundleKeys.size;
     result.unresolvedItems = resolved.unresolvedNames.length;
 

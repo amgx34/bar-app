@@ -55,6 +55,16 @@ public static class LocalConfigWriter
                     ["Sales"]    = cfg.Columns.ZReport.Sales,
                     ["CcTips"]   = cfg.Columns.ZReport.CcTips,
                     ["CashTips"] = cfg.Columns.ZReport.CashTips,
+                    // Written even when they are the literal "0", so a config
+                    // that predates the cash/card split is visibly not mapped
+                    // rather than silently absent.
+                    ["CashSales"] = cfg.Columns.ZReport.CashSales,
+                    ["CardSales"] = cfg.Columns.ZReport.CardSales,
+                    // Decided from the date column's SQL type during setup. It
+                    // must be written: a plain DATE has already been rounded to
+                    // a calendar day, and re-applying the business-day cutoff to
+                    // it files a whole night against the wrong date.
+                    ["DateHasTime"] = cfg.Columns.ZReport.DateHasTime,
                 },
                 ["EwReport"] = new JsonObject
                 {
@@ -64,6 +74,7 @@ public static class LocalConfigWriter
                     ["TipsPaidOut"]   = cfg.Columns.EwReport.TipsPaidOut,
                     ["RegularHours"]  = cfg.Columns.EwReport.RegularHours,
                     ["OvertimeHours"] = cfg.Columns.EwReport.OvertimeHours,
+                    ["DateHasTime"]   = cfg.Columns.EwReport.DateHasTime,
                 },
                 ["ItemAudit"] = new JsonObject
                 {
@@ -72,6 +83,7 @@ public static class LocalConfigWriter
                     ["Category"] = cfg.Columns.ItemAudit.Category,
                     ["QtySold"]  = cfg.Columns.ItemAudit.QtySold,
                     ["NetSales"] = cfg.Columns.ItemAudit.NetSales,
+                    ["DateHasTime"] = cfg.Columns.ItemAudit.DateHasTime,
                 },
             },
             ["Sync"] = new JsonObject

@@ -61,29 +61,42 @@ public static class TwoTouchProfile
             SELECT h.dtmTicketDate          AS BusinessDate,
                    h.fNetAmt                AS NetSales,
                    CAST(0 AS FLOAT)         AS CcTips,
-                   CAST(0 AS FLOAT)         AS CashTips
+                   CAST(0 AS FLOAT)         AS CashTips,
+                   CAST(0 AS FLOAT)         AS CashSales,
+                   CAST(0 AS FLOAT)         AS CardSales
             FROM dbo.tblSalesHdrHist h
             WHERE h.dtmTicketDate >= '{cutoff}'
             UNION ALL
-            SELECT h.dtmTicketDate, h.fNetAmt, 0, 0
+            SELECT h.dtmTicketDate, h.fNetAmt, 0, 0, 0, 0
             FROM dbo.tblSalesDailyHdr h
             WHERE h.dtmTicketDate >= '{cutoff}'
             UNION ALL
             SELECT p.dtmPmntDate, 0,
                    CASE WHEN p.lPaymentType IN ({{CreditPayment}}, {{CreditRefund}}) THEN ISNULL(p.fTipAmt, 0) ELSE 0 END,
-                   CASE WHEN p.lPaymentType = {{Cash}}                               THEN ISNULL(p.fTipAmt, 0) ELSE 0 END
+                   CASE WHEN p.lPaymentType = {{Cash}}                               THEN ISNULL(p.fTipAmt, 0) ELSE 0 END,
+                   -- Cash actually kept: tendered less any change handed back.
+                   -- fAmount alone is what the customer put on the bar, so a $20
+                   -- note against a $12 tab would overstate takings by the $8.
+                   CASE WHEN p.lPaymentType = {{Cash}}
+                        THEN ISNULL(p.fAmount, 0) - ISNULL(p.fCashPaidBack, 0) ELSE 0 END,
+                   CASE WHEN p.lPaymentType IN ({{CreditPayment}}, {{CreditRefund}})
+                        THEN ISNULL(p.fAmount, 0) ELSE 0 END
             FROM dbo.tblSalesHistPmnts p
             WHERE p.dtmPmntDate >= '{cutoff}'
             UNION ALL
             SELECT p.dtmPmntDate, 0,
                    CASE WHEN p.lPaymentType IN ({{CreditPayment}}, {{CreditRefund}}) THEN ISNULL(p.fTipAmt, 0) ELSE 0 END,
-                   CASE WHEN p.lPaymentType = {{Cash}}                               THEN ISNULL(p.fTipAmt, 0) ELSE 0 END
+                   CASE WHEN p.lPaymentType = {{Cash}}                               THEN ISNULL(p.fTipAmt, 0) ELSE 0 END,
+                   CASE WHEN p.lPaymentType = {{Cash}}
+                        THEN ISNULL(p.fAmount, 0) - ISNULL(p.fCashPaidBack, 0) ELSE 0 END,
+                   CASE WHEN p.lPaymentType IN ({{CreditPayment}}, {{CreditRefund}})
+                        THEN ISNULL(p.fAmount, 0) ELSE 0 END
             FROM dbo.tblSalesDailyPmnts p
             WHERE p.dtmPmntDate >= '{cutoff}'
         ) AS rail_z
         """,
         ["tblSalesHdrHist", "tblSalesDailyHdr", "tblSalesHistPmnts", "tblSalesDailyPmnts"],
-        "net sales per ticket, plus the cash/credit tip split per payment");
+        "net sales per ticket, plus the cash/credit split of both tips and takings per payment");
 
     public static readonly ProfileFeed EwReport = new(
         FeedSpecs.EwReportKey,
@@ -164,6 +177,7 @@ public static class TwoTouchProfile
                 cfg.Columns.ZReport = new ZReportColumns
                 {
                     Date = "[BusinessDate]", Sales = "[NetSales]", CcTips = "[CcTips]", CashTips = "[CashTips]",
+                    CashSales = "[CashSales]", CardSales = "[CardSales]",
                 };
                 break;
 

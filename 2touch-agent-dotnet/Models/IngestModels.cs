@@ -7,7 +7,11 @@ public sealed record ZReportRow(
     string report_date,
     decimal total_sales,
     decimal cc_tips,
-    decimal cash_tips);
+    decimal cash_tips,
+    // How the night's takings were tendered. Zero when the schema cannot
+    // supply the split — Rail treats that as "not reported", not as "no cash".
+    decimal cash_sales,
+    decimal card_sales);
 
 public sealed record EwReportRow(
     string shift_date,

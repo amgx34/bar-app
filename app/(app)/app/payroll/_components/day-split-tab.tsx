@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { getDaySplitData, DaySplitData, DaySplitEmployee } from '../actions';
+import { CashTipsCard } from './cash-tips-card';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -91,12 +92,15 @@ function computeSplit(
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function DaySplitTab() {
+export default function DaySplitTab({ canEdit = false }: { canEdit?: boolean }) {
   const [date, setDate] = useState(toLocalDateStr(new Date()));
   const [data, setData] = useState<DaySplitData | null>(null);
   const [loading, setLoading] = useState(false);
   const [noData, setNoData] = useState(false);
   const [states, setStates] = useState<Record<string, RowState>>({});
+  // Bumped after cash tips are logged, so the split below re-reads the total it
+  // is derived from rather than showing a figure that is now stale.
+  const [refresh, setRefresh] = useState(0);
 
   // Fetch data whenever date changes
   useEffect(() => {
@@ -117,7 +121,7 @@ export default function DaySplitTab() {
       setStates(init);
     });
     return () => { cancelled = true; };
-  }, [date]);
+  }, [date, refresh]);
 
   const toggleActive = (id: string) =>
     setStates((s) => ({ ...s, [id]: { ...s[id], active: !s[id]?.active } }));
@@ -151,6 +155,12 @@ export default function DaySplitTab() {
           className="ml-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
         />
       </div>
+
+      <CashTipsCard
+        date={date}
+        canEdit={canEdit}
+        onSaved={() => setRefresh((n) => n + 1)}
+      />
 
       {/* Loading */}
       {loading && <p className="text-sm text-muted-foreground">Loading…</p>}

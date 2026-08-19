@@ -11,6 +11,7 @@ export type BundleComponentRow = {
   inventory_item_id: string;
   item_name: string;
   quantity: number;
+  unit: 'each' | 'oz';
 };
 
 export type BundleRow = {
@@ -30,6 +31,12 @@ const componentSchema = z.object({
   inventory_item_id: z.string().uuid(),
   // Fractional on purpose: a pitcher is a real fraction of a keg.
   quantity: z.number().positive('Quantity must be greater than zero').max(1000),
+  /**
+   * 'each' = whole stock units, as the bar counts them. 'oz' = a measured pour,
+   * converted through the item's bottle size — which is what makes a mixed
+   * drink expressible. Defaults to 'each' so existing recipes are unchanged.
+   */
+  unit: z.enum(['each', 'oz']).default('each'),
 });
 
 const bundleSchema = z.object({
@@ -52,7 +59,7 @@ export async function listBundles(): Promise<BundleRow[]> {
   const { data } = await supabase
     .from('pos_bundles')
     .select(
-      'id, item_name, is_active, pos_bundle_components(inventory_item_id, quantity, inventory_items(name))',
+      'id, item_name, is_active, pos_bundle_components(inventory_item_id, quantity, unit, inventory_items(name))',
     )
     .eq('organization_id', org.id)
     .order('item_name');
@@ -70,6 +77,7 @@ export async function listBundles(): Promise<BundleRow[]> {
         inventory_item_id: c.inventory_item_id,
         item_name: (item as { name?: string })?.name ?? 'Unknown item',
         quantity: Number(c.quantity),
+        unit: (c.unit === 'oz' ? 'oz' : 'each') as 'each' | 'oz',
       };
     }),
   }));
@@ -124,9 +132,14 @@ export async function saveBundle(raw: unknown): Promise<{
   // A component list naming the same item twice would violate the UNIQUE
   // constraint on (bundle_id, inventory_item_id); sum instead of failing, which
   // is what someone adding "Well Vodka x1" twice meant anyway.
-  const merged = new Map<string, number>();
+  // Keyed by item AND unit: adding "2 each" to "0.5 oz" would be adding two
+  // different measures, and the result would be neither.
+  const merged = new Map<string, { itemId: string; unit: 'each' | 'oz'; quantity: number }>();
   for (const c of input.components) {
-    merged.set(c.inventory_item_id, (merged.get(c.inventory_item_id) ?? 0) + c.quantity);
+    const key = `${c.inventory_item_id}|${c.unit}`;
+    const existing = merged.get(key);
+    if (existing) existing.quantity += c.quantity;
+    else merged.set(key, { itemId: c.inventory_item_id, unit: c.unit, quantity: c.quantity });
   }
 
   // Guard against a recipe that consumes the deal itself, which would make the
@@ -135,7 +148,7 @@ export async function saveBundle(raw: unknown): Promise<{
     .from('inventory_items')
     .select('id, name')
     .eq('organization_id', org.id)
-    .in('id', [...merged.keys()]);
+    .in('id', [...new Set([...merged.values()].map((m) => m.itemId))]);
 
   for (const item of ownItems ?? []) {
     if (posItemMatchKey(item.name) === matchKey) {
@@ -146,7 +159,8 @@ export async function saveBundle(raw: unknown): Promise<{
   // Every component must belong to this org. The ids arrive from the browser,
   // so this is the gate — pos_bundle_components has no organization_id of its
   // own to filter on later.
-  if ((ownItems ?? []).length !== merged.size) {
+  const distinctItemIds = new Set([...merged.values()].map((m) => m.itemId));
+  if ((ownItems ?? []).length !== distinctItemIds.size) {
     throw new Error('One of those items is no longer in your inventory');
   }
 
@@ -181,10 +195,11 @@ export async function saveBundle(raw: unknown): Promise<{
   // admin-scope-ok: as above — bundle.id is this org's, and every
   // inventory_item_id was verified in-org by the ownItems check.
   const { error: insertErr } = await supabase.from('pos_bundle_components').insert(
-    [...merged.entries()].map(([inventory_item_id, quantity]) => ({
+    [...merged.values()].map((m) => ({
       bundle_id: bundle.id,
-      inventory_item_id,
-      quantity,
+      inventory_item_id: m.itemId,
+      quantity: m.quantity,
+      unit: m.unit,
     })),
   );
   if (insertErr) throw new Error(`Could not save those components: ${insertErr.message}`);

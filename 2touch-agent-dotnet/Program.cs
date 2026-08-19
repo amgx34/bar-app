@@ -109,6 +109,12 @@ builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, relo
 builder.Services.AddWindowsService(options => options.ServiceName = ServiceControl.ServiceName);
 
 builder.Services.Configure<AgentConfig>(builder.Configuration.GetSection("Agent"));
+
+// rail-update.exe can only replace the binary — the schema mapping lives in
+// appsettings.local.json, so an upgraded box would keep running the query its
+// setup wrote in 2024 and never report anything this build added. Runs after
+// binding, and only ever replaces text setup itself generated.
+builder.Services.PostConfigure<AgentConfig>(ProfileMigration.Apply);
 builder.Services.AddHttpClient("rail", c => c.Timeout = TimeSpan.FromSeconds(60));
 builder.Services.AddSingleton<SqlReader>();
 builder.Services.AddSingleton<RailClient>();

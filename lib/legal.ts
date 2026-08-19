@@ -10,10 +10,10 @@
  *   - Do NOT bump it for a typo fix. That would force a re-prompt for every
  *     user and muddy the record with acceptances that mean nothing.
  */
-export const TERMS_VERSION = '2026-08-17';
+export const TERMS_VERSION = '2026-08-19';
 
 /** Shown on the page. Kept beside the version so the two cannot drift. */
-export const TERMS_UPDATED = '2026-08-17';
+export const TERMS_UPDATED = '2026-08-19';
 
 export const PRIVACY_UPDATED = '2026-08-17';
 
@@ -25,28 +25,33 @@ export const PRIVACY_UPDATED = '2026-08-17';
  * Windows machine. Tying them together would force a re-acceptance of the
  * service terms every time the agent shipped a licence clarification.
  */
-export const EULA_VERSION = '2026-08-17';
-export const EULA_UPDATED = '2026-08-17';
+export const EULA_VERSION = '2026-08-19';
+export const EULA_UPDATED = '2026-08-19';
 
 /** Where policy questions go. */
 export const LEGAL_CONTACT_EMAIL = 'railsystemspos@gmail.com';
 
 /**
- * Governing law for the Terms.
+ * Governing law for the Terms and the agent EULA.
  *
- * Deliberately null, and the Terms page omits the whole governing-law section
- * while it stays null — the same rule the LocalBusiness address follows in
- * lib/site.ts. Naming a state Rail is not actually organised in would be worse
- * than saying nothing: it is the one clause a court reads first, and an
- * invented one is both unenforceable and evidence of carelessness about the
- * rest of the document.
+ * Both pages render the governing-law section only when this is non-null. It
+ * stayed null until there was a real answer, because it is the one clause a
+ * court reads first: naming a state the business is not organised in is both
+ * unenforceable and evidence of carelessness about the rest of the document.
  *
- * FILL IN before launch, e.g. { state: 'Texas', venue: 'Harris County, Texas' }.
+ * `venue` is the county whose courts hear a dispute, and it must be a county
+ * that exists within `state` — the two are rendered in the same sentence.
  */
-export const GOVERNING_LAW: { state: 'Ohio'; venue: 'Hamilton County, Ohio' } | null = null;
+export const GOVERNING_LAW: { state: string; venue: string } | null = {
+  state: 'Ohio',
+  venue: 'Hamilton County, Ohio',
+};
 
 /**
- * Legal entity name. Null until incorporated — the Terms fall back to the
- * product name, which is honest for a sole operator and wrong for a company.
+ * Legal entity name — who the contract is actually with.
+ *
+ * Both policy pages fall back to the product name when this is null, which is
+ * honest for a sole operator and wrong once there is an entity. Written exactly
+ * as it is registered, because this is the name a user is agreeing with.
  */
-export const LEGAL_ENTITY_NAME: 'Rail Pos Systems' | null = null;
+export const LEGAL_ENTITY_NAME: string | null = 'Rail Pos Systems';

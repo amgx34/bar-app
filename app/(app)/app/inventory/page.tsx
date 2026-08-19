@@ -43,7 +43,7 @@ export default async function InventoryPage({
 
   const [{ data: items, error }, { data: categories }, { data: reps }, { data: usageLogs }] = await Promise.all([
     query,
-    supabase.from('inventory_categories').select('id, name, cost_type').eq('organization_id', org.id).order('name'),
+    supabase.from('inventory_categories').select('id, name, cost_type, default_pour_oz').eq('organization_id', org.id).order('name'),
     supabase.from('reps').select('id, name').eq('organization_id', org.id).eq('is_active', true).order('name'),
     supabase
       .from('usage_logs')
