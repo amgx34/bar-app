@@ -63,7 +63,9 @@ export function InventoryHeader({
       <div
         className="overflow-hidden"
         style={{
-          maxHeight: panelOpen ? '200px' : '0px',
+          // 400px, not 200: on a phone these filters wrap onto several rows and a
+          // 200px cap silently clipped the action buttons off the bottom.
+          maxHeight: panelOpen ? '400px' : '0px',
           opacity: panelOpen ? 1 : 0,
           transition: 'max-height 0.35s ease, opacity 0.25s ease',
         }}
@@ -120,8 +122,13 @@ export function InventoryHeader({
             ))}
           </div>
 
-          {/* Action buttons */}
-          <div className="flex gap-2 ml-auto">
+          {/* Action buttons.
+              Wraps, and only pushes right once there is room to. `ml-auto` on a
+              phone shoved this group past the panel's right edge, and the panel
+              clips with overflow-hidden — so "Add item", the primary action on
+              this screen, was invisible and unreachable rather than merely
+              awkward. */}
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:ml-auto">
             {canManageCategories(role) && (
               <Button
                 variant="outline"

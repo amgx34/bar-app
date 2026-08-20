@@ -180,7 +180,7 @@ function AddItemForm({
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className="space-y-1">
           <Label className="text-xs">Bottle Size (ml)</Label>
           <Input value={bottleSize} onChange={(e) => setBottleSize(e.target.value)} type="number" min="0" placeholder="750" className="h-8 text-sm" />
@@ -195,7 +195,7 @@ function AddItemForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <LevelInput label="Opening Level (0–1)" value={openLevel}  onChange={setOpenLevel}  />
         <LevelInput label="Closing Level (0–1)" value={closeLevel} onChange={setCloseLevel} />
         <div className="space-y-1">

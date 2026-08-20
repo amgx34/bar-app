@@ -89,9 +89,12 @@ export default function EmployeesTab({ employees: initialEmployees }: EmployeesT
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      {/* Wraps on a phone. The count block plus the "Set all tips" button group
+          measured ~500px side by side, which pushed the Employees tab 130px
+          wider than a 375px viewport and scrolled the whole page sideways. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
             <Users className="h-4 w-4 text-primary" />
           </div>
           <div>
@@ -108,9 +111,9 @@ export default function EmployeesTab({ employees: initialEmployees }: EmployeesT
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {employees.length > 0 && (
-            <div className="flex items-center gap-1.5 rounded-lg border px-2 py-1">
+            <div className="flex flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1">
               <span className="text-xs text-muted-foreground pr-1">Set all tips:</span>
               <button
                 onClick={() => handleBulkTipMode('pool')}

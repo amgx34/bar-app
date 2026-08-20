@@ -1,0 +1,213 @@
+- generic [ref=e1]:
+  - link "Skip to content" [ref=e932] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=e3]:
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - generic [ref=e9]:
+          - generic [ref=e10]: Menu
+          - list [ref=e12]:
+            - listitem [ref=e13]:
+              - link "Dashboard" [ref=e933] [cursor=pointer]:
+                - /url: /app/dashboard
+            - listitem [ref=e19]:
+              - button "Inventory" [ref=e934] [cursor=pointer]
+            - listitem [ref=e28]:
+              - link "Reps" [ref=e935] [cursor=pointer]:
+                - /url: /app/reps
+            - listitem [ref=e36]:
+              - link "Books" [ref=e936] [cursor=pointer]:
+                - /url: /app/books
+        - separator [ref=e41]
+        - generic [ref=e42]:
+          - generic [ref=e43]: More
+          - list [ref=e45]:
+            - listitem [ref=e46]:
+              - link "Payroll" [ref=e937] [cursor=pointer]:
+                - /url: /app/payroll
+            - listitem [ref=e52]:
+              - link "Employees" [ref=e938] [cursor=pointer]:
+                - /url: /app/employees
+            - listitem [ref=e58]:
+              - link "Tips" [ref=e939] [cursor=pointer]:
+                - /url: /app/tips
+            - listitem [ref=e64]:
+              - link "Settings" [ref=e940] [cursor=pointer]:
+                - /url: /app/settings
+      - button "Toggle Sidebar" [ref=e941]
+    - main [ref=e71]:
+      - generic [ref=e72]:
+        - button "Toggle Sidebar" [ref=e942]
+        - generic [ref=e75]: Rail
+        - generic [ref=e76]: Demo Bar — The Tipsy Tavern
+        - 'button "Theme: Dark. Switch to System." [ref=e943] [cursor=pointer]'
+        - button "Notifications" [ref=e944]
+        - button "Account menu" [ref=e945]
+      - main [ref=e86]:
+        - generic [ref=e87]:
+          - generic [ref=e88]:
+            - generic [ref=e89]:
+              - heading "Payroll" [level=1] [ref=e946]
+              - paragraph [ref=e91]: Calculate wages, tips, and manage staff pay
+            - link "Run Payroll" [ref=e947] [cursor=pointer]:
+              - /url: /app/payroll/review?startDate=2026-08-17&endDate=2026-08-23
+          - generic [ref=e96]:
+            - link "Payroll" [ref=e948] [cursor=pointer]:
+              - /url: /app/payroll?tab=payroll
+            - link "Employees" [ref=e949] [cursor=pointer]:
+              - /url: /app/payroll?tab=employees
+            - link "Day Split" [ref=e950] [cursor=pointer]:
+              - /url: /app/payroll?tab=split
+            - link "Direct Deposit" [ref=e951] [cursor=pointer]:
+              - /url: /app/payroll?tab=direct-deposit
+          - generic [ref=e137]:
+            - generic [ref=e138]:
+              - heading "Weekly Revenue — Last 3 Weeks" [level=2] [ref=e952]
+              - application [ref=e145]:
+                - generic [ref=e174]:
+                  - generic [ref=e175]:
+                    - generic [ref=e176]: Aug 3
+                    - generic [ref=e178]: Aug 10
+                    - generic [ref=e180]: Aug 17
+                  - generic [ref=e182]:
+                    - generic [ref=e183]: $0
+                    - generic [ref=e185]: $5.5k
+                    - generic [ref=e187]: $11.0k
+                    - generic [ref=e189]: $16.5k
+                    - generic [ref=e191]: $22.0k
+            - generic [ref=e193]:
+              - generic [ref=e194]:
+                - button [ref=e195]
+                - generic [ref=e196]: Aug 17 – Aug 23, 2026
+                - button [ref=e197]
+              - generic [ref=e198]:
+                - textbox "Start date" [ref=e973]: 2026-08-17
+                - generic [ref=e200]: to
+                - textbox "End date" [ref=e974]: 2026-08-23
+                - button "Go" [ref=e975]
+            - generic [ref=e203]:
+              - generic [ref=e204]:
+                - heading "Total Hours" [level=2] [ref=e976]
+                - generic [ref=e210]:
+                  - generic [ref=e211]: "30.3"
+                  - paragraph [ref=e212]: hrs this week
+              - generic [ref=e213]:
+                - heading "Regular Pay" [level=2] [ref=e977]
+                - generic [ref=e218]: $453.75
+              - generic [ref=e220]:
+                - heading "Overtime Pay" [level=2] [ref=e978]
+                - generic [ref=e226]: $0.00
+              - generic [ref=e228]:
+                - heading "Tips" [level=2] [ref=e979]
+                - generic [ref=e234]: $648.00
+              - generic [ref=e236]:
+                - heading "Total Pay" [level=2] [ref=e980]
+                - generic [ref=e242]: $1101.75
+            - button "Add someone to a shift" [ref=e981]
+            - table [ref=e248]:
+              - rowgroup [ref=e249]:
+                - row [ref=e982]:
+                  - columnheader "Employee" [ref=e983]
+                  - columnheader "Reg. Hrs" [ref=e984]
+                  - columnheader "OT Hrs" [ref=e985]
+                  - columnheader "Total Hrs" [ref=e986]
+                  - columnheader "Rate" [ref=e987]
+                  - columnheader "Reg. Pay" [ref=e988]
+                  - columnheader "OT Pay" [ref=e989]
+                  - columnheader "Tips" [ref=e990]
+                  - columnheader "Eff. /hr" [ref=e991]
+                  - columnheader "Total Pay" [ref=e992]
+                  - columnheader "Adjust" [ref=e993]
+              - rowgroup [ref=e263]:
+                - row [ref=e994]:
+                  - cell "Bartenders2 people" [ref=e995]:
+                    - text: Bartenders
+                    - generic [ref=e266]: 2 people
+                - row [ref=e996]:
+                  - cell "Kayla Chen" [ref=e997]
+                  - cell "16.25" [ref=e998]
+                  - cell "0.00" [ref=e999]
+                  - cell "16.25" [ref=e1000]
+                  - cell "$15.00" [ref=e1001]
+                  - cell "$243.75" [ref=e1002]
+                  - cell "$0.00" [ref=e1003]
+                  - cell "$348.30" [ref=e1004]
+                  - cell "$36.43 +$21.43 tips" [ref=e1005]:
+                    - text: $36.43
+                    - generic [ref=e277]: +$21.43 tips
+                  - cell "$592.05" [ref=e1006]
+                  - cell [ref=e1007]:
+                    - button "Adjust Kayla Chen" [active] [ref=e1008] [cursor=pointer]
+                - row [ref=e1009]:
+                  - cell "Wes Berns" [ref=e1010]
+                  - cell "14.00" [ref=e1011]
+                  - cell "0.00" [ref=e1012]
+                  - cell "14.00" [ref=e1013]
+                  - cell "$15.00" [ref=e1014]
+                  - cell "$210.00" [ref=e1015]
+                  - cell "$0.00" [ref=e1016]
+                  - cell "$299.70" [ref=e1017]
+                  - cell "$36.41 +$21.41 tips" [ref=e1018]:
+                    - text: $36.41
+                    - generic [ref=e292]: +$21.41 tips
+                  - cell "$509.70" [ref=e1019]
+                  - cell [ref=e1020]:
+                    - button "Adjust Wes Berns" [ref=e1021] [cursor=pointer]
+                - row [ref=e1022]:
+                  - cell "Bartenders subtotal" [ref=e1023]
+                  - cell "30.25" [ref=e1024]
+                  - cell "0.00" [ref=e1025]
+                  - cell "30.25" [ref=e1026]
+                  - cell [ref=e302]
+                  - cell "$453.75" [ref=e1027]
+                  - cell "$0.00" [ref=e1028]
+                  - cell "$648.00" [ref=e1029]
+                  - cell "$36.42 +$21.42 tips" [ref=e1030]:
+                    - text: $36.42
+                    - generic [ref=e307]: +$21.42 tips
+                  - cell "$1101.75" [ref=e1031]
+                  - cell [ref=e309]
+                - row [ref=e1032]:
+                  - cell "Totals" [ref=e1033]
+                  - cell "30.25" [ref=e1034]
+                  - cell "0.00" [ref=e1035]
+                  - cell "30.25" [ref=e1036]
+                  - cell [ref=e315]
+                  - cell "$453.75" [ref=e1037]
+                  - cell "$0.00" [ref=e1038]
+                  - cell "$648.00" [ref=e1039]
+                  - cell "$36.42 +$21.42 tips" [ref=e1040]:
+                    - text: $36.42
+                    - generic [ref=e320]: +$21.42 tips
+                  - cell "$1101.75" [ref=e1041]
+                  - cell [ref=e322]
+            - generic [ref=e323]:
+              - button "Import Data Z Report · Employee Shifts" [ref=e1042]:
+                - generic [ref=e328]: Import Data
+                - generic [ref=e329]: Z Report · Employee Shifts
+              - generic [ref=e332]:
+                - generic [ref=e333]:
+                  - paragraph [ref=e334]: Daily Z Report
+                  - generic [ref=e335]:
+                    - textbox "Paste your full Z report text here… Any POS format is supported — text is parsed automatically, with AI as fallback." [ref=e1043]:
+                      - /placeholder: "Paste your full Z report text here…\n\nAny POS format is supported — text is parsed automatically, with AI as fallback."
+                    - generic [ref=e337]:
+                      - button "Parse" [disabled]
+                      - button "Upload file" [ref=e1044]
+                      - generic [ref=e339]: .txt · .csv
+                - generic [ref=e340]:
+                  - paragraph [ref=e341]: Employee Shifts
+                  - generic [ref=e342]:
+                    - 'textbox "Paste your Employee Worked Report or CSV here… Supports: POS text report, CSV (name, date, hours), or any shift export — AI fallback if format isn''t recognised." [ref=e1045]':
+                      - /placeholder: "Paste your Employee Worked Report or CSV here…\n\nSupports: POS text report, CSV (name, date, hours), or any shift export — AI fallback if format isn't recognised."
+                    - generic [ref=e344]:
+                      - button "Parse" [disabled]
+                      - button "Upload file" [ref=e1046]
+                      - generic [ref=e346]: .txt · .csv
+  - region "Notifications alt+T":
+    - list:
+      - listitem [ref=e1047]:
+        - generic [ref=e1052]: Kayla Chen's shift released to the POS
+  - button "Open Next.js Dev Tools" [ref=e347] [cursor=pointer]
+  - alert [ref=e116]
+  - generic [ref=e351]: $0

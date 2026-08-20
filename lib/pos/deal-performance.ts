@@ -19,11 +19,24 @@
 export type DealComponent = {
   inventoryItemId: string;
   itemName: string;
-  /** Units of this item consumed per one sale of the deal. */
+  /**
+   * STOCK units of this item consumed per one sale of the deal — already
+   * through `componentUnits()`, so an 'oz' recipe line arrives as a fraction of
+   * a bottle rather than as a number of ounces. It pairs with `costPrice`,
+   * which is per stock unit.
+   */
   quantity: number;
-  /** Cost per unit. Null when the operator has not entered one. */
+  /** Cost per STOCK unit. Null when the operator has not entered one. */
   costPrice: number | null;
-  /** What the item sells for on its own. Null when not set — usually is. */
+  /**
+   * How many individual DRINKS of this item the component represents. Pairs
+   * with `salePrice`, which is per drink — `quantity` does not, and using it
+   * here priced a 0.06-bottle pour as if six hundredths of a drink had been
+   * sold. Falls back to `quantity` when the caller does not supply it, which is
+   * correct for whole-unit components where the two are the same number.
+   */
+  servings?: number;
+  /** What ONE of these sells for on its own. Null when not set — usually is. */
   salePrice: number | null;
 };
 
@@ -192,7 +205,10 @@ export function computeDealPerformance(
       const everyComponentPriced =
         deal.components.length > 0 && deal.components.every((c) => c.salePrice !== null);
       const alaCarteValue = everyComponentPriced
-        ? deal.components.reduce((s, c) => s + c.quantity * (c.salePrice ?? 0), 0)
+        ? deal.components.reduce(
+            (s, c) => s + (c.servings ?? c.quantity) * (c.salePrice ?? 0),
+            0,
+          )
         : null;
 
       const revenuePerUnit = unitsSold > 0 ? revenue / unitsSold : 0;

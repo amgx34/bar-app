@@ -11,6 +11,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentOrg } from '@/lib/org';
 import { posItemMatchKey } from '@/lib/pos/excluded-items';
 import { computeVelocity } from '@/lib/pos/velocity';
+import { unitsPerSale } from '@/lib/pos/pour';
+import { assessSyncHealth } from '@/lib/pos/sync-health';
+import { SyncStatusStrip } from './_components/sync-status-strip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const RevenueChart = dynamicImport(() => import('./_components/DashBoardRevenueChart'));
@@ -106,7 +109,7 @@ export default async function DashboardPage() {
       .eq('organization_id', orgId)
       .order('name'),
     supabase.from('inventory_categories')
-      .select('id, name')
+      .select('id, name, default_pour_oz')
       .eq('organization_id', orgId),
     supabase.from('reps')
       .select('id, name')
@@ -216,8 +219,26 @@ export default async function DashboardPage() {
   // bar that syncs a POS but does not hand-log spillage: nothing writes a usage
   // log in that case, while pos_item_sales fills up nightly. Stock level was
   // never an input, so having plenty on the shelf changed nothing.
+  // Item -> category -> organisation, the same chain the ingest route depletes
+  // with. Without it, drinks sold were added to stock lost as though a shot
+  // were a bottle and top movers ranked poured spirits far too high.
+  const orgPourOz = Number(
+    (org.bar_settings as { default_pour_oz?: number } | null)?.default_pour_oz,
+  ) || null;
+  const catPourById = new Map<string, number | null>(
+    (allCategories ?? []).map((c) => [c.id as string, Number(c.default_pour_oz) || null]),
+  );
+
   const movers = computeVelocity(
-    items.map((i) => ({ id: i.id, name: i.name, matchKey: posItemMatchKey(i.name) })),
+    items.map((i) => ({
+      id: i.id,
+      name: i.name,
+      matchKey: posItemMatchKey(i.name),
+      unitsPerSale: unitsPerSale(
+        { bottleSizeMl: i.bottle_size_ml ?? null, pourSizeOz: i.pour_size_oz ?? null },
+        { categoryPourOz: catPourById.get(i.category_id) ?? null, orgPourOz },
+      ),
+    })),
     (posSales30 ?? []).map((s) => ({
       matchKey: s.match_key,
       qtySold: Number(s.qty_sold) || 0,
@@ -254,6 +275,13 @@ export default async function DashboardPage() {
     totalTips:  (d.cash_tips as number) + (d.cc_tips as number),
     tipPercent: d.total_sales > 0 ? ((d.cash_tips + d.cc_tips) / d.total_sales) * 100 : 0,
   }));
+
+  // Whether the POS agent is still feeding this bar. Renders nothing at all for
+  // a bar with no agent, so it never becomes background noise.
+  const syncHealth = assessSyncHealth(
+    org.pos_config as Record<string, unknown> | null,
+    org.pos_provider as string | null,
+  );
 
   const hasAlerts = unconfiguredEmployees.length > 0 || reorderGroups.length > 0;
 
@@ -609,6 +637,9 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* ── 5b. POS sync health ────────────────────────────────────────────── */}
+      <SyncStatusStrip health={syncHealth} />
 
       {/* ── 6. Alerts ──────────────────────────────────────────────────────── */}
       {hasAlerts && (

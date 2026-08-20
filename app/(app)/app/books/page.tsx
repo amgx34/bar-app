@@ -3,7 +3,7 @@ import dynamicImport from 'next/dynamic';
 import Link from 'next/link';
 import {
   BookOpen, TrendingUp, TrendingDown,
-  DollarSign, Users, Calculator, Percent,
+  DollarSign, Users, Calculator, Percent, Landmark,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getBooksData } from './actions';
@@ -94,6 +94,21 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
         : `+${fmtMoney(data.tips)} tips · tax not configured`,
       icon:  TrendingUp,
       color: 'text-primary',
+    },
+    {
+      // Sales tax gets a slot of its own because it is the one figure on this
+      // page that is a liability rather than a result. An owner looking at a
+      // healthy month still owes this, and burying it inside the statement is
+      // how bars end up spending money they were only holding.
+      label: 'Sales Tax Collected',
+      value: data.taxConfigured ? fmtMoney(data.salesTax ?? 0) : '—',
+      sub: data.taxConfigured
+        ? `held for the state · ${data.salesTaxRatePct}% rate`
+        : 'set your rate in Settings → General',
+      icon: Landmark,
+      // Deliberately not green or red. It is neither good news nor bad news;
+      // it is money that was never the bar's to judge.
+      color: data.taxConfigured ? 'text-sky-600 dark:text-sky-400' : 'text-muted-foreground',
     },
     {
       // Pour cost is the ratio a bar is benchmarked on, so it gets a KPI slot of
@@ -201,7 +216,7 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
       </div>
 
       {/* KPI cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((kpi) => {
           const Icon = kpi.icon;
           return (

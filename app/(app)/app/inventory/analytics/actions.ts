@@ -4,8 +4,17 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentOrg } from '@/lib/org';
 import { posItemMatchKey } from '@/lib/pos/excluded-items';
 import { computeVelocity } from '@/lib/pos/velocity';
+import { unitsPerSale } from '@/lib/pos/pour';
 
 const OZ_PER_ML = 0.033814;
+
+/** The category's default pour, when the join returned one. */
+function getCatPourOz(raw: unknown): number | null {
+  if (!raw) return null;
+  const obj = Array.isArray(raw) ? raw[0] : raw;
+  const n = Number((obj as { default_pour_oz?: number | null } | undefined)?.default_pour_oz);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 function getCatName(raw: unknown): string {
   if (!raw) return 'Uncategorized';
@@ -54,7 +63,7 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
   const d90 = new Date(now); d90.setDate(now.getDate() - 90);
 
   const [{ data: rawItems }, { data: logs30 }, { data: logs90 }, { data: posSales30 }] = await Promise.all([
-    supabase.from('inventory_items').select('id, name, unit, current_stock, par_level, cost_price, bottle_size_ml, pour_size_oz, inventory_categories(name)').eq('organization_id', orgId).eq('is_active', true).order('name'),
+    supabase.from('inventory_items').select('id, name, unit, current_stock, par_level, cost_price, bottle_size_ml, pour_size_oz, inventory_categories(name, default_pour_oz)').eq('organization_id', orgId).eq('is_active', true).order('name'),
     supabase.from('usage_logs').select('item_id, quantity, reason, logged_at').eq('organization_id', orgId).gte('logged_at', d30.toISOString()),
     supabase.from('usage_logs').select('item_id, quantity, reason, logged_at').eq('organization_id', orgId).gte('logged_at', d90.toISOString()),
     // What actually SOLD. Velocity used to read usage_logs alone, so a bar that
@@ -94,8 +103,23 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
 
   // Sold + lost, with pos_sale logs excluded from the loss side so a sold unit
   // is never counted twice once depletion is running.
+  // The org-wide pour, last link of the item -> category -> organisation chain.
+  const orgPourOz = Number(
+    (org.bar_settings as { default_pour_oz?: number } | null)?.default_pour_oz,
+  ) || null;
+
   const velocity = computeVelocity(
-    items.map((i) => ({ id: i.id, name: i.name, matchKey: posItemMatchKey(i.name) })),
+    items.map((i) => ({
+      id: i.id,
+      name: i.name,
+      matchKey: posItemMatchKey(i.name),
+      // Without this, drinks sold were added to stock lost as though a shot
+      // were a bottle, and daysRemaining below came out ~17x too short.
+      unitsPerSale: unitsPerSale(
+        { bottleSizeMl: i.bottle_size_ml ?? null, pourSizeOz: i.pour_size_oz ?? null },
+        { categoryPourOz: getCatPourOz(i.inventory_categories), orgPourOz },
+      ),
+    })),
     (posSales30 ?? []).map((s) => ({
       matchKey: s.match_key,
       qtySold: Number(s.qty_sold) || 0,

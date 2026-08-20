@@ -1,0 +1,72 @@
+- generic [active] [ref=f21e1]:
+  - link "Skip to content" [ref=f21e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=f21e3]:
+    - generic [ref=f21e6]:
+      - generic [ref=f21e8]:
+        - generic [ref=f21e9]:
+          - generic [ref=f21e10]: Menu
+          - list [ref=f21e12]:
+            - listitem [ref=f21e13]:
+              - link "Dashboard" [ref=f21e14] [cursor=pointer]:
+                - /url: /app/dashboard
+            - listitem [ref=f21e19]:
+              - button "Inventory" [ref=f21e20] [cursor=pointer]
+            - listitem [ref=f21e28]:
+              - link "Reps" [ref=f21e29] [cursor=pointer]:
+                - /url: /app/reps
+            - listitem [ref=f21e36]:
+              - link "Books" [ref=f21e37] [cursor=pointer]:
+                - /url: /app/books
+        - separator [ref=f21e41]
+        - generic [ref=f21e42]:
+          - generic [ref=f21e43]: More
+          - list [ref=f21e45]:
+            - listitem [ref=f21e46]:
+              - link "Payroll" [ref=f21e47] [cursor=pointer]:
+                - /url: /app/payroll
+            - listitem [ref=f21e52]:
+              - link "Employees" [ref=f21e53] [cursor=pointer]:
+                - /url: /app/employees
+            - listitem [ref=f21e58]:
+              - link "Tips" [ref=f21e59] [cursor=pointer]:
+                - /url: /app/tips
+            - listitem [ref=f21e64]:
+              - link "Settings" [ref=f21e65] [cursor=pointer]:
+                - /url: /app/settings
+      - button "Toggle Sidebar" [ref=f21e70]
+    - main [ref=f21e71]:
+      - generic [ref=f21e72]:
+        - button "Toggle Sidebar" [ref=f21e73]
+        - generic [ref=f21e75]: Rail
+        - generic [ref=f21e76]: Demo Bar — The Tipsy Tavern
+        - 'button "Theme: Dark. Switch to System." [ref=f21e77] [cursor=pointer]'
+        - button "Notifications" [ref=f21e81]
+        - button "Account menu" [ref=f21e85]
+      - main [ref=f21e86]:
+        - generic [ref=f21e87]:
+          - generic [ref=f21e88]:
+            - generic [ref=f21e89]:
+              - heading "Payroll" [level=1] [ref=f21e90]
+              - paragraph [ref=f21e91]: Calculate wages, tips, and manage staff pay
+            - link "Run Payroll" [ref=f21e92] [cursor=pointer]:
+              - /url: /app/payroll/review?startDate=2026-08-17&endDate=2026-08-23
+          - generic [ref=f21e96]:
+            - link "Payroll" [ref=f21e97] [cursor=pointer]:
+              - /url: /app/payroll?tab=payroll
+            - link "Employees" [ref=f21e98] [cursor=pointer]:
+              - /url: /app/payroll?tab=employees
+            - link "Day Split" [ref=f21e99] [cursor=pointer]:
+              - /url: /app/payroll?tab=split
+            - link "Direct Deposit" [ref=f21e100] [cursor=pointer]:
+              - /url: /app/payroll?tab=direct-deposit
+          - generic [ref=f21e101]: Loading payroll...
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f21e108] [cursor=pointer]:
+    - generic [ref=f21e111]:
+      - text: Rendering
+      - generic [ref=f21e112]:
+        - generic [ref=f21e113]: .
+        - generic [ref=f21e114]: .
+        - generic [ref=f21e115]: .
+  - alert [ref=f21e116]

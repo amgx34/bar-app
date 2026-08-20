@@ -1,0 +1,294 @@
+- generic [active] [ref=f17e1]:
+  - link [ref=f17e350] [cursor=pointer]:
+    - /url: "#main-content"
+    - text: Skip to content
+  - generic [ref=f17e3]:
+    - generic [ref=f17e6]:
+      - generic [ref=f17e8]:
+        - generic [ref=f17e9]:
+          - generic [ref=f17e10]: Menu
+          - list [ref=f17e12]:
+            - listitem [ref=f17e13]:
+              - link [ref=f17e351] [cursor=pointer]:
+                - /url: /app/dashboard
+                - generic [ref=f17e18]: Dashboard
+            - listitem [ref=f17e19]:
+              - button [expanded] [ref=f17e352] [cursor=pointer]:
+                - generic [ref=f17e25]: Inventory
+              - list [ref=f17e28]:
+                - listitem [ref=f17e29]:
+                  - link [ref=f17e353] [cursor=pointer]:
+                    - /url: /app/inventory
+                    - text: Items
+                - listitem [ref=f17e31]:
+                  - link [ref=f17e354] [cursor=pointer]:
+                    - /url: /app/inventory/weigh
+                    - text: Weigh
+                - listitem [ref=f17e33]:
+                  - link [ref=f17e355] [cursor=pointer]:
+                    - /url: /app/inventory/analytics
+                    - text: Analytics
+            - listitem [ref=f17e35]:
+              - link [ref=f17e356] [cursor=pointer]:
+                - /url: /app/reps
+                - generic [ref=f17e42]: Reps
+            - listitem [ref=f17e43]:
+              - link [ref=f17e357] [cursor=pointer]:
+                - /url: /app/books
+                - generic [ref=f17e47]: Books
+        - separator [ref=f17e48]
+        - generic [ref=f17e49]:
+          - generic [ref=f17e50]: More
+          - list [ref=f17e52]:
+            - listitem [ref=f17e53]:
+              - link [ref=f17e358] [cursor=pointer]:
+                - /url: /app/payroll
+                - generic [ref=f17e58]: Payroll
+            - listitem [ref=f17e59]:
+              - link [ref=f17e359] [cursor=pointer]:
+                - /url: /app/employees
+                - generic [ref=f17e64]: Employees
+            - listitem [ref=f17e65]:
+              - link [ref=f17e360] [cursor=pointer]:
+                - /url: /app/tips
+                - generic [ref=f17e70]: Tips
+            - listitem [ref=f17e71]:
+              - link [ref=f17e361] [cursor=pointer]:
+                - /url: /app/settings
+                - generic [ref=f17e76]: Settings
+      - button [ref=f17e362]
+    - main [ref=f17e78]:
+      - generic [ref=f17e79]:
+        - button [ref=f17e363]:
+          - generic [ref=f17e81]: Toggle Sidebar
+        - generic [ref=f17e82]: Rail
+        - generic [ref=f17e83]: Demo Bar — The Tipsy Tavern
+        - button [ref=f17e364] [cursor=pointer]
+        - button [ref=f17e365]
+        - button [ref=f17e366]
+      - main [ref=f17e91]:
+        - generic [ref=f17e92]:
+          - navigation [ref=f17e367]:
+            - generic [ref=f17e94]:
+              - link [ref=f17e368] [cursor=pointer]:
+                - /url: /app/inventory
+                - text: Items
+              - link [ref=f17e369] [cursor=pointer]:
+                - /url: /app/inventory/weigh
+                - text: Weigh
+              - link [ref=f17e370] [cursor=pointer]:
+                - /url: /app/inventory/analytics
+                - text: Analytics
+          - main [ref=f17e99]:
+            - heading [level=1] [ref=f17e371]: Inventory
+            - generic [ref=f17e101]:
+              - button [ref=f17e372]:
+                - generic [ref=f17e103]: Inventory Overview
+              - generic [ref=f17e106]:
+                - generic [ref=f17e107]:
+                  - heading [level=2] [ref=f17e373]: Top Sellers
+                  - application [ref=f17e261]:
+                    - generic [ref=f17e281]:
+                      - generic [ref=f17e282]:
+                        - generic [ref=f17e283]: "0"
+                        - generic [ref=f17e285]: "0.25"
+                        - generic [ref=f17e287]: "0.5"
+                        - generic [ref=f17e289]: "0.75"
+                        - generic [ref=f17e291]: "1"
+                      - generic [ref=f17e293]:
+                        - generic [ref=f17e294]: Grey Goose Vodka750m…
+                        - generic [ref=f17e296]: …
+                        - generic [ref=f17e298]: K…
+                        - generic [ref=f17e300]: Ti…
+                        - generic [ref=f17e302]: Bac…
+                - generic [ref=f17e116]:
+                  - heading [level=2] [ref=f17e374]: Biggest Losses
+                  - application [ref=f17e305]:
+                    - generic [ref=f17e325]:
+                      - generic [ref=f17e326]:
+                        - generic [ref=f17e327]: "0"
+                        - generic [ref=f17e329]: "0.25"
+                        - generic [ref=f17e331]: "0.5"
+                        - generic [ref=f17e333]: "0.75"
+                        - generic [ref=f17e335]: "1"
+                      - generic [ref=f17e337]:
+                        - generic [ref=f17e338]: Grey Goose Vodka750m…
+                        - generic [ref=f17e340]: …
+                        - generic [ref=f17e342]: K…
+                        - generic [ref=f17e344]: Ti…
+                        - generic [ref=f17e346]: Bac…
+                - generic [ref=f17e124]:
+                  - heading [level=2] [ref=f17e375]: Cost of Product on Hand
+                  - generic [ref=f17e129]:
+                    - paragraph [ref=f17e130]: $89.97
+                    - paragraph [ref=f17e131]: 1 item currently in stock
+                - generic [ref=f17e132]:
+                  - heading [level=2] [ref=f17e376]: Latest Shipment
+                  - generic [ref=f17e140]:
+                    - paragraph [ref=f17e141]: Aug 19, 2026
+                    - list [ref=f17e142]:
+                      - listitem [ref=f17e143]:
+                        - generic [ref=f17e144]: Tito's Handmade Vodka 750ml
+                        - generic [ref=f17e145]: "+6"
+                      - listitem [ref=f17e146]:
+                        - generic [ref=f17e147]: Jack Daniel's Tennessee Whiskey
+                        - generic [ref=f17e148]: "+4"
+                      - listitem [ref=f17e149]:
+                        - generic [ref=f17e150]: Jameson Irish Whiskey 750ml
+                        - generic [ref=f17e151]: "+3"
+                      - listitem [ref=f17e152]:
+                        - generic [ref=f17e153]: Bulleit Bourbon 750ml
+                        - generic [ref=f17e154]: "+3"
+                      - listitem [ref=f17e155]:
+                        - generic [ref=f17e156]: Modelo Especial (case/24)
+                        - generic [ref=f17e157]: "+3"
+                      - listitem [ref=f17e158]:
+                        - generic [ref=f17e159]: Corona Extra (case/24)
+                        - generic [ref=f17e160]: "+2"
+                      - listitem [ref=f17e161]:
+                        - generic [ref=f17e162]: Heineken (case/24)
+                        - generic [ref=f17e163]: "+2"
+                      - listitem [ref=f17e164]:
+                        - generic [ref=f17e165]: Fever-Tree Tonic Water (case/24)
+                        - generic [ref=f17e166]: "+2"
+                      - listitem [ref=f17e167]:
+                        - generic [ref=f17e168]: Fever-Tree Club Soda (case/24)
+                        - generic [ref=f17e169]: "+2"
+                      - listitem [ref=f17e170]:
+                        - generic [ref=f17e171]: Cocktail Straws (box/500)
+                        - generic [ref=f17e172]: "+2"
+            - generic [ref=f17e173]:
+              - generic [ref=f17e175]:
+                - textbox [ref=f17e377]:
+                  - /placeholder: Search items…
+                  - text: Grey Goose
+                - combobox [ref=f17e178]:
+                  - generic [ref=f17e179]: All categories
+                  - img: ▼
+                - textbox [ref=f17e180]: all
+                - generic [ref=f17e181]:
+                  - button [ref=f17e378]: All
+                  - button [ref=f17e379]: In Stock
+                  - button [ref=f17e380]: Low Stock
+                - generic [ref=f17e185]:
+                  - button [ref=f17e381]: Categories
+                  - button [ref=f17e382]: AI Import
+                  - button [ref=f17e383]: Add item
+                  - button [ref=f17e384]: Show inactive
+              - button [ref=f17e385]
+            - generic [ref=f17e195]:
+              - generic [ref=f17e196]:
+                - link [ref=f17e386] [cursor=pointer]:
+                  - /url: /app/inventory
+                  - text: Items
+                - separator [ref=f17e201]
+              - generic [ref=f17e202]:
+                - link [ref=f17e387] [cursor=pointer]:
+                  - /url: /app/inventory/weigh
+                  - text: Weigh
+                - separator [ref=f17e208]
+              - link [ref=f17e388] [cursor=pointer]:
+                - /url: /app/inventory/analytics
+                - text: Analytics
+            - table [ref=f17e216]:
+              - rowgroup [ref=f17e217]:
+                - row [ref=f17e389]:
+                  - columnheader [ref=f17e390]: Name
+                  - columnheader [ref=f17e391]: Category
+                  - columnheader [ref=f17e392]: Unit
+                  - columnheader [ref=f17e393]: Stock
+                  - columnheader [ref=f17e394]: Par
+                  - columnheader [ref=f17e395]: Cost
+                  - columnheader [ref=f17e396]: Price
+                  - columnheader [ref=f17e226]
+              - rowgroup [ref=f17e227]:
+                - row [ref=f17e397]:
+                  - cell [ref=f17e398]:
+                    - generic [ref=f17e230]: Grey Goose Vodka 750ml
+                    - generic [ref=f17e231]: GG-750
+                    - generic [ref=f17e232]: Marcus Johnson
+                  - cell [ref=f17e399]: Spirits
+                  - cell [ref=f17e400]: bottle
+                  - cell [ref=f17e401]:
+                    - generic [ref=f17e236]: "3"
+                  - cell [ref=f17e402]: "6"
+                  - cell [ref=f17e403]: $29.99
+                  - cell [ref=f17e404]: —
+                  - cell [ref=f17e405]:
+                    - button [ref=f17e406]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f17e253] [cursor=pointer]
+  - alert [ref=f17e348]
+  - generic [ref=f17e349]: Grey Goose Vodka 750m…
+  - dialog [ref=f17e414]:
+    - heading "Edit — Grey Goose Vodka 750ml" [level=2] [ref=f17e416]
+    - generic [ref=f17e417]:
+      - generic [ref=f17e418]:
+        - generic [ref=f17e419]: Name *
+        - textbox "Name *" [ref=f17e420]: Grey Goose Vodka 750ml
+      - generic [ref=f17e421]:
+        - generic [ref=f17e422]:
+          - generic [ref=f17e423]: Category
+          - combobox [ref=f17e424]:
+            - generic [ref=f17e425]: Spirits
+            - img: ▼
+          - textbox [ref=f17e426]: 7ed6b877-8f8b-43e1-973f-5db96de7a68d
+        - generic [ref=f17e427]:
+          - generic [ref=f17e428]: Unit *
+          - combobox [ref=f17e429]:
+            - generic [ref=f17e430]: bottle
+            - img: ▼
+          - textbox [ref=f17e431]: bottle
+      - generic [ref=f17e432]:
+        - generic [ref=f17e433]: Rep / Supplier
+        - combobox [ref=f17e434]:
+          - generic [ref=f17e435]: Marcus Johnson
+          - img: ▼
+        - textbox [ref=f17e436]: 70420066-7b6c-41b8-b831-5ac816a257ca
+      - generic [ref=f17e437]:
+        - generic [ref=f17e438]: SKU / Code
+        - textbox "SKU / Code" [ref=f17e439]:
+          - /placeholder: Optional
+          - text: GG-750
+      - generic [ref=f17e440]:
+        - generic [ref=f17e441]:
+          - generic [ref=f17e442]: Cost per bottle
+          - spinbutton "Cost per bottle" [ref=f17e443]: "29.99"
+          - paragraph [ref=f17e444]: What you pay for one bottle from the supplier.
+        - generic [ref=f17e445]:
+          - generic [ref=f17e446]: Menu price per pour
+          - spinbutton "Menu price per pour" [ref=f17e447]
+          - paragraph [ref=f17e448]: What a customer pays for one pour of this.
+      - generic [ref=f17e449]:
+        - generic [ref=f17e450]:
+          - generic [ref=f17e451]: Par level
+          - spinbutton "Par level" [ref=f17e452]: "6"
+        - generic [ref=f17e453]:
+          - generic [ref=f17e454]: Current stock
+          - spinbutton "Current stock" [disabled]: "3"
+          - paragraph [ref=f17e455]: Use "Adjust stock" to change.
+      - generic [ref=f17e456]:
+        - button [ref=f17e457]:
+          - generic [ref=f17e460]:
+            - paragraph [ref=f17e461]: Track as liquor / spirits bottle
+            - paragraph [ref=f17e462]: Unlocks bottle size, pour tracking, and cost-per-pour
+        - generic [ref=f17e465]:
+          - generic [ref=f17e466]:
+            - generic [ref=f17e467]:
+              - generic [ref=f17e468]: Bottle Size
+              - combobox [ref=f17e469]:
+                - generic [ref=f17e470]: Select size
+                - img: ▼
+              - textbox [ref=f17e471]: none
+            - generic [ref=f17e472]:
+              - generic [ref=f17e473]: Pour Size
+              - generic [ref=f17e474]:
+                - spinbutton "Pour Size" [ref=f17e475]: "1.5"
+                - generic [ref=f17e476]: oz
+          - paragraph [ref=f17e477]: Pour size set, but no container size — this still deducts one whole unit per sale.
+      - group [ref=f17e478]:
+        - generic "How does stock tracking actually work?" [ref=f17e479] [cursor=pointer]
+      - generic [ref=f17e482]:
+        - button "Cancel" [ref=f17e483]
+        - button "Save changes" [ref=f17e484]
+    - button "Close" [ref=f17e485]

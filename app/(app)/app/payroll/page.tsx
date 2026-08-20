@@ -93,7 +93,10 @@ export default async function PayrollPage({
 
       {/* Tab Navigation */}
       <div className="border-b">
-        <div className="flex gap-8">
+        {/* Scrolls sideways on a phone rather than wrapping to two rows or
+            squeezing the labels: four tabs at 8-unit gaps do not fit 375px,
+            and a wrapped tab strip stops reading as one control. */}
+        <div className="-mx-6 flex gap-8 overflow-x-auto px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
           <TabLink href="/app/payroll?tab=payroll"         active={tab === 'payroll'}         label="Payroll" />
           <TabLink href="/app/payroll?tab=employees"       active={tab === 'employees'}       label="Employees" />
           <TabLink href="/app/payroll?tab=split"           active={tab === 'split'}           label="Day Split" />
@@ -154,7 +157,11 @@ function TabLink({
   return (
     <a
       href={href}
-      className={`px-1 pb-4 text-sm font-medium border-b-2 transition-colors ${
+      // whitespace-nowrap is what makes the scrolling strip actually scroll.
+      // Without it "Day Split" and "Direct Deposit" broke onto two lines inside
+      // the overflow container, so the tabs stopped reading as one row and
+      // never scrolled at all.
+      className={`whitespace-nowrap px-1 pb-4 text-sm font-medium border-b-2 transition-colors ${
         active
           ? 'border-primary text-primary'
           : 'border-transparent text-muted-foreground hover:text-foreground'

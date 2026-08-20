@@ -5,7 +5,6 @@ import { MoreHorizontal, Package, AlertTriangle } from 'lucide-react';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
@@ -94,9 +93,111 @@ export function InventoryTable({ items, categories, reps, role, defaultPourOz, b
     );
   }
 
+  /**
+   * Extracted so the phone and desktop layouts share one definition of what a
+   * user may do to an item. Two copies of this menu would eventually disagree
+   * about which roles can deactivate, which is the kind of bug nobody notices
+   * until the wrong person deactivates something.
+   */
+  function ActionsMenu({ item, className }: { item: ItemRow; className?: string }) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          className={`inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${className ?? 'h-9 w-9'}`}
+          aria-label={`Actions for ${item.name}`}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {canAdjustStock(role) && item.is_active && (
+            <DropdownMenuItem onClick={() => setAdjusting(item)}>
+              Adjust stock
+            </DropdownMenuItem>
+          )}
+          {canEditInventory(role) && (
+            <DropdownMenuItem onClick={() => setEditing(item)}>
+              Edit
+            </DropdownMenuItem>
+          )}
+          {canDeleteInventory(role) && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setDeactivating(item)}
+                className="text-destructive focus:text-destructive"
+              >
+                {item.is_active ? 'Deactivate' : 'Reactivate'}
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
   return (
     <>
-      <div className="border rounded-lg">
+      {/* Phone layout. Stock and par are the two figures someone walking the
+          shelves is actually comparing, so they lead; cost and price follow.
+          Below-par items get a visible band rather than a small icon, because
+          the point of the screen is spotting them at a glance. */}
+      <div className="space-y-2 sm:hidden">
+        {optimisticItems.map((item) => {
+          const belowPar =
+            item.par_level !== null && item.current_stock < item.par_level;
+          return (
+            <div
+              key={item.id}
+              className={`rounded-xl border bg-card p-4 ${!item.is_active ? 'opacity-50' : ''} ${
+                belowPar ? 'border-l-4 border-l-amber-500' : ''
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{item.name}</span>
+                    {!item.is_active && (
+                      <Badge variant="outline" className="text-xs">Inactive</Badge>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {item.inventory_categories?.name ?? 'Uncategorised'}
+                    {item.sku ? ` · ${item.sku}` : ''}
+                  </p>
+                  {item.reps && (
+                    <p className="text-xs text-muted-foreground/60">{item.reps.name}</p>
+                  )}
+                </div>
+                <ActionsMenu item={item} className="h-11 w-11 shrink-0" />
+              </div>
+
+              <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 border-t pt-3 text-sm">
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">In stock</dt>
+                  <dd className="flex items-center gap-1.5 tabular-nums font-medium">
+                    {belowPar && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
+                    {item.current_stock} {item.unit}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Par</dt>
+                  <dd className="tabular-nums text-muted-foreground">{item.par_level ?? '—'}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Cost / {item.unit}</dt>
+                  <dd className="tabular-nums text-muted-foreground">{formatMoney(item.cost_price)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Menu price</dt>
+                  <dd className="tabular-nums">{formatMoney(item.sale_price)}</dd>
+                </div>
+              </dl>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="hidden border rounded-lg sm:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -152,34 +253,7 @@ export function InventoryTable({ items, categories, reps, role, defaultPourOz, b
                     {formatMoney(item.sale_price)}
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 w-9" aria-label="Actions">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {canAdjustStock(role) && item.is_active && (
-                          <DropdownMenuItem onClick={() => setAdjusting(item)}>
-                            Adjust stock
-                          </DropdownMenuItem>
-                        )}
-                        {canEditInventory(role) && (
-                          <DropdownMenuItem onClick={() => setEditing(item)}>
-                            Edit
-                          </DropdownMenuItem>
-                        )}
-                        {canDeleteInventory(role) && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => setDeactivating(item)}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              {item.is_active ? 'Deactivate' : 'Reactivate'}
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <ActionsMenu item={item} />
                   </TableCell>
                 </TableRow>
               );

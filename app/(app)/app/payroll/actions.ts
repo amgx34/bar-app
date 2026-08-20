@@ -4,9 +4,16 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
 import {
+  classifyTipRole,
+  tipExclusionReason,
+  barbackFractionFromSettings,
+  type TipRole,
+} from '@/lib/payroll/tip-pool';
+import {
   applyTipTransfers,
   openerBonus,
   openerBonusFromSettings,
+  type OpenerBonusConfig,
   type TipTransfer,
 } from '@/lib/payroll/adjustments';
 import { ParsedEmployeeShift, parseDate } from '@/lib/csv-parsers/parse-employee-shifts';
@@ -495,8 +502,7 @@ export async function computePayroll(
 
   // Configurable barback cut (Settings → Tip & Pay → Barback tip %).
   // Falls back to 15 % if not set.
-  const barbackPct  = Math.min(100, Math.max(0, org.bar_settings?.barback_tip_pct ?? 15));
-  const barbackFrac = barbackPct / 100;
+  const barbackFrac = barbackFractionFromSettings(org.bar_settings ?? {});
   const poolFrac    = 1 - barbackFrac;
 
   // Configurable since the app was built, but never applied to anything until
@@ -628,8 +634,7 @@ export async function computePayroll(
       // Barbacks on this day — triggered by role OR tip_mode, but not if no_tip
       const barbackShiftsToday = dayShifts.filter((s) => {
         const emp = employeeById.get(s.employee_id);
-        if (!emp || emp.tip_mode === 'no_tip') return false;
-        return emp.role === 'barback' || emp.tip_mode === 'barback';
+        return !!emp && classifyTipRole({ role: emp.role, tipMode: emp.tip_mode }) === 'barback';
       });
 
       let poolTips: number;
@@ -650,13 +655,7 @@ export async function computePayroll(
       // Regular pool: tip_mode='pool', not barback role/mode, not security/manager, not no_tip
       const poolShiftsToday = dayShifts.filter((s) => {
         const emp = employeeById.get(s.employee_id);
-        return (
-          emp &&
-          emp.tip_mode === 'pool' &&
-          emp.role !== 'barback' &&
-          emp.role !== 'security' &&
-          emp.role !== 'manager'
-        );
+        return !!emp && classifyTipRole({ role: emp.role, tipMode: emp.tip_mode }) === 'pool';
       });
 
       const poolHoursToday = poolShiftsToday.reduce(
@@ -808,6 +807,14 @@ export interface DaySplitEmployee {
   name: string;
   role: string | null;
   hours: number;
+  /**
+   * Which pool this person draws from, decided by the same function the pay run
+   * uses. Never re-derived on the client from `role` alone — that is exactly
+   * how this screen came to include managers and Not Tipped staff.
+   */
+  tipRole: TipRole;
+  /** Why they are not in the split, when they are not. Null when they are. */
+  excludedReason: string | null;
 }
 
 export interface DaySplitData {
@@ -815,6 +822,19 @@ export interface DaySplitData {
   totalTips: number;
   totalSales: number;
   employees: DaySplitEmployee[];
+  /**
+   * The bar's configured opener bonus, carried to the client so the preview
+   * uses the same rule the pay run does. It used to be hardcoded at 5% here
+   * and read from settings there, so the two disagreed for every bar that had
+   * changed it — and silently, because both looked plausible.
+   */
+  openerBonus: OpenerBonusConfig;
+  /**
+   * The barback share of the night, as a fraction. Configurable in Settings
+   * (a 0-50% slider) and read by the pay run; this screen hardcoded 0.15, so
+   * any bar that moved the slider saw a preview that did not match its wages.
+   */
+  barbackFraction: number;
 }
 
 const DAY_SPLIT_EXCLUDED = new Set(['front door']);
@@ -828,7 +848,10 @@ export async function getDaySplitData(date: string): Promise<DaySplitData | null
   // Shifts for this date joined with employee info
   const { data: shifts } = await supabase
     .from('employee_shifts')
-    .select('employee_id, regular_hours, overtime_hours, employees(id, name, role)')
+    // tip_mode is what decides whether somebody shares the pool at all. It was
+    // not selected, so the split silently included people the pay run pays
+    // nothing — managers, security, and anyone set to Not Tipped.
+    .select('employee_id, regular_hours, overtime_hours, employees(id, name, role, tip_mode)')
     .eq('organization_id', org.id)
     .eq('shift_date', date);
 
@@ -845,7 +868,9 @@ export async function getDaySplitData(date: string): Promise<DaySplitData | null
   // Merge multiple shifts per employee and attach employee info
   const empMap = new Map<string, DaySplitEmployee>();
   for (const shift of shifts) {
-    const emp = (shift.employees as unknown as { id: string; name: string; role: string | null } | null);
+    const emp = (shift.employees as unknown as {
+      id: string; name: string; role: string | null; tip_mode: string | null;
+    } | null);
     if (!emp) continue;
     if (DAY_SPLIT_EXCLUDED.has(emp.name.toLowerCase().trim())) continue;
 
@@ -853,7 +878,15 @@ export async function getDaySplitData(date: string): Promise<DaySplitData | null
     if (empMap.has(emp.id)) {
       empMap.get(emp.id)!.hours += hours;
     } else {
-      empMap.set(emp.id, { id: emp.id, name: emp.name, role: emp.role, hours });
+      const participant = { role: emp.role, tipMode: emp.tip_mode };
+      empMap.set(emp.id, {
+        id: emp.id,
+        name: emp.name,
+        role: emp.role,
+        hours,
+        tipRole: classifyTipRole(participant),
+        excludedReason: tipExclusionReason(participant),
+      });
     }
   }
 
@@ -866,6 +899,8 @@ export async function getDaySplitData(date: string): Promise<DaySplitData | null
     totalTips: ((day?.cash_tips as number) ?? 0) + ((day?.cc_tips as number) ?? 0),
     totalSales: (day?.total_sales as number) ?? 0,
     employees,
+    openerBonus: openerBonusFromSettings(org.bar_settings ?? {}),
+    barbackFraction: barbackFractionFromSettings(org.bar_settings ?? {}),
   };
 }
 

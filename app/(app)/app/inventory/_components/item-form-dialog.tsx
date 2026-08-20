@@ -4,7 +4,7 @@ import { useEffect, useTransition, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { Calculator, Wine } from 'lucide-react';
+import { Calculator, Info, Wine } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select';
+import { describePour } from '@/lib/pos/pour';
 import { inventoryItemSchema, type InventoryItemInput } from '@/lib/schemas/inventory';
 import { createItem, updateItem } from '../actions';
 import type { ItemRow } from './inventory-table';
@@ -73,6 +74,7 @@ export function ItemFormDialog({
   const bottleSizeMl     = watch('bottle_size_ml');
   const pourSizeOz       = watch('pour_size_oz') ?? defaultPourOz;
   const costPrice        = watch('cost_price');
+  const salePrice        = watch('sale_price');
 
   // Auto-detect liquor category
   useEffect(() => {
@@ -87,6 +89,30 @@ export function ItemFormDialog({
   const bottleOz  = bottleSizeMl ? bottleSizeMl * ML_TO_OZ : null;
   const servings  = bottleOz && pourSizeOz > 0 ? bottleOz / pourSizeOz : null;
   const costPer   = servings && costPrice && costPrice > 0 ? costPrice / servings : null;
+
+  // Derived from the SAME helper the ingest route depletes with, so the
+  // explanation below cannot drift from the arithmetic it describes. That is
+  // exactly what describePour exists for — a separately-written explanation is
+  // how this screen ended up claiming pour size was "for costing only".
+  const pour = describePour(
+    {
+      bottleSizeMl: bottleSizeMl ?? null,
+      pourSizeOz: watch('pour_size_oz') ?? null,
+    },
+    { orgPourOz: defaultPourOz },
+  );
+
+  // Margin on one sale, which is the figure an operator is actually pricing
+  // against. Compared against cost-per-pour when the item is poured and against
+  // the flat unit cost when it is not — mixing the two is precisely the
+  // confusion this panel exists to remove.
+  const unitCostOfOneSale = isBottle && costPer !== null ? costPer : (costPrice ?? null);
+  const margin =
+    salePrice != null && salePrice > 0 && unitCostOfOneSale != null
+      ? salePrice - unitCostOfOneSale
+      : null;
+  const marginPct =
+    margin !== null && salePrice ? (margin / salePrice) * 100 : null;
 
   // Available bottle sizes (settings + any existing value)
   const availableSizes = Array.from(new Set([
@@ -206,16 +232,30 @@ export function ItemFormDialog({
           </div>
 
           {/* ── Pricing & stock ─────────────────────────────────────── */}
+          {/* The two prices are measured in DIFFERENT units, and labelling them
+              both "price" is what made this screen unreadable. Cost is what you
+              pay a distributor for one {unit}. Sale price is what the POS
+              charges for one thing on the menu — a shot, not a bottle. */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="cost_price">Cost price</Label>
+              <Label htmlFor="cost_price">Cost per {currentUnit}</Label>
               <Input id="cost_price" type="number" step="0.01" min="0"
                 {...register('cost_price', { setValueAs: (v) => v === '' ? null : parseFloat(v) })} />
+              <p className="text-xs text-muted-foreground">
+                What you pay for one {currentUnit} from the supplier.
+              </p>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="sale_price">Sale price</Label>
+              <Label htmlFor="sale_price">
+                Menu price {isBottle ? 'per pour' : `per ${currentUnit}`}
+              </Label>
               <Input id="sale_price" type="number" step="0.01" min="0"
                 {...register('sale_price', { setValueAs: (v) => v === '' ? null : parseFloat(v) })} />
+              <p className="text-xs text-muted-foreground">
+                {isBottle
+                  ? 'What a customer pays for one pour of this.'
+                  : `What a customer pays for one ${currentUnit}.`}
+              </p>
             </div>
           </div>
 
@@ -295,33 +335,108 @@ export function ItemFormDialog({
                   </div>
                 </div>
 
-                {/* Live calculations */}
+                {/* A pour size with no container size is the misconfiguration
+                    that silently deducts a whole bottle per shot. describePour
+                    detects it; without this the item just looks fine. */}
+                {pour.warning && (
+                  <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
+                    {pour.warning}
+                  </p>
+                )}
+
+                {/* Live calculations, written as a sentence first.
+                    A grid of labelled numbers assumes the reader already knows
+                    how the numbers relate; the sentence is what a bar manager
+                    can check against reality without being taught the model. */}
                 {servings !== null && (
-                  <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 space-y-1.5">
+                  <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 space-y-2">
                     <p className="text-xs font-semibold text-primary flex items-center gap-1.5">
-                      <Calculator className="h-3.5 w-3.5" /> Auto-calculated
+                      <Calculator className="h-3.5 w-3.5" /> What this works out to
                     </p>
-                    <div className="grid grid-cols-2 gap-x-4 text-xs text-muted-foreground">
-                      <div className="flex justify-between">
-                        <span>Bottle volume</span>
-                        <span className="tabular-nums">{bottleOz?.toFixed(1)} oz</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Servings / bottle</span>
-                        <span className="tabular-nums font-semibold text-foreground">{servings.toFixed(1)}</span>
-                      </div>
+
+                    <p className="text-sm leading-relaxed">
+                      One {bottleSizeMl} ml bottle holds{' '}
+                      <strong className="tabular-nums">{bottleOz?.toFixed(1)} oz</strong>, so at a{' '}
+                      <strong className="tabular-nums">{pourSizeOz} oz</strong> pour you get about{' '}
+                      <strong className="tabular-nums">{servings.toFixed(1)} pours</strong> out of it.
                       {costPer !== null && (
-                        <div className="flex justify-between col-span-2">
-                          <span>Cost per pour</span>
-                          <span className="tabular-nums font-semibold text-foreground">${costPer.toFixed(3)}</span>
-                        </div>
+                        <> Each pour costs you{' '}
+                          <strong className="tabular-nums">${costPer.toFixed(2)}</strong>.</>
                       )}
-                    </div>
+                      {margin !== null && marginPct !== null && (
+                        <> Selling it at{' '}
+                          <strong className="tabular-nums">${salePrice?.toFixed(2)}</strong> leaves{' '}
+                          <strong className="tabular-nums">${margin.toFixed(2)}</strong> a pour
+                          ({marginPct.toFixed(0)}% margin).</>
+                      )}
+                    </p>
+
+                    {costPer === null && (
+                      <p className="text-xs text-muted-foreground">
+                        Enter a cost per {currentUnit} to see cost per pour.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
             )}
           </div>
+
+          {/* The single most-asked question about this screen, answered where it
+              is asked. Stock depletes one unit per POS item sold — there is no
+              pour-to-bottle conversion anywhere in the pipeline, so saying
+              otherwise here would be a comforting lie. */}
+          <details className="rounded-xl border bg-muted/20 group">
+            <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 text-sm font-medium">
+              <Info className="h-4 w-4 text-muted-foreground shrink-0" />
+              How does stock tracking actually work?
+            </summary>
+            <div className="space-y-2 border-t px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+              <p>
+                <strong className="text-foreground">Stock is counted in {currentUnit}s.</strong>{' '}
+                &ldquo;Current stock: 8&rdquo; means eight {currentUnit}s on the shelf.
+              </p>
+              <p>
+                <strong className="text-foreground">
+                  {pour.pourOz === null
+                    ? `Every POS sale removes one whole ${currentUnit}.`
+                    : `Every POS sale removes one ${pour.pourOz} oz pour.`}
+                </strong>{' '}
+                {pour.pourOz === null
+                  ? `Nothing here is sold by the pour, so ringing up 12 drops stock by 12 ${currentUnit}s.`
+                  : `Ringing up 12 drops stock by about ${(pour.unitsPerSale * 12).toFixed(2)} ${currentUnit}s, not by 12.`}
+              </p>
+              <p>
+                <strong className="text-foreground">
+                  Pouring needs BOTH a container size and a pour size.
+                </strong>{' '}
+                A pour size on its own cannot say what fraction of anything it is,
+                so the sale falls back to one whole {currentUnit}. The pour is taken
+                from this item, or its category, or the bar-wide default &mdash; in
+                that order.
+                {pour.source !== 'none' && (
+                  <> This one is currently coming from{' '}
+                    <strong className="text-foreground">
+                      {pour.source === 'item' ? 'this item' : `the ${pour.source} default`}
+                    </strong>.
+                  </>
+                )}
+              </p>
+              <p>
+                <strong className="text-foreground">
+                  To correct stock, use Adjust stock &rarr; Physical count.
+                </strong>{' '}
+                That is the only thing that sets the number to what is really on
+                the shelf.
+              </p>
+              <p>
+                <strong className="text-foreground">Weigh sessions do not change stock.</strong>{' '}
+                They measure what was actually poured, in ounces, and cost the
+                variance against your bottle cost. Treat them as a report on
+                pouring, not as a stock count.
+              </p>
+            </div>
+          </details>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>

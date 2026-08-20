@@ -144,7 +144,126 @@ export default function PayrollTable({
   const COLUMNS = canAdjust ? 11 : 10;
 
   return (
-    <div className="overflow-x-auto rounded-xl border">
+    <>
+      {/* Phones get cards, not a sideways-scrolling grid.
+          Eleven columns cannot be made to fit a 375px screen, and a manager
+          checking a run on the bar floor reads one person at a time anyway.
+          Both layouts are built from the same `groups` array, so they cannot
+          drift apart. */}
+      <div className="space-y-5 sm:hidden">
+        {groups.map((group) => (
+          <section key={group.role} className="space-y-2">
+            <h3 className="flex items-baseline gap-2 px-1">
+              <span className="font-heading text-xs font-semibold uppercase tracking-wider">
+                {group.label}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {group.rows.length} {group.rows.length === 1 ? 'person' : 'people'}
+              </span>
+            </h3>
+
+            {group.rows.map((entry) => (
+              <div key={entry.employeeId} className="rounded-xl border bg-card p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{entry.employeeName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {entry.totalHours.toFixed(2)} hrs @ ${entry.hourlyRate.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span className="tabular-nums text-lg font-semibold text-primary">
+                      {fmt(entry.totalCompensation)}
+                    </span>
+                    {canAdjust && (
+                      <button
+                        type="button"
+                        onClick={() => setAdjusting(entry)}
+                        aria-label={`Adjust ${entry.employeeName}`}
+                        // 44px — the smallest reliably tappable target on a phone.
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
+                        <SlidersHorizontal className="h-4 w-4" aria-hidden />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 border-t pt-3 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Reg. hrs</dt>
+                    <dd className="tabular-nums">{entry.regularHours.toFixed(2)}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">OT hrs</dt>
+                    <dd className={`tabular-nums ${entry.overtimeHours > 0 ? 'font-medium text-amber-600 dark:text-amber-300' : 'text-muted-foreground'}`}>
+                      {entry.overtimeHours.toFixed(2)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Reg. pay</dt>
+                    <dd className="tabular-nums">{fmt(entry.regularPay)}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">OT pay</dt>
+                    <dd className={`tabular-nums ${entry.overtimePay > 0 ? 'text-amber-600 dark:text-amber-300' : 'text-muted-foreground'}`}>
+                      {fmt(entry.overtimePay)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Tips</dt>
+                    <dd className="tabular-nums text-cyan-700 dark:text-cyan-300">
+                      {fmt(entry.tipAmount)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Eff. /hr</dt>
+                    <dd className="tabular-nums">
+                      {entry.totalHours > 0 ? fmt(entry.effectiveHourlyRate) : '—'}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            ))}
+
+            <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-2.5 text-sm">
+              <span className="font-medium text-muted-foreground">{group.label} subtotal</span>
+              <span className="tabular-nums font-semibold">
+                {group.subtotal.totalHours.toFixed(2)} hrs · {fmt(group.subtotal.totalCompensation)}
+              </span>
+            </div>
+          </section>
+        ))}
+
+        <div className="rounded-xl border-2 bg-card p-4">
+          <div className="flex items-baseline justify-between">
+            <span className="font-heading text-sm font-semibold uppercase tracking-wider">Totals</span>
+            <span className="tabular-nums text-xl font-bold text-primary">
+              {fmt(totals.totalCompensation)}
+            </span>
+          </div>
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 border-t pt-3 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Total hrs</dt>
+              <dd className="tabular-nums">{totals.totalHours.toFixed(2)}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Tips</dt>
+              <dd className="tabular-nums text-cyan-700 dark:text-cyan-300">{fmt(totals.tips)}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Reg. pay</dt>
+              <dd className="tabular-nums">{fmt(totals.regularPay)}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">OT pay</dt>
+              <dd className="tabular-nums text-amber-600 dark:text-amber-300">{fmt(totals.overtimePay)}</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-xl border sm:block">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -329,10 +448,11 @@ export default function PayrollTable({
           </TableRow>
         </TableBody>
       </Table>
+      </div>
 
       {/* Mounted only while open: the form holds its own state, and keeping one
           instance per table would reset nothing and cost a render on every row
-          change. */}
+          change. Shared by both layouts. */}
       {canAdjust && adjusting && (
         <AdjustDialog
           open={!!adjusting}
@@ -343,7 +463,7 @@ export default function PayrollTable({
           endDate={endDate ?? ''}
         />
       )}
-    </div>
+    </>
   );
 }
 

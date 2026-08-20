@@ -18,6 +18,8 @@ import { createHmac }                from 'crypto';
 import { createAdminClient }         from '@/lib/supabase/admin';
 import { buildExclusionSet, isExcluded, posItemMatchKey } from '@/lib/pos/excluded-items';
 import { resolveSales, toRpcComponents, type BundleRecipe, type InventoryRef } from '@/lib/pos/bundles';
+import { partitionShifts, shiftKey } from '@/lib/payroll/manual-hours';
+import type { SyncSummary } from '@/lib/pos/sync-health';
 
 export const runtime     = 'nodejs';
 export const maxDuration = 30;
@@ -144,6 +146,7 @@ async function recordSyncOutcome(
   orgId: string,
   posConfig: Record<string, unknown>,
   errors: string[],
+  summary?: SyncSummary,
 ): Promise<void> {
   const supabase = createAdminClient();
   const { error } = await supabase
@@ -153,6 +156,10 @@ async function recordSyncOutcome(
         ...posConfig,
         last_sync_at: new Date().toISOString(),
         last_sync_errors: errors.slice(0, 5).map((e) => e.slice(0, 300)),
+        // What the sync actually moved. Without it the status line can only say
+        // "it ran", which does not distinguish a healthy night from an agent
+        // dutifully posting empty payloads every five minutes.
+        last_sync_summary: summary ?? null,
       },
     })
     .eq('id', orgId);
@@ -219,6 +226,10 @@ export async function POST(req: NextRequest) {
   const result   = {
     zReports: 0,
     ewReports: 0,
+    // Shifts left alone because a person had corrected them. Reported so a
+    // silently-skipped write is visible in the agent log rather than looking
+    // like the sync did nothing.
+    shiftsProtected: 0,
     itemAudit: 0,
     itemAuditSkipped: 0,
     // Bundle/depletion observability. `stockMoved` counts item-days actually
@@ -338,7 +349,7 @@ export async function POST(req: NextRequest) {
       const empId = empByName.get(name.toLowerCase());
       if (!empId) continue;
 
-      shifts.set(`${empId}|${row.shift_date}`, {
+      shifts.set(shiftKey(empId, row.shift_date), {
         organization_id: resolvedOrgId,
         employee_id:     empId,
         shift_date:      row.shift_date,
@@ -357,12 +368,46 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Hours a person corrected by hand are protected from being overwritten.
+    //
+    // Same problem, and the same shape of fix, as the cash-tips guard above.
+    // The agent re-sends a rolling window every five minutes, so an unguarded
+    // upsert reverted every manual correction within minutes of it being made
+    // — while leaving the payroll_adjustments row in place, so the audit log
+    // described a change the pay run no longer reflected.
+    //
+    // Read once for the whole window rather than per row: this is a 5-minute
+    // loop and the previous version of this block was rewritten specifically to
+    // stop issuing round-trips per shift.
     if (shifts.size) {
-      const { error } = await supabase
+      const dates = [...new Set([...shifts.values()].map(s => s.shift_date))];
+      const { data: manualRows, error: manualErr } = await supabase
         .from('employee_shifts')
-        .upsert([...shifts.values()], { onConflict: 'organization_id,employee_id,shift_date' });
-      if (error) result.errors.push(`employee_shifts: ${error.message}`);
-      else result.ewReports = shifts.size;
+        .select('employee_id, shift_date')
+        .eq('organization_id', resolvedOrgId)
+        .eq('hours_source', 'manual')
+        .in('shift_date', dates);
+
+      // Fail loudly rather than overwriting. If this lookup breaks we cannot
+      // tell which rows are protected, and guessing "none" silently destroys
+      // exactly the corrections this guard exists to keep.
+      if (manualErr) {
+        result.errors.push(`employee_shifts manual lookup: ${manualErr.message}`);
+      }
+
+      if (!manualErr) {
+        const { writable, protectedCount } = partitionShifts(shifts, manualRows ?? []);
+
+        if (writable.length) {
+          const { error } = await supabase
+            .from('employee_shifts')
+            .upsert(writable, { onConflict: 'organization_id,employee_id,shift_date' });
+          if (error) result.errors.push(`employee_shifts: ${error.message}`);
+          else result.ewReports = writable.length;
+        }
+
+        result.shiftsProtected = protectedCount;
+      }
     }
 
     if (tips.size) {
@@ -585,7 +630,14 @@ export async function POST(req: NextRequest) {
   // and carries on so one bad day cannot block the rest, but "carries on" also
   // meant the only trace was a server log nobody reads. The POS settings panel
   // now shows the last sync and anything that went wrong on it.
-  await recordSyncOutcome(resolvedOrgId, posConfig, result.errors);
+  await recordSyncOutcome(resolvedOrgId, posConfig, result.errors, {
+    zReports: result.zReports,
+    ewReports: result.ewReports,
+    shiftsProtected: result.shiftsProtected,
+    itemAudit: result.itemAudit,
+    stockMoved: result.stockMoved,
+    unresolvedItems: result.unresolvedItems,
+  });
 
   if (result.errors.length) {
     console.error(`[2touch/ingest] org=${resolvedOrgId} FAILED`, result.errors);

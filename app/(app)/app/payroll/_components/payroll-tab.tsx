@@ -115,8 +115,11 @@ export default function PayrollTab({
         </div>
       )}
 
-      {/* Week navigator */}
-      <div className="flex items-center justify-between gap-4">
+      {/* Week navigator.
+          Wraps on a phone: the arrows-and-label group and the date form are
+          each about 200-370px, so side by side they forced the page wider than
+          the viewport and the whole of Payroll scrolled sideways. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => navigateWeek('prev')}>
             <ChevronLeft className="h-4 w-4" />
@@ -129,20 +132,27 @@ export default function PayrollTab({
           </Button>
         </div>
 
-        {/* Manual date picker */}
-        <form method="GET" className="flex items-center gap-2">
+        {/* Manual date picker.
+            Two native date inputs are ~143px each on a phone, so the old
+            single-line flex measured 368px inside a 375px viewport and pushed
+            the whole document to 682px wide — the entire payroll page scrolled
+            sideways. It wraps now, and the inputs share the row so the pair
+            still reads as one range. */}
+        <form method="GET" className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <input
             type="date"
             name="startDate"
             defaultValue={startDate}
-            className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+            aria-label="Start date"
+            className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm sm:flex-none"
           />
           <span className="text-muted-foreground text-sm">to</span>
           <input
             type="date"
             name="endDate"
             defaultValue={endDate}
-            className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+            aria-label="End date"
+            className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm sm:flex-none"
           />
           <input type="hidden" name="tab" value="payroll" />
           <Button type="submit" size="sm" variant="secondary">

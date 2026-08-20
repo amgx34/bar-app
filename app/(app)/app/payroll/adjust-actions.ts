@@ -45,6 +45,12 @@ const openerSchema = z.object({
   shiftDate: isoDate,
 });
 
+const revertSchema = z.object({
+  employeeId: z.string().uuid(),
+  shiftDate: isoDate,
+  reason,
+});
+
 /** Throws unless every id belongs to the caller's organisation. */
 async function assertEmployeesInOrg(
   supabase: ReturnType<typeof createAdminClient>,
@@ -112,6 +118,11 @@ export async function adjustShiftHours(raw: unknown): Promise<void> {
         shift_date: input.shiftDate,
         regular_hours: input.regularHours,
         overtime_hours: input.overtimeHours,
+        // Claims the row for the operator. Without this the agent's next sync
+        // — at most five minutes away — silently reverted the correction while
+        // leaving the adjustment log below in place, so the figures and their
+        // own explanation disagreed.
+        hours_source: 'manual',
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'organization_id,employee_id,shift_date' },
@@ -322,7 +333,14 @@ export async function removeFromShift(raw: unknown): Promise<void> {
   // and the function throws when it is missing, so this id is always in-org.
   const { error: writeErr } = await supabase
     .from('employee_shifts')
-    .update({ regular_hours: 0, overtime_hours: 0, updated_at: new Date().toISOString() })
+    // hours_source too: zeroing a shift is exactly the case where the POS still
+    // believes the person worked, so it is the most likely of all to be undone.
+    .update({
+      regular_hours: 0,
+      overtime_hours: 0,
+      hours_source: 'manual',
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', shift.id);
 
   if (writeErr) throw new Error(`Could not remove that shift: ${writeErr.message}`);
@@ -390,4 +408,74 @@ export async function getShiftRoster(shiftDate: string): Promise<RosterEntry[]> 
     hours: byEmployee.get(e.id) ?? 0,
     onShift: byEmployee.has(e.id),
   }));
+}
+
+/**
+ * Hands a shift back to the POS.
+ *
+ * Correcting hours marks the row `hours_source = 'manual'`, which stops the
+ * 2Touch agent overwriting it. That lock is deliberate but permanent, and it is
+ * wrong once the POS itself has been fixed: the operator would be stuck with a
+ * figure they no longer want, and re-syncing would appear to do nothing.
+ *
+ * Logged like any other adjustment. Releasing the lock is a decision about what
+ * somebody gets paid — the next sync may move the figure — so it belongs in the
+ * same audit trail as the correction that created it, not in a silent toggle.
+ *
+ * Idempotent: reverting a row the POS already owns changes nothing and is not an
+ * error. The caller cannot see `hours_source` from the payroll table, so asking
+ * is a reasonable thing to do.
+ */
+export async function revertShiftToPos(raw: unknown): Promise<{ wasLocked: boolean }> {
+  const { org, role } = await getCurrentOrg();
+  if (!canManagePayroll(role)) throw new Error('Not authorized');
+
+  const input = revertSchema.parse(raw);
+  const user = await getAuthUser();
+  const supabase = createAdminClient();
+
+  await assertEmployeesInOrg(supabase, org.id, [input.employeeId]);
+
+  const { data: shift } = await supabase
+    .from('employee_shifts')
+    .select('id, regular_hours, overtime_hours, hours_source')
+    .eq('organization_id', org.id)
+    .eq('employee_id', input.employeeId)
+    .eq('shift_date', input.shiftDate)
+    .maybeSingle();
+
+  if (!shift) throw new Error('No shift recorded for that employee on that date');
+  if (shift.hours_source !== 'manual') return { wasLocked: false };
+
+  const current =
+    (Number(shift.regular_hours) || 0) + (Number(shift.overtime_hours) || 0);
+
+  // The log entry is written BEFORE the unlock, and records the figure as both
+  // before and after, because reverting does not itself change the hours — it
+  // changes who is allowed to. The next sync is what may move them, and this row
+  // is what explains why they moved on their own.
+  const { error: logErr } = await supabase.from('payroll_adjustments').insert({
+    organization_id: org.id,
+    shift_date: input.shiftDate,
+    kind: 'hours',
+    employee_id: input.employeeId,
+    hours_before: current,
+    hours_after: current,
+    reason: `Released to POS sync: ${input.reason}`,
+    created_by: user?.id ?? null,
+  });
+
+  if (logErr) throw new Error(`Could not record that change: ${logErr.message}`);
+
+  const { error } = await supabase
+    .from('employee_shifts')
+    .update({ hours_source: 'pos', updated_at: new Date().toISOString() })
+    .eq('organization_id', org.id)
+    .eq('employee_id', input.employeeId)
+    .eq('shift_date', input.shiftDate);
+
+  if (error) throw new Error(`Could not release that shift: ${error.message}`);
+
+  revalidatePath('/app/payroll');
+  return { wasLocked: true };
 }

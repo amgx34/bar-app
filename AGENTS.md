@@ -15,7 +15,8 @@ One org = one bar; users join orgs via a `memberships` table.
 npm run dev          # next dev
 npm run build        # next build
 npm run lint         # eslint
-npx tsc --noEmit     # typecheck (no test runner in the Next app)
+npx tsc --noEmit     # typecheck
+npm test             # vitest, unit tests for the pure money functions in lib/
 ```
 
 Sibling codebases have their own toolchains:
@@ -79,6 +80,25 @@ The agent re-sends a 2-day window every 5 minutes, so depletion is delta-based
 against `pos_stock_applications` — never subtract what the POS reports, subtract
 the difference from what was already applied. `pos_apply_item_sales()` does this
 atomically; see `supabase/migrations/20260817000003_*.sql`.
+
+**Drinks and stock are different units, and the conversion is in TypeScript.**
+`lib/pos/pour.ts` turns a POS sale into stock consumed (`unitsPerSale`), resolving
+the pour size item → category → org. `lib/pos/bundles.ts` applies it *before* the
+RPC, so `pos_apply_item_sales()` receives quantities already in stock units and
+its 1:1 subtraction is correct — do not add a second conversion in SQL. It needs
+BOTH a container size and a pour size; either alone deducts one whole unit.
+
+Which side of that line a figure sits on is not guessable from its name:
+
+| stock units | drinks (POS units) |
+|---|---|
+| `inventory_items.current_stock`, `cost_price`, `par_level` | `inventory_items.sale_price` |
+| `usage_logs.quantity` | `pos_item_sales.qty_sold` |
+| `pos_bundle_components.quantity` when `unit='each'` | `pos_bundle_components.quantity` when `unit='oz'` |
+
+`Books COGS = usage_logs.quantity × cost_price`, so anything writing `usage_logs`
+must write stock units. `lib/pos/velocity.ts` sums both sources and converts the
+sales side first. `lib/pos/*.test.ts` pins these invariants down.
 
 **Cash tips entered by a person outrank the POS.** `z_report_days.cash_tips` has
 two writers: the agent's Z feed and the payroll close screen

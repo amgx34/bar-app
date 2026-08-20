@@ -1,0 +1,645 @@
+[     370ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[     467ms] [LOG] [Fast Refresh] done in 209ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[     573ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[     652ms] [LOG] [Fast Refresh] done in 183ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[    1571ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[    1616ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[    3012ms] [INFO] Loading the script 'https://va.vercel-scripts.com/v1/script.debug.js' violates the following Content Security Policy directive: "script-src 'self' 'unsafe-inline' 'unsafe-eval'". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The policy is report-only, so the violation has been logged but no further action has been taken. @ http://localhost:3000/_next/static/chunks/node_modules_04laho7._.js:174
+[    3018ms] [LOG] %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[    3018ms] [LOG] %c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {route: /app/inventory, path: /app/inventory} @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[    3019ms] [LOG] %c[Vercel Web Analytics]%c [view] http://localhost:3000/app/inventory?q=Grey%20Goose color: rgb(120, 120, 120) color: inherit {o: http://localhost:3000/app/inventory?q=Grey%20Goose, sv: 0.1.3, sdkn: @vercel/analytics/next, sdkv: 2.0.1, ts: 1787195489862} /_vercel/insights/view @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   28163ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   28242ms] [LOG] [Fast Refresh] done in 186ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   37295ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   37374ms] [LOG] [Fast Refresh] done in 190ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   47683ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   47684ms] [LOG] [Fast Refresh] done in 110ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[  126942ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[  129497ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:3272
+[  130065ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:3272
+[  130178ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[  131714ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:3272
+[  131821ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[  131931ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:3272
+[  132040ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[  134224ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:3272
+[  134225ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/app/inventory?q=Grey%20Goose&_rsc=14qvt:0
+[  134354ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:3272
+[  134419ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:3272
+[  134484ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:3272
+[  134529ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/app/inventory?q=Grey%20Goose&_rsc=14qvt:0
+[  134556ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:3272
+[  134635ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/app/inventory?q=Grey+Goose:0
+[  134779ms] [ERROR] Refused to execute script from 'http://localhost:3000/_next/static/development/_clientMiddlewareManifest.js' because its MIME type ('application/json') is not executable, and strict MIME type checking is enabled. @ http://localhost:3000/app/inventory?q=Grey+Goose:0
+[  134855ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/node_modules_react-dom_0bruynb._.js:15305
+[  134973ms] Error: ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed
+
+
+    at <unknown> (Error: ./app/(app)/app/inventory/page.tsx:35:26)
+    at Object.getCompilationErrors (file://C:\Users\notug\bar-app\node_modules\next\dist\server\dev\hot-reloader-turbopack.js:1186:59)
+    at DevBundlerService.getCompilationError (file://C:\Users\notug\bar-app\node_modules\next\dist\server\lib\dev-bundler-service.js:44:55)
+    at DevServer.getCompilationError (file://C:\Users\notug\bar-app\node_modules\next\dist\server\dev\next-dev-server.js:719:42)
+    at DevServer.findPageComponents (file://C:\Users\notug\bar-app\node_modules\next\dist\server\dev\next-dev-server.js:689:43)
+    at async DevServer.renderErrorToResponseImpl (file://C:\Users\notug\bar-app\node_modules\next\dist\server\base-server.js:1745:26)
+[  134999ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1226
+[  135026ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  135147ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1226
+[  135233ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  135301ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  135365ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  135443ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  135520ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  135598ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  135678ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  135755ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  135817ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  135879ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  135942ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  136004ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  136083ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  136161ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  136224ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  136301ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  136379ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  136441ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  136503ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  136565ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  136627ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  136689ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  136752ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  136815ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  136876ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  136939ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  137001ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  137063ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  137125ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  137203ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  137265ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  137328ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  137389ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  137452ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  137515ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  137576ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  137638ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  137702ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  137764ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  137827ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  137904ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  137966ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  138077ms] [ERROR] ./app/(app)/app/inventory/page.tsx:35:26
+Expected ',', got 'ident'
+  33 |       current_stock, is_active, category_id, rep_id,
+  34 |       -- Load-bearing, not display detail. ItemRow declares both and the edit
+> 35 |       -- dialog derives `isBottle` from bottle_size_ml; omitted here they came
+     |                          ^^^^^^^^
+  36 |       -- through as undefined, so opening Edit on a spirit and saving wrote both
+  37 |       -- back as NULL. That silently switched off the pour conversion for that
+  38 |       -- item, and it went back to deducting a whole bottle per shot.
+
+Parsing ecmascript source code failed @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1945
+[  138184ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1226
+[  140724ms] [LOG] [Fast Refresh] done in 2630ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1226
+[  142454ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1226
+[  143645ms] [LOG] [Fast Refresh] done in 1306ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1226
+[  143871ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1226
+[  143873ms] [LOG] [Fast Refresh] done in 110ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1226
+[  143995ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1226
+[  144932ms] [LOG] [Fast Refresh] done in 1042ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_0u_w_5s._.js:1226
+[  145755ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[  145803ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[  145944ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[  146175ms] [LOG] [Fast Refresh] done in 340ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[  147752ms] [INFO] Loading the script 'https://va.vercel-scripts.com/v1/script.debug.js' violates the following Content Security Policy directive: "script-src 'self' 'unsafe-inline' 'unsafe-eval'". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The policy is report-only, so the violation has been logged but no further action has been taken. @ http://localhost:3000/_next/static/chunks/node_modules_04laho7._.js:174
+[  147758ms] [LOG] %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[  147758ms] [LOG] %c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {route: /app/inventory, path: /app/inventory} @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[  147759ms] [LOG] %c[Vercel Web Analytics]%c [view] http://localhost:3000/app/inventory?q=Grey+Goose color: rgb(120, 120, 120) color: inherit {o: http://localhost:3000/app/inventory?q=Grey+Goose, sv: 0.1.3, sdkn: @vercel/analytics/next, sdkv: 2.0.1, ts: 1787195634602} /_vercel/insights/view @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431

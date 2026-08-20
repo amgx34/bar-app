@@ -35,6 +35,48 @@ const TOOLTIP_STYLE = {
 const TOOLTIP_TEXT = { color: '#e0e0e0' };
 
 /**
+ * Quantities are NUMERIC in the database and summed in JS, so three 0.1 pours
+ * arrive as 0.30000000000000004. Printing that raw is how a tidy list turns
+ * into line noise. Two decimals is past anything a bar counts, and trailing
+ * zeros are dropped so whole units stay whole.
+ */
+function fmtQty(n: number): string {
+  if (!Number.isFinite(n)) return '0';
+  return String(Math.round(n * 100) / 100);
+}
+
+/**
+ * The same ranking as a list, for phones.
+ *
+ * A horizontal bar chart cannot show "Grey Goose Vodka 750ml" in a 290px
+ * card: a 140px name gutter leaves nothing for the bars, and Recharts
+ * responds by clipping the ticks to "Gre…" and "Ti…", which is exactly the
+ * unreadable-names problem the wider axis was meant to fix. A list gives the
+ * name the full width and keeps the comparison via a proportional bar.
+ */
+function RankedList({ entries, tone }: { entries: ChartEntry[]; tone: string }) {
+  const max = Math.max(...entries.map((e) => e.total), 1);
+  return (
+    <ul className="space-y-2.5">
+      {entries.map((entry) => (
+        <li key={entry.name} className="space-y-1">
+          <div className="flex items-baseline justify-between gap-3 text-sm">
+            <span className="min-w-0 truncate">{entry.name}</span>
+            <span className="shrink-0 tabular-nums font-medium">{fmtQty(entry.total)}</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full"
+              style={{ width: `${(entry.total / max) * 100}%`, background: tone }}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
  * InventoryDashboard displays an overview of inventory statistics, including top sellers,
  * biggest losses, total cost of products on hand, and details about the latest shipment.
  *
@@ -99,9 +141,14 @@ export function InventoryDashboard({
     };
   }, [usageLogs]);
 
-  const TRUNCATE_LENGTH = 12;
+  // 12 characters in an 84px gutter cut almost every real bottle name down to
+  // something unreadable — "Tito's Handmade Vodka" arrived as "Tito's Handm…",
+  // and two Jameson expressions were indistinguishable. The axis is wider and
+  // the cut later; the tooltip carries the untruncated name for the rest.
+  const AXIS_WIDTH = 140;
+  const TRUNCATE_LENGTH = 22;
   const truncate = (s: string, length: number = TRUNCATE_LENGTH) =>
-    s.length > length ? s.slice(0, length) + '…' : s;
+    s.length > length ? s.slice(0, length - 1).trimEnd() + '…' : s;
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -131,23 +178,35 @@ export function InventoryDashboard({
               {topSellers.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-4 text-center">No usage data yet</p>
               ) : (
-                <ResponsiveContainer width="100%" height={160}>
+                <>
+                <div className="sm:hidden">
+                  <RankedList entries={topSellers} tone={CHART_PRIMARY} />
+                </div>
+                <ResponsiveContainer width="100%" height={160} className="hidden sm:block">
                   <BarChart data={topSellers} layout="vertical" margin={{ left: 4, right: 20, top: 0, bottom: 0 }}>
                     <XAxis type="number" tick={{ fontSize: 11, fill: TICK_COLOR }} axisLine={false} tickLine={false} />
                     <YAxis
                       type="category"
                       dataKey="name"
                       tick={{ fontSize: 11, fill: TICK_COLOR }}
-                      width={84}
+                      width={AXIS_WIDTH}
                       axisLine={false}
                       tickLine={false}
                       tickFormatter={truncate}
                     />
-                   
-
+                    {/* The label is the full item name — the axis is the only
+                        place it gets shortened, so hovering always resolves it. */}
+                    <Tooltip
+                      contentStyle={TOOLTIP_STYLE}
+                      labelStyle={TOOLTIP_TEXT}
+                      itemStyle={TOOLTIP_TEXT}
+                      cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                      formatter={(value) => [`${fmtQty(Number(value ?? 0))} units`, 'Sold'] as [string, string]}
+                    />
                     <Bar dataKey="total" fill={CHART_PRIMARY} radius={[0, 4, 4, 0]} maxBarSize={18} />
                   </BarChart>
                 </ResponsiveContainer>
+                </>
               )}
             </CardContent>
           </Card>
@@ -164,14 +223,18 @@ export function InventoryDashboard({
               {biggestLosses.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-4 text-center">No loss data yet</p>
               ) : (
-                <ResponsiveContainer width="100%" height={160}>
+                <>
+                <div className="sm:hidden">
+                  <RankedList entries={biggestLosses} tone={CHART_LOSS} />
+                </div>
+                <ResponsiveContainer width="100%" height={160} className="hidden sm:block">
                   <BarChart data={biggestLosses} layout="vertical" margin={{ left: 4, right: 20, top: 0, bottom: 0 }}>
                     <XAxis type="number" tick={{ fontSize: 11, fill: TICK_COLOR }} axisLine={false} tickLine={false} />
                     <YAxis
                       type="category"
                       dataKey="name"
                       tick={{ fontSize: 11, fill: TICK_COLOR }}
-                      width={84}
+                      width={AXIS_WIDTH}
                       axisLine={false}
                       tickLine={false}
                       tickFormatter={truncate}
@@ -181,11 +244,12 @@ export function InventoryDashboard({
                       labelStyle={TOOLTIP_TEXT}
                       itemStyle={TOOLTIP_TEXT}
                       cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                      formatter={(value: any): any => [`${value ?? 0} units`, 'Lost']}
+                      formatter={(value) => [`${fmtQty(Number(value ?? 0))} units`, 'Lost'] as [string, string]}
                     />
                     <Bar dataKey="total" fill={CHART_LOSS} radius={[0, 4, 4, 0]} maxBarSize={18} />
                   </BarChart>
                 </ResponsiveContainer>
+                </>
               )}
             </CardContent>
           </Card>
@@ -228,7 +292,7 @@ export function InventoryDashboard({
                     {latestShipmentItems.map((item) => (
                       <li key={`${item.name}-${item.quantity}`} className="flex justify-between items-center text-sm">
                         <span className="truncate">{item.name}</span>
-                        <span className="text-muted-foreground ml-3 shrink-0 tabular-nums">+{item.quantity}</span>
+                        <span className="text-muted-foreground ml-3 shrink-0 tabular-nums">+{fmtQty(item.quantity)}</span>
                       </li>
                     ))}
                   </ul>

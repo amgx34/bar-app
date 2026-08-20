@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentOrg } from '@/lib/org';
+import { componentUnits, unitsPerSale } from '@/lib/pos/pour';
 import {
   computeDealPerformance,
   summariseDeals,
@@ -47,7 +48,7 @@ export async function getDealsAnalytics(): Promise<DealsAnalytics> {
   const [{ data: bundleRows }, { data: salesRows }] = await Promise.all([
     supabase
       .from('pos_bundles')
-      .select('id, item_name, match_key, is_active, pos_bundle_components(inventory_item_id, quantity)')
+      .select('id, item_name, match_key, is_active, pos_bundle_components(inventory_item_id, quantity, unit)')
       .eq('organization_id', org.id),
     supabase
       .from('pos_item_sales')
@@ -71,7 +72,7 @@ export async function getDealsAnalytics(): Promise<DealsAnalytics> {
   const { data: items } = componentIds.length
     ? await supabase
         .from('inventory_items')
-        .select('id, name, cost_price, sale_price')
+        .select('id, name, cost_price, sale_price, bottle_size_ml, pour_size_oz')
         .eq('organization_id', org.id)
         .in('id', componentIds)
     : { data: [] };
@@ -85,10 +86,36 @@ export async function getDealsAnalytics(): Promise<DealsAnalytics> {
     isActive: b.is_active,
     components: (b.pos_bundle_components ?? []).map((c) => {
       const item = itemById.get(c.inventory_item_id as string);
+      const pourItem = {
+        bottleSizeMl: item?.bottle_size_ml === null || item?.bottle_size_ml === undefined
+          ? null
+          : Number(item.bottle_size_ml),
+        pourSizeOz: item?.pour_size_oz === null || item?.pour_size_oz === undefined
+          ? null
+          : Number(item.pour_size_oz),
+      };
+
+      // The recipe's unit was being ignored here, so an 'oz' component costed
+      // its OUNCES at the per-bottle price: 1.5 oz of a $20 bottle read as $30
+      // rather than $1.18, and every cocktail deal looked like it sold below
+      // cost. componentUnits is the same conversion depletion uses.
+      const stockUnits = componentUnits(
+        Number(c.quantity),
+        (c.unit as 'each' | 'oz') ?? 'each',
+        pourItem,
+      );
+
+      // What the components would ring up as individually, for the a-la-carte
+      // comparison. sale_price is per DRINK, so stock units have to be turned
+      // back into a number of drinks before multiplying by it.
+      const perSale = unitsPerSale(pourItem);
+      const servings = perSale > 0 ? stockUnits / perSale : stockUnits;
+
       return {
         inventoryItemId: c.inventory_item_id as string,
         itemName: item?.name ?? 'Unknown item',
-        quantity: Number(c.quantity),
+        quantity: stockUnits,
+        servings,
         // Null, never 0: a missing cost must read as "unknown" so margin is
         // withheld rather than reported as 100%.
         costPrice: item?.cost_price === null || item?.cost_price === undefined

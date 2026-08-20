@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { Clock, ArrowLeftRight, Sunrise, UserMinus } from 'lucide-react';
+import { Clock, ArrowLeftRight, Sunrise, UserMinus, Unlock } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -13,10 +13,63 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { FormStatus } from '@/components/ui/form-status';
-import { adjustShiftHours, transferTips, setOpener, removeFromShift } from '../adjust-actions';
+import { adjustShiftHours, transferTips, setOpener, removeFromShift, revertShiftToPos } from '../adjust-actions';
 import type { PayrollEntry } from '../actions';
 
-type Mode = 'hours' | 'transfer' | 'opener' | 'remove';
+type Mode = 'hours' | 'transfer' | 'opener' | 'remove' | 'revert';
+
+// Mirrors the `reason` schema in adjust-actions.ts. Kept in step with it on
+// purpose: the server is still the authority, but a server rejection reaches
+// the browser as a redacted "an error occurred" in production, so a correction
+// refused for a missing reason used to fail silently. Checking here is what
+// turns that into a sentence the operator can act on.
+const REASON_MIN = 3;
+const REASON_MAX = 300;
+
+/** The reason a change cannot be saved yet, or null when it can. */
+function validate(
+  mode: Mode,
+  fields: { reason: string; regularHours: string; overtimeHours: string; counterparty: string; amount: string },
+): string | null {
+  if (mode !== 'opener') {
+    const reason = fields.reason.trim();
+    if (reason.length === 0) {
+      return 'Give a reason for this change — it is shown in the adjustment log and on the pay stub query later.';
+    }
+    if (reason.length < REASON_MIN) {
+      return `That reason is too short. Write at least ${REASON_MIN} characters saying what happened.`;
+    }
+    if (reason.length > REASON_MAX) {
+      return `That reason is ${reason.length} characters. Keep it under ${REASON_MAX}.`;
+    }
+  }
+
+  if (mode === 'hours') {
+    // An empty box coerces to 0 through Number(), which would quietly zero out
+    // somebody's night instead of failing. Catch it before it becomes a wage.
+    if (fields.regularHours.trim() === '') {
+      return 'Enter the regular hours for that night. Use 0 only if they genuinely worked none.';
+    }
+    const regular = Number(fields.regularHours);
+    const overtime = fields.overtimeHours.trim() === '' ? 0 : Number(fields.overtimeHours);
+    if (!Number.isFinite(regular) || regular < 0 || regular > 24) {
+      return 'Regular hours must be between 0 and 24.';
+    }
+    if (!Number.isFinite(overtime) || overtime < 0 || overtime > 24) {
+      return 'Overtime hours must be between 0 and 24.';
+    }
+  }
+
+  if (mode === 'transfer') {
+    if (!fields.counterparty) return 'Choose who the tips are moving to.';
+    const amount = Number(fields.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return 'Enter an amount greater than zero.';
+    }
+  }
+
+  return null;
+}
 
 /**
  * Manual corrections to one person's pay.
@@ -56,19 +109,28 @@ export function AdjustDialog({
   const [counterparty, setCounterparty] = useState('');
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
+  // Suppresses the inline warning until the operator has either tried to save
+  // or left the field, so an untouched dialog does not open shouting.
+  const [touched, setTouched] = useState(false);
 
   if (!entry) return null;
 
+  const reasonMissing = mode !== 'opener' && reason.trim().length < REASON_MIN;
+
   const others = everyone.filter((e) => e.employeeId !== entry.employeeId);
 
-  function run(fn: () => Promise<void>, success: string) {
+  // `fn` may return its own message when the outcome is not knowable up front —
+  // releasing a shift that was never locked succeeded, but "released to the POS"
+  // would be a lie.
+  function run(fn: () => Promise<string | void>, success: string) {
     setError(null);
     startTransition(async () => {
       try {
-        await fn();
-        toast.success(success);
+        const outcome = await fn();
+        toast.success(typeof outcome === 'string' ? outcome : success);
         setReason('');
         setAmount('');
+        setTouched(false);
         onOpenChange(false);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Could not save that change';
@@ -80,6 +142,17 @@ export function AdjustDialog({
 
   function submit() {
     if (!entry) return;
+
+    // Checked on submit rather than by disabling the button: a greyed-out
+    // control tells the operator nothing about what is missing, and "why can't
+    // I save this" is the exact confusion this is meant to remove.
+    const problem = validate(mode, { reason, regularHours, overtimeHours, counterparty, amount });
+    if (problem) {
+      setTouched(true);
+      setError(problem);
+      toast.error(problem);
+      return;
+    }
 
     if (mode === 'hours') {
       run(
@@ -109,6 +182,26 @@ export function AdjustDialog({
       return;
     }
 
+    if (mode === 'revert') {
+      run(
+        async () => {
+          const { wasLocked } = await revertShiftToPos({
+            employeeId: entry.employeeId,
+            shiftDate,
+            reason,
+          });
+          // Reported rather than swallowed: "nothing was locked" is a useful
+          // answer, not a failure, and claiming it was released would teach the
+          // operator that the button does something it did not do.
+          return wasLocked
+            ? `${entry!.employeeName}'s shift released to the POS`
+            : 'That shift was already following the POS — nothing to unlock.';
+        },
+        `${entry.employeeName}'s shift released to the POS`,
+      );
+      return;
+    }
+
     if (mode === 'remove') {
       run(
         () => removeFromShift({ employeeId: entry.employeeId, shiftDate, reason }),
@@ -128,6 +221,7 @@ export function AdjustDialog({
     { key: 'transfer', label: 'Move tips', icon: ArrowLeftRight },
     { key: 'opener', label: 'Opener', icon: Sunrise },
     { key: 'remove', label: 'Remove', icon: UserMinus },
+    { key: 'revert', label: 'Unlock', icon: Unlock },
   ];
 
   return (
@@ -141,14 +235,14 @@ export function AdjustDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex gap-1 rounded-lg bg-muted p-1">
+        <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
           {MODES.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               type="button"
-              onClick={() => { setMode(key); setError(null); }}
+              onClick={() => { setMode(key); setError(null); setTouched(false); }}
               aria-pressed={mode === key}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+              className={`flex min-w-[4.5rem] flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
                 mode === key
                   ? 'bg-background text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
@@ -244,6 +338,16 @@ export function AdjustDialog({
             </p>
           )}
 
+          {mode === 'revert' && (
+            <p className="text-sm text-muted-foreground">
+              Hands this night back to the POS. Corrected hours are frozen so the
+              2Touch sync cannot overwrite them &mdash; use this once the POS itself
+              has been fixed and you want its figures again.
+              <strong className="text-foreground"> The next sync may change what
+              {' '}{entry.employeeName} is paid for that night.</strong>
+            </p>
+          )}
+
           {mode === 'opener' && (
             <p className="text-sm text-muted-foreground">
               Marks {entry.employeeName} as the opener for that night. Only one
@@ -254,13 +358,29 @@ export function AdjustDialog({
 
           {mode !== 'opener' && (
             <div className="space-y-1.5">
-              <Label htmlFor="adj-reason">Reason</Label>
+              <Label htmlFor="adj-reason">
+                Reason <span className="text-destructive" aria-hidden>*</span>
+              </Label>
               <Input
                 id="adj-reason"
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                required
+                aria-required="true"
+                aria-invalid={touched && reasonMissing ? true : undefined}
+                aria-describedby="adj-reason-help"
+                onChange={(e) => { setReason(e.target.value); setError(null); }}
+                onBlur={() => setTouched(true)}
                 placeholder="Covered Dana's last hour"
+                className={touched && reasonMissing ? 'border-destructive focus-visible:ring-destructive' : undefined}
               />
+              <p
+                id="adj-reason-help"
+                className={`text-xs ${touched && reasonMissing ? 'text-destructive' : 'text-muted-foreground'}`}
+              >
+                {touched && reasonMissing
+                  ? `Required — at least ${REASON_MIN} characters.`
+                  : 'Required. Recorded against your name so this change can be explained later.'}
+              </p>
             </div>
           )}
 

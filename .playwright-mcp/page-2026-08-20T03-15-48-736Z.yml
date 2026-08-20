@@ -1,0 +1,68 @@
+- generic [active] [ref=f22e1]:
+  - link "Skip to content" [ref=f22e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - main [ref=f22e4]:
+    - generic [ref=f22e5]:
+      - button "Toggle Sidebar" [ref=f22e6]
+      - generic [ref=f22e8]: Rail
+      - generic [ref=f22e9]: Demo Bar — The Tipsy Tavern
+      - 'button "Theme: Dark. Switch to System." [ref=f22e10] [cursor=pointer]'
+      - button "Notifications" [ref=f22e14]
+      - button "Account menu" [ref=f22e18]
+    - main [ref=f22e19]:
+      - generic [ref=f22e20]:
+        - generic [ref=f22e21]:
+          - generic [ref=f22e22]:
+            - heading "Payroll" [level=1] [ref=f22e23]
+            - paragraph [ref=f22e24]: Calculate wages, tips, and manage staff pay
+          - link "Run Payroll" [ref=f22e25] [cursor=pointer]:
+            - /url: /app/payroll/review?startDate=2026-08-17&endDate=2026-08-23
+        - generic [ref=f22e29]:
+          - link "Payroll" [ref=f22e30] [cursor=pointer]:
+            - /url: /app/payroll?tab=payroll
+          - link "Employees" [ref=f22e31] [cursor=pointer]:
+            - /url: /app/payroll?tab=employees
+          - link "Day Split" [ref=f22e32] [cursor=pointer]:
+            - /url: /app/payroll?tab=split
+          - link "Direct Deposit" [ref=f22e33] [cursor=pointer]:
+            - /url: /app/payroll?tab=direct-deposit
+        - generic [ref=f22e35]:
+          - generic [ref=f22e36]:
+            - paragraph [ref=f22e37]: Important — Rail does not process payroll payments
+            - paragraph [ref=f22e40]:
+              - text: This tool
+              - strong [ref=f22e41]: securely stores
+              - text: employee banking information only. Rail is not a payroll processor, payment processor, or financial institution. Rail does not initiate, originate, or guarantee any ACH direct deposit transactions.
+            - paragraph [ref=f22e42]:
+              - text: To pay employees via direct deposit, you must provide this information to your
+              - strong [ref=f22e43]: bank, payroll provider (Gusto, ADP, Paychex, etc.), or accountant
+              - text: who is licensed to originate ACH transactions. Use the
+              - emphasis [ref=f22e44]: Export for Payroll Provider
+              - text: button below to download the data in a standard format.
+          - generic [ref=f22e48]:
+            - paragraph [ref=f22e49]: Bank-grade security · SMS 2-factor verification required
+            - paragraph [ref=f22e50]: Every change requires a 6-digit SMS code. Account numbers are AES-256 encrypted. A full audit trail is maintained for every addition or removal.
+          - generic [ref=f22e51]:
+            - paragraph [ref=f22e55]: Phone number required
+            - paragraph [ref=f22e56]: A phone number is needed to receive SMS verification codes before any direct deposit change is committed.
+            - generic [ref=f22e57]:
+              - generic [ref=f22e58]:
+                - generic [ref=f22e59]: Your mobile number (E.164 format)
+                - textbox "+15555550100" [ref=f22e60]
+              - button "Save" [ref=f22e62]
+  - navigation "Primary" [ref=f22e63]:
+    - generic [ref=f22e64]:
+      - link "Home" [ref=f22e65] [cursor=pointer]:
+        - /url: /app/dashboard
+      - link "Inventory" [ref=f22e71] [cursor=pointer]:
+        - /url: /app/inventory
+      - link "Payroll" [ref=f22e78] [cursor=pointer]:
+        - /url: /app/payroll
+      - link "Reps" [ref=f22e84] [cursor=pointer]:
+        - /url: /app/reps
+      - link "Books" [ref=f22e92] [cursor=pointer]:
+        - /url: /app/books
+  - button "Quick actions" [ref=f22e98]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f22e105] [cursor=pointer]
+  - alert [ref=f22e109]

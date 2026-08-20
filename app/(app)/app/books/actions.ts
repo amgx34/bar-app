@@ -33,6 +33,8 @@ export type BooksData = {
   grossTakings: number | null;
   /** Held for the state — never the bar's money. Null until configured. */
   salesTax: number | null;
+  /** The configured rate, so the figure above can be shown with its basis. */
+  salesTaxRatePct: number | null;
   /** True once a rate and a tax treatment are both set. */
   taxConfigured: boolean;
   /** Net of tax when configured; the raw POS figure when it is not. */
@@ -229,6 +231,7 @@ export async function getBooksData(startDate: string, endDate: string): Promise<
     foodCostPct: pnl.foodCostPct,
     grossTakings: profit.grossTakings,
     salesTax: profit.salesTax,
+    salesTaxRatePct: taxConfig.ratePct,
     taxConfigured: profit.taxConfigured,
     netProfit: profit.netProfit,
     netProfitPct: profit.netProfitPct,

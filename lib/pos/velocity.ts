@@ -20,8 +20,20 @@
  *
  * That exclusion is the whole reason this cannot double-count. `pos_apply_item_sales`
  * writes a `pos_sale` usage log for every unit it deducts, so once depletion is
- * working the two sources describe the SAME units — and only one of them may be
- * counted.
+ * working the two sources describe the SAME movement — and only one of them may
+ * be counted.
+ *
+ * THE TWO SOURCES ARE NOT IN THE SAME UNIT
+ *
+ * `pos_item_sales.qty_sold` counts DRINKS, straight off the POS and unconverted.
+ * `usage_logs.quantity` counts STOCK, because the ingest route has already put
+ * sales through `unitsPerSale()` before depleting. Adding them raw treats a shot
+ * as a bottle.
+ *
+ * So the sales side is converted here, via the `unitsPerSale` carried on each
+ * ItemRef, and everything this module reports downstream — unitsMoved,
+ * dailyUsage — is in stock units. `salesCount` keeps the raw drink count for
+ * the questions that are genuinely about the POS.
  */
 
 /** Movements that represent stock ARRIVING or being corrected upward. */
@@ -52,20 +64,37 @@ export type ItemRef = {
   name: string;
   /** Normalised name, matching how `pos_item_sales.match_key` is built. */
   matchKey: string;
+  /**
+   * Stock units consumed by ONE POS sale. Comes from `unitsPerSale()` in
+   * lib/pos/pour.ts; 1 for anything not sold by the pour.
+   *
+   * This is not optional cosmetics. `pos_item_sales.qty_sold` counts DRINKS
+   * while `usage_logs.quantity` counts STOCK, and this file adds the two
+   * together. Without the factor a spirit poured at 1.5oz from a 750ml bottle
+   * reported roughly seventeen times its real movement — which then divided
+   * into `current_stock` to produce a "days remaining" seventeen times too
+   * short, and reorder alerts for items nobody needed to reorder.
+   */
+  unitsPerSale?: number;
 };
 
 export type ItemVelocity = {
   itemId: string;
   name: string;
-  /** Units sold through the POS over the window. */
+  /** Drinks rung up on the POS. The figure that pairs with `revenue`. */
+  salesCount: number;
+  /** STOCK units those sales consumed — bottles, not shots. */
   unitsSold: number;
   /** Revenue those sales brought in. */
   revenue: number;
-  /** Units lost to spillage, comps and staff drinks. */
+  /** Stock units lost to spillage, comps and staff drinks. */
   unitsLost: number;
-  /** Everything that left: sold plus lost. */
+  /** Everything that left, in stock units: sold plus lost. */
   unitsMoved: number;
-  /** Average units leaving per day across the window. */
+  /**
+   * Average STOCK units leaving per day. Callers divide `current_stock` by this
+   * to get days of cover, so it must be in the same unit as the stock level.
+   */
   dailyUsage: number;
 };
 
@@ -103,12 +132,20 @@ export function computeVelocity(
     .map((item) => {
       const sold = soldByKey.get(item.matchKey) ?? { units: 0, revenue: 0 };
       const lost = lostById.get(item.id) ?? 0;
-      const moved = sold.units + lost;
+
+      // Drinks -> stock units, before the two sources are added together. The
+      // usage-log side is already in stock units, so only the sales side moves.
+      const perSale = Number.isFinite(item.unitsPerSale) && (item.unitsPerSale ?? 0) > 0
+        ? (item.unitsPerSale as number)
+        : 1;
+      const stockSold = sold.units * perSale;
+      const moved = stockSold + lost;
 
       return {
         itemId: item.id,
         name: item.name,
-        unitsSold: sold.units,
+        salesCount: sold.units,
+        unitsSold: stockSold,
         revenue: sold.revenue,
         unitsLost: lost,
         unitsMoved: moved,
@@ -119,11 +156,17 @@ export function computeVelocity(
     .sort((a, b) => b.unitsMoved - a.unitsMoved);
 }
 
-/** Best sellers by units. Revenue is carried so the caller can show both. */
+/**
+ * Best sellers by DRINKS sold, not by stock consumed.
+ *
+ * Ranking on stock would put a keg above a top-shelf spirit that outsold it
+ * many times over, because one keg is one stock unit and it empties slowly.
+ * "What sells" is a question about the POS, so it is answered in POS units.
+ */
 export function topSellers(velocity: ItemVelocity[], limit = 10): ItemVelocity[] {
   return [...velocity]
-    .filter((v) => v.unitsSold > 0)
-    .sort((a, b) => b.unitsSold - a.unitsSold)
+    .filter((v) => v.salesCount > 0)
+    .sort((a, b) => b.salesCount - a.salesCount)
     .slice(0, limit);
 }
 

@@ -1,0 +1,44 @@
+- generic [active] [ref=f16e1]:
+  - link "Skip to content" [ref=f16e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - main [ref=f16e4]:
+    - generic [ref=f16e5]:
+      - button "Toggle Sidebar" [ref=f16e6]
+      - generic [ref=f16e8]: Rail
+      - generic [ref=f16e9]: Demo Bar — The Tipsy Tavern
+      - 'button "Theme: Dark. Switch to System." [ref=f16e10] [cursor=pointer]'
+      - button "Notifications" [ref=f16e14]
+      - button "Account menu" [ref=f16e18]
+    - main [ref=f16e19]:
+      - generic [ref=f16e20]:
+        - navigation "Inventory sections" [ref=f16e21]:
+          - generic [ref=f16e22]:
+            - link "Items" [ref=f16e23] [cursor=pointer]:
+              - /url: /app/inventory
+            - link "Weigh" [ref=f16e24] [cursor=pointer]:
+              - /url: /app/inventory/weigh
+            - link "Analytics" [ref=f16e25] [cursor=pointer]:
+              - /url: /app/inventory/analytics
+        - main [ref=f16e27]
+  - navigation "Primary" [ref=f16e99]:
+    - generic [ref=f16e100]:
+      - link "Home" [ref=f16e101] [cursor=pointer]:
+        - /url: /app/dashboard
+      - link "Inventory" [ref=f16e107] [cursor=pointer]:
+        - /url: /app/inventory
+      - link "Payroll" [ref=f16e114] [cursor=pointer]:
+        - /url: /app/payroll
+      - link "Reps" [ref=f16e120] [cursor=pointer]:
+        - /url: /app/reps
+      - link "Books" [ref=f16e128] [cursor=pointer]:
+        - /url: /app/books
+  - button "Quick actions" [ref=f16e134]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f16e141] [cursor=pointer]:
+    - generic [ref=f16e144]:
+      - text: Compiling
+      - generic [ref=f16e145]:
+        - generic [ref=f16e146]: .
+        - generic [ref=f16e147]: .
+        - generic [ref=f16e148]: .
+  - alert [ref=f16e149]

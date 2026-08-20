@@ -1,0 +1,59 @@
+- generic [active] [ref=f4e1]:
+  - link "Skip to content" [ref=f4e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=f4e3]:
+    - generic [ref=f4e6]:
+      - generic [ref=f4e8]:
+        - generic [ref=f4e9]:
+          - generic [ref=f4e10]: Menu
+          - list [ref=f4e12]:
+            - listitem [ref=f4e13]:
+              - link "Dashboard" [ref=f4e14] [cursor=pointer]:
+                - /url: /app/dashboard
+            - listitem [ref=f4e19]:
+              - button "Inventory" [ref=f4e20] [cursor=pointer]
+            - listitem [ref=f4e28]:
+              - link "Reps" [ref=f4e29] [cursor=pointer]:
+                - /url: /app/reps
+            - listitem [ref=f4e36]:
+              - link "Books" [ref=f4e37] [cursor=pointer]:
+                - /url: /app/books
+        - separator [ref=f4e41]
+        - generic [ref=f4e42]:
+          - generic [ref=f4e43]: More
+          - list [ref=f4e45]:
+            - listitem [ref=f4e46]:
+              - link "Payroll" [ref=f4e47] [cursor=pointer]:
+                - /url: /app/payroll
+            - listitem [ref=f4e52]:
+              - link "Employees" [ref=f4e53] [cursor=pointer]:
+                - /url: /app/employees
+            - listitem [ref=f4e58]:
+              - link "Tips" [ref=f4e59] [cursor=pointer]:
+                - /url: /app/tips
+            - listitem [ref=f4e64]:
+              - link "Settings" [ref=f4e65] [cursor=pointer]:
+                - /url: /app/settings
+      - button "Toggle Sidebar" [ref=f4e70]
+    - main [ref=f4e71]:
+      - generic [ref=f4e72]:
+        - button "Toggle Sidebar" [ref=f4e73]
+        - generic [ref=f4e75]: Rail
+        - generic [ref=f4e76]: Demo Bar — The Tipsy Tavern
+        - button "Notifications" [ref=f4e79]
+        - button "Account menu" [ref=f4e83]
+      - main [ref=f4e84]:
+        - generic [ref=f4e85]:
+          - navigation "Inventory sections" [ref=f4e86]:
+            - generic [ref=f4e87]:
+              - link "Items" [ref=f4e88] [cursor=pointer]:
+                - /url: /app/inventory
+              - link "Weigh" [ref=f4e89] [cursor=pointer]:
+                - /url: /app/inventory/weigh
+              - link "Setup" [ref=f4e90] [cursor=pointer]:
+                - /url: /app/inventory/setup
+              - link "Analytics" [ref=f4e91] [cursor=pointer]:
+                - /url: /app/inventory/analytics
+          - main [ref=f4e93]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f4e187] [cursor=pointer]
