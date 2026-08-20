@@ -85,6 +85,25 @@ function matchesAny(category: string | null, needles: string[]): boolean {
 }
 
 /**
+ * Is this category poured from a bottle, so the item needs a pour size?
+ *
+ * Exported so the item form can ask the same question this report asks. Two
+ * copies of the category lists would eventually disagree, and the disagreement
+ * would show up as the setup report flagging an item the editor said was fine.
+ */
+export function isPouredCategory(category: string | null): boolean {
+  return matchesAny(category, POURED);
+}
+
+/**
+ * Is this category MIXED from several bottles, so it needs a recipe rather
+ * than a cost per unit?
+ */
+export function isMixedDrinkCategory(category: string | null): boolean {
+  return matchesAny(category, MIXED);
+}
+
+/**
  * Classifies one sold item.
  *
  * `hasRecipe` wins over everything: once a drink is a recipe it depletes real

@@ -2,6 +2,10 @@ import type { Metadata } from 'next';
 import { ClipboardCheck } from 'lucide-react';
 import { getSetupGaps } from './actions';
 import { SetupGapsPanel } from './_components/setup-gaps-panel';
+import { listBundles, listInventoryOptions } from '../../settings/bundle-actions';
+import { BundlesPanel } from '../../settings/_components/bundles-panel';
+import { getCurrentOrg } from '@/lib/org';
+import { canEditInventory } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +20,15 @@ export const metadata: Metadata = { title: 'Stock Tracking Setup' };
  * the one thing that invalidates everything above it.
  */
 export default async function InventorySetupPage() {
-  const data = await getSetupGaps();
+  // The report and the tool that resolves it, loaded together. Recipes used to
+  // live under Settings -> POS Integration, three guesses away from the item
+  // form where the question actually arises.
+  const [data, bundles, inventoryOptions, { role }] = await Promise.all([
+    getSetupGaps(),
+    listBundles(),
+    listInventoryOptions(),
+    getCurrentOrg(),
+  ]);
 
   return (
     <main className="p-4 sm:p-6 space-y-6 max-w-5xl mx-auto">
@@ -34,6 +46,14 @@ export default async function InventorySetupPage() {
       </div>
 
       <SetupGapsPanel gaps={data.gaps} summary={data.summary} />
+
+      {/* Directly below the report, because "18 items need a recipe" and "here
+          is where you write one" belong on the same screen. */}
+      <BundlesPanel
+        bundles={bundles}
+        options={inventoryOptions}
+        canEdit={canEditInventory(role)}
+      />
     </main>
   );
 }

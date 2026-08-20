@@ -4,7 +4,7 @@ import { useEffect, useTransition, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { Calculator, Info, Wine } from 'lucide-react';
+import { ArrowUpRight, Calculator, Info, Wine } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -15,6 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select';
 import { describePour } from '@/lib/pos/pour';
+import { isMixedDrinkCategory } from '@/lib/pos/setup-gaps';
 import { inventoryItemSchema, type InventoryItemInput } from '@/lib/schemas/inventory';
 import { createItem, updateItem } from '../actions';
 import type { ItemRow } from './inventory-table';
@@ -89,6 +90,21 @@ export function ItemFormDialog({
   const bottleOz  = bottleSizeMl ? bottleSizeMl * ML_TO_OZ : null;
   const servings  = bottleOz && pourSizeOz > 0 ? bottleOz / pourSizeOz : null;
   const costPer   = servings && costPrice && costPrice > 0 ? costPrice / servings : null;
+
+  /**
+   * A mixed drink sitting in inventory as though it were a bottle.
+   *
+   * The ingest auto-creates an item for every POS menu name, so "Lemon Drop"
+   * arrives here as stock. This form then asks for a cost per unit — a question
+   * with no sensible answer, because nobody buys Lemon Drops by the case — and
+   * every sale depletes a phantom while the vodka it was poured from never
+   * moves. Naming that here is the difference between a confusing form and one
+   * that tells you where to go.
+   *
+   * Same category test the setup report uses, so the two cannot disagree.
+   */
+  const categoryName = categories.find((c) => c.id === currentCategory)?.name ?? null;
+  const looksMixed = isMixedDrinkCategory(categoryName) && !isBottle;
 
   // Derived from the SAME helper the ingest route depletes with, so the
   // explanation below cannot drift from the arithmetic it describes. That is
@@ -232,6 +248,32 @@ export function ItemFormDialog({
           </div>
 
           {/* ── Pricing & stock ─────────────────────────────────────── */}
+          {looksMixed && (
+            <div className="rounded-lg border border-sky-500/40 bg-sky-500/10 p-3 text-xs leading-relaxed">
+              <p className="font-medium text-sky-800 dark:text-sky-200">
+                This looks like a mixed drink, not something you buy.
+              </p>
+              <p className="mt-1 text-sky-800/90 dark:text-sky-200/90">
+                A cost per {currentUnit} only makes sense for stock that arrives in a
+                {' '}{currentUnit}. Because &ldquo;{watch('name') || 'this item'}&rdquo; is
+                held here as its own stock item, every sale takes one off this count and
+                the liquor it is actually poured from never moves.
+              </p>
+              <p className="mt-1.5 text-sky-800/90 dark:text-sky-200/90">
+                Give it a <strong>recipe</strong> instead — the bottles it is made from,
+                and how much of each. Then a sale draws down the real stock and the cost
+                works itself out.
+              </p>
+              <a
+                href="/app/inventory/setup"
+                className="mt-2 inline-flex items-center gap-1 font-medium text-sky-700 underline underline-offset-2 hover:text-sky-900 dark:text-sky-300 dark:hover:text-sky-100"
+              >
+                Set up a recipe
+                <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+              </a>
+            </div>
+          )}
+
           {/* The two prices are measured in DIFFERENT units, and labelling them
               both "price" is what made this screen unreadable. Cost is what you
               pay a distributor for one {unit}. Sale price is what the POS

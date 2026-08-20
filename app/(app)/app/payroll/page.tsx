@@ -1,207 +1,60 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { computePayroll, Employee } from './actions';
-import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import { computePayroll } from './actions';
 import { getCurrentOrg } from '@/lib/org';
 import { canManagePayroll } from '@/lib/permissions';
 import PayrollTab from './_components/payroll-tab';
-import EmployeesTab from './_components/employees-tab';
-import DaySplitTab from './_components/day-split-tab';
-import DirectDepositTab from './_components/direct-deposit-tab';
-import { getAllDirectDepositAccounts } from './direct-deposit-actions';
+import {
+  defaultWeek,
+  loadEmployees,
+  loadWeeklyTrend,
+  LEGACY_TAB_ROUTES,
+} from './_shared';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = { title: 'Payroll' };
+export const metadata: Metadata = { title: 'Pay Run' };
 
-export default async function PayrollPage({
+export default async function PayRunPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const params = await searchParams;
-  const tab = (params.tab as string) || 'payroll';
-  const startDate = (params.startDate as string) || getDefaultStartDate();
-  const endDate = (params.endDate as string) || getDefaultEndDate();
+
+  // The tabs used to be `?tab=` on this one route. Anything already bookmarked
+  // or pasted into a message keeps working instead of silently landing here.
+  const legacyTab = typeof params.tab === 'string' ? params.tab : null;
+  if (legacyTab && LEGACY_TAB_ROUTES[legacyTab]) {
+    redirect(LEGACY_TAB_ROUTES[legacyTab]);
+  }
+
+  const week = defaultWeek();
+  const startDate = (params.startDate as string) || week.start;
+  const endDate = (params.endDate as string) || week.end;
 
   const { org, role } = await getCurrentOrg();
-  if (!org?.id) {
-    return <div>Organization not found</div>;
-  }
+  if (!org?.id) return <div className="p-6">Organization not found</div>;
 
-  const supabase = await createClient();
-
-  // Fetch last 12 weeks of daily reports for the weekly trend chart
-  const twelveWeeksAgo = new Date();
-  twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 84);
-  const { data: trendDays } = await supabase
-    .from('z_report_days')
-    .select('report_date, total_sales, cash_tips, cc_tips')
-    .eq('organization_id', org.id)
-    .gte('report_date', toLocalDateStr(twelveWeeksAgo))
-    .order('report_date');
-
-  // Group by Monday of each week
-  const weeklyMap = new Map<string, { sales: number; tips: number }>();
-  for (const day of trendDays ?? []) {
-    const monday = getMondayStr(day.report_date as string);
-    if (!weeklyMap.has(monday)) weeklyMap.set(monday, { sales: 0, tips: 0 });
-    const w = weeklyMap.get(monday)!;
-    w.sales += day.total_sales ?? 0;
-    w.tips += (day.cash_tips ?? 0) + (day.cc_tips ?? 0);
-  }
-  const WMONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const weeklyTrend = [...weeklyMap.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([iso, { sales, tips }]) => {
-      const [, m, d] = iso.split('-').map(Number);
-      return { weekLabel: `${WMONTHS[m - 1]} ${d}`, sales, tips };
-    });
-
-  // Fetch all employees
-  const { data: employees } = await supabase
-    .from('employees')
-    .select('*')
-    .eq('organization_id', org?.id)
-    .order('name');
-
-  // Fetch payroll data + direct deposit accounts in parallel
-  const [payrollEntries, ddAccounts] = await Promise.all([
+  const [employees, weeklyTrend, payrollEntries] = await Promise.all([
+    loadEmployees(),
+    loadWeeklyTrend(),
     computePayroll(startDate, endDate),
-    tab === 'direct-deposit' ? getAllDirectDepositAccounts() : Promise.resolve({}),
   ]);
-  const adminPhone = ((org.bar_settings ?? {}) as Record<string, unknown>).admin_phone as string | null ?? null;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Payroll</h1>
-          <p className="text-muted-foreground">Calculate wages, tips, and manage staff pay</p>
-        </div>
-        {/* Run Payroll — prominent CTA, links to the review page */}
-        <a
-          href={`/app/payroll/review?startDate=${startDate}&endDate=${endDate}`}
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-          Run Payroll
-        </a>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="border-b">
-        {/* Scrolls sideways on a phone rather than wrapping to two rows or
-            squeezing the labels: four tabs at 8-unit gaps do not fit 375px,
-            and a wrapped tab strip stops reading as one control. */}
-        <div className="-mx-6 flex gap-8 overflow-x-auto px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
-          <TabLink href="/app/payroll?tab=payroll"         active={tab === 'payroll'}         label="Payroll" />
-          <TabLink href="/app/payroll?tab=employees"       active={tab === 'employees'}       label="Employees" />
-          <TabLink href="/app/payroll?tab=split"           active={tab === 'split'}           label="Day Split" />
-          <TabLink href="/app/payroll?tab=direct-deposit"  active={tab === 'direct-deposit'}  label="Direct Deposit" />
-        </div>
-      </div>
-
-      {/* Tab Content */}
-      <div>
-        {tab === 'payroll' && (
-          <Suspense fallback={<div>Loading payroll...</div>}>
-            <PayrollTab
-              startDate={startDate}
-              endDate={endDate}
-              payrollEntries={payrollEntries}
-              employees={employees || []}
-              weeklyTrend={weeklyTrend}
-              canAdjust={canManagePayroll(role)}
-            />
-          </Suspense>
-        )}
-
-        {tab === 'employees' && (
-          <Suspense fallback={<div>Loading employees...</div>}>
-            <EmployeesTab employees={employees || []} />
-          </Suspense>
-        )}
-
-        {tab === 'split' && (
-          <Suspense fallback={<div>Loading...</div>}>
-            <DaySplitTab canEdit={canManagePayroll(role)} />
-          </Suspense>
-        )}
-
-        {tab === 'direct-deposit' && (
-          <Suspense fallback={<div>Loading...</div>}>
-            <DirectDepositTab
-              employees={employees || []}
-              accountsByEmployee={ddAccounts}
-              adminPhone={adminPhone}
-            />
-          </Suspense>
-        )}
-      </div>
+    <div className="p-5 sm:p-6">
+      <Suspense fallback={<div>Loading payroll…</div>}>
+        <PayrollTab
+          startDate={startDate}
+          endDate={endDate}
+          payrollEntries={payrollEntries}
+          employees={employees as never}
+          weeklyTrend={weeklyTrend}
+          canAdjust={canManagePayroll(role)}
+        />
+      </Suspense>
     </div>
   );
-}
-
-function TabLink({
-  href,
-  active,
-  label,
-}: {
-  href: string;
-  active: boolean;
-  label: string;
-}) {
-  return (
-    <a
-      href={href}
-      // whitespace-nowrap is what makes the scrolling strip actually scroll.
-      // Without it "Day Split" and "Direct Deposit" broke onto two lines inside
-      // the overflow container, so the tabs stopped reading as one row and
-      // never scrolled at all.
-      className={`whitespace-nowrap px-1 pb-4 text-sm font-medium border-b-2 transition-colors ${
-        active
-          ? 'border-primary text-primary'
-          : 'border-transparent text-muted-foreground hover:text-foreground'
-      }`}
-    >
-      {label}
-    </a>
-  );
-}
-
-function getMondayStr(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  const day = date.getDay();
-  date.setDate(date.getDate() - (day === 0 ? 6 : day - 1));
-  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
-}
-
-function toLocalDateStr(date: Date): string {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-');
-}
-
-function getDefaultStartDate(): string {
-  const today = new Date();
-  const day = today.getDay();
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
-  return toLocalDateStr(monday);
-}
-
-function getDefaultEndDate(): string {
-  const today = new Date();
-  const day = today.getDay();
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  return toLocalDateStr(sunday);
 }

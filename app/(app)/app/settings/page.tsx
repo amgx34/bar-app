@@ -6,8 +6,6 @@ import { InventoryTab } from './_components/inventory-tab';
 import { POSPanel } from './_components/pos-panel';
 import { ExcludedItemsPanel } from './_components/excluded-items-panel';
 import { listExcludedItems, suggestDealItems } from './excluded-items-actions';
-import { BundlesPanel } from './_components/bundles-panel';
-import { listBundles, listInventoryOptions } from './bundle-actions';
 import { canEditInventory } from '@/lib/permissions';
 import { TeamTab } from './_components/team-tab';
 import { listTeamMembers } from './team-actions';
@@ -56,14 +54,12 @@ export default async function SettingsPage({
 
   // Fetched only for the tab that renders them, and in parallel — the
   // suggestion scan reads the whole active item list.
-  const [excludedItems, dealSuggestions, bundles, inventoryOptions] = tab === 'pos'
+  const [excludedItems, dealSuggestions] = tab === 'pos'
     ? await Promise.all([
         listExcludedItems(),
         suggestDealItems(),
-        listBundles(),
-        listInventoryOptions(),
       ])
-    : [[], [], [], []];
+    : [[], []];
 
   return (
     <div className="p-6 space-y-6 max-w-3xl mx-auto">
@@ -114,16 +110,9 @@ export default async function SettingsPage({
             flashConnected={params.connected === 'clover'}
             flashError={params.error}
           />
-          {/* Both sit under POS settings because they only affect what the POS
-              sync writes — neither is an inventory setting the operator edits
-              daily. Bundles come first: defining a recipe is the better answer
-              for a deal, and excluding one is the fallback for a deal whose
-              components are not worth tracking. */}
-          <BundlesPanel
-            bundles={bundles}
-            options={inventoryOptions}
-            canEdit={canEditInventory(role)}
-          />
+          {/* Recipes moved to Inventory -> Setup, beside the report that lists
+              which drinks need one. Exclusions stay here: excluding an item is
+              a decision about what the POS sync writes, not about stock. */}
           <ExcludedItemsPanel
             items={excludedItems}
             suggestions={dealSuggestions}

@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  isMixedDrinkCategory,
+  isPouredCategory,
   classifyGap,
   findSetupGaps,
   summariseGaps,
@@ -179,5 +181,47 @@ describe('summariseGaps', () => {
     const s = summariseGaps(gaps);
     expect(s.ok).toBe(1);
     expect(s.unitsAffected).toBe(0);
+  });
+});
+
+/**
+ * These two back the item form's "this looks like a mixed drink" callout as
+ * well as the setup report. Exported precisely so the two cannot disagree —
+ * a form that says an item is fine while the report flags it is worse than
+ * either being wrong alone.
+ */
+describe('category classification', () => {
+  it('recognises mixed drinks across the names bars actually use', () => {
+    for (const c of ['Cocktails', 'Shots', 'SHOTS', 'Frozen Margarita', 'Bearcat Bombs', 'Party Punch']) {
+      expect(isMixedDrinkCategory(c)).toBe(true);
+    }
+  });
+
+  it('recognises poured spirits across the names bars actually use', () => {
+    for (const c of ['Vodka', 'Whiskey/Bourbon', 'Well Liquor', 'premium tequila', 'Gin']) {
+      expect(isPouredCategory(c)).toBe(true);
+    }
+  });
+
+  it('leaves whole-unit categories alone', () => {
+    // Flagging beer would put a false chore in front of the operator on every
+    // edit, which is how a warning stops being read.
+    for (const c of ['Draft Beer', 'Bottle Beer', 'Seltzers & Cans', 'Supplies', 'Wine']) {
+      expect(isMixedDrinkCategory(c)).toBe(false);
+      expect(isPouredCategory(c)).toBe(false);
+    }
+  });
+
+  it('says nothing when there is no category', () => {
+    expect(isMixedDrinkCategory(null)).toBe(false);
+    expect(isPouredCategory(null)).toBe(false);
+  });
+
+  it('keeps the two kinds separate', () => {
+    // A shot of vodka is poured; a Lemon Drop is mixed. Nothing should be both,
+    // or the item form and the report would give contradictory advice.
+    for (const c of ['Cocktails', 'Shots', 'Vodka', 'Whiskey/Bourbon']) {
+      expect(isMixedDrinkCategory(c) && isPouredCategory(c)).toBe(false);
+    }
   });
 });

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { sidebarGroups } from './nav-config';
 import {
   Sidebar,
   SidebarContent,
@@ -20,12 +21,16 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from '@/components/ui/sidebar';
-import {
-  Home, Package, CircleDollarSign, User, Receipt,
-  Settings, BookOpen, Users, ChevronRight,
-} from 'lucide-react';
+// Icons travel with the nav config now; only the disclosure arrow is local.
+import { ChevronRight } from 'lucide-react';
 
 // ── Nav structure ─────────────────────────────────────────────────────────────
+//
+// Read from nav-config rather than declared here. The sidebar, the mobile bar,
+// the section tab strips and the breadcrumbs all derive from one structure, so
+// a route cannot appear in one and be missing from another — which is how two
+// different Inventory tab strips ended up rendering at once, and how /app/tax
+// ended up with no link to it from anywhere.
 
 type NavChild = { label: string; href: string };
 type NavItem  = {
@@ -34,27 +39,6 @@ type NavItem  = {
   icon:     React.ComponentType<{ className?: string }>;
   children?: NavChild[];
 };
-
-const PRIMARY: NavItem[] = [
-  { label: 'Dashboard', href: '/app/dashboard', icon: Home },
-  {
-    label: 'Inventory', href: '/app/inventory', icon: Package,
-    children: [
-      { label: 'Items',      href: '/app/inventory' },
-      { label: 'Weigh',      href: '/app/inventory/weigh' },
-      { label: 'Analytics',  href: '/app/inventory/analytics' },
-    ],
-  },
-  { label: 'Reps',  href: '/app/reps',  icon: Users },
-  { label: 'Books', href: '/app/books', icon: BookOpen },
-];
-
-const SECONDARY: NavItem[] = [
-  { label: 'Payroll',   href: '/app/payroll',   icon: CircleDollarSign },
-  { label: 'Employees', href: '/app/employees', icon: User },
-  { label: 'Tips',      href: '/app/tips',      icon: Receipt },
-  { label: 'Settings',  href: '/app/settings',  icon: Settings },
-];
 
 // ── Collapsible nav item ──────────────────────────────────────────────────────
 
@@ -137,57 +121,48 @@ function CollapsibleNavItem({ item, pathname }: { item: NavItem; pathname: strin
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const groups = sidebarGroups();
 
   return (
     <Sidebar collapsible="icon" variant="inset">
       <SidebarHeader className="border-b border-border" />
 
       <SidebarContent>
-        {/* Primary navigation */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Menu</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {PRIMARY.map((item) => (
-                // Keyed on pathname so the open state re-seeds from the route on
-                // every navigation, instead of being frozen at first mount.
-                <CollapsibleNavItem
-                  key={`${item.href}:${pathname}`}
-                  item={item}
-                  pathname={pathname}
-                />
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {groups.map(({ group, items }, groupIndex) => (
+          <Fragment key={group}>
+            {groupIndex > 0 && <SidebarSeparator />}
 
-        <SidebarSeparator />
+            <SidebarGroup>
+              {/* Named for the job, not the data model. The previous "Menu" and
+                  "More" split filed Payroll — the most-used screen after the
+                  dashboard — under "More". */}
+              <SidebarGroupLabel>{group}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {items.map((section) => {
+                    const item: NavItem = {
+                      label: section.root.label,
+                      href: section.root.href,
+                      icon: section.root.icon,
+                      children: section.tabs?.map((t) => ({ label: t.label, href: t.href })),
+                    };
 
-        {/* Secondary navigation */}
-        <SidebarGroup>
-          <SidebarGroupLabel>More</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {SECONDARY.map(({ label, href, icon: Icon }) => {
-                const isActive =
-                  pathname === href ||
-                  (href !== '/app/dashboard' && pathname.startsWith(href + '/'));
-                return (
-                  <SidebarMenuItem key={href}>
-                    <SidebarMenuButton
-                      render={<Link href={href} />}
-                      isActive={isActive}
-                      className="flex items-center gap-3"
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span>{label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                    return (
+                      // Keyed on pathname so the open state re-seeds from the
+                      // route on every navigation, rather than freezing at
+                      // first mount.
+                      <CollapsibleNavItem
+                        key={`${item.href}:${pathname}`}
+                        item={item}
+                        pathname={pathname}
+                      />
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </Fragment>
+        ))}
       </SidebarContent>
 
       <SidebarRail />

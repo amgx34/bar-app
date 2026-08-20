@@ -8,7 +8,6 @@ import { getAnalyticsData } from './actions';
 import { getDealsAnalytics } from './deals-actions';
 import { DealsPanel } from './_components/deals-panel';
 import type { AlertItem } from './actions';
-import { InventoryNav } from '../_components/inventory-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,8 +51,6 @@ export default async function InventoryAnalyticsPage() {
         </h1>
         <p className="text-sm text-muted-foreground mt-1">Last 30-day velocity · 90-day shrinkage · current snapshot</p>
       </div>
-
-      <InventoryNav />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

@@ -133,8 +133,9 @@ export function SetupGapsPanel({
 
         <p className="text-xs text-muted-foreground">
           Pour sizes are set on the item itself, or once for a whole category.
-          Recipes live under Settings &rarr; Deals &amp; bundles &mdash; a mixed drink
-          becomes a recipe over the bottles it is poured from.
+          Recipes are written below &mdash; a mixed drink becomes a recipe over the
+          bottles it is poured from, and the phantom item it created is retired
+          automatically.
         </p>
       </CardContent>
     </Card>

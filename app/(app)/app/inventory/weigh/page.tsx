@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Scale } from 'lucide-react';
-import { InventoryNav } from '../_components/inventory-nav';
 import { getWeighReports, getInventoryItemsForWeigh } from './actions';
 import { WeighManager } from './_components/weigh-manager';
 
@@ -23,8 +22,6 @@ export default async function WeighPage() {
           Weigh Reports
         </h1>
       </div>
-
-      <InventoryNav />
 
       <p className="text-sm text-muted-foreground max-w-xl">
         Track bottle levels at the start and end of each shift to measure actual

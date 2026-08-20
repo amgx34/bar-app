@@ -1,0 +1,112 @@
+- generic [active] [ref=f12e1]:
+  - link "Skip to content" [ref=f12e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=f12e3]:
+    - generic [ref=f12e6]:
+      - generic [ref=f12e8]:
+        - generic [ref=f12e9]:
+          - generic [ref=f12e10]: Overview
+          - list [ref=f12e12]:
+            - listitem [ref=f12e13]:
+              - link "Dashboard" [ref=f12e14] [cursor=pointer]:
+                - /url: /app/dashboard
+        - separator [ref=f12e19]
+        - generic [ref=f12e20]:
+          - generic [ref=f12e21]: Stock
+          - list [ref=f12e23]:
+            - listitem [ref=f12e24]:
+              - button "Inventory" [ref=f12e25] [cursor=pointer]
+        - separator [ref=f12e33]
+        - generic [ref=f12e34]:
+          - generic [ref=f12e35]: People & Pay
+          - list [ref=f12e37]:
+            - listitem [ref=f12e38]:
+              - button "Payroll" [expanded] [ref=f12e39] [cursor=pointer]
+              - list [ref=f12e46]:
+                - listitem [ref=f12e47]:
+                  - link "Pay Run" [ref=f12e48] [cursor=pointer]:
+                    - /url: /app/payroll
+                - listitem [ref=f12e49]:
+                  - link "Day Split" [ref=f12e50] [cursor=pointer]:
+                    - /url: /app/payroll/split
+                - listitem [ref=f12e51]:
+                  - link "Employees" [ref=f12e52] [cursor=pointer]:
+                    - /url: /app/payroll/employees
+                - listitem [ref=f12e53]:
+                  - link "Direct Deposit" [ref=f12e54] [cursor=pointer]:
+                    - /url: /app/payroll/direct-deposit
+                - listitem [ref=f12e55]:
+                  - link "Review" [ref=f12e56] [cursor=pointer]:
+                    - /url: /app/payroll/review
+        - separator [ref=f12e57]
+        - generic [ref=f12e58]:
+          - generic [ref=f12e59]: Money
+          - list [ref=f12e61]:
+            - listitem [ref=f12e62]:
+              - link "Books" [ref=f12e63] [cursor=pointer]:
+                - /url: /app/books
+            - listitem [ref=f12e67]:
+              - link "Tips" [ref=f12e68] [cursor=pointer]:
+                - /url: /app/tips
+            - listitem [ref=f12e73]:
+              - link "Tax" [ref=f12e74] [cursor=pointer]:
+                - /url: /app/tax
+        - separator [ref=f12e78]
+        - generic [ref=f12e79]:
+          - generic [ref=f12e80]: Ordering
+          - list [ref=f12e82]:
+            - listitem [ref=f12e83]:
+              - link "Reps" [ref=f12e84] [cursor=pointer]:
+                - /url: /app/reps
+        - separator [ref=f12e91]
+        - generic [ref=f12e92]:
+          - generic [ref=f12e93]: Setup
+          - list [ref=f12e95]:
+            - listitem [ref=f12e96]:
+              - link "Settings" [ref=f12e97] [cursor=pointer]:
+                - /url: /app/settings
+      - button "Toggle Sidebar" [ref=f12e102]
+    - main [ref=f12e103]:
+      - generic [ref=f12e104]:
+        - button "Toggle Sidebar" [ref=f12e105]
+        - generic [ref=f12e107]: Rail
+        - generic [ref=f12e108]: Demo Bar — The Tipsy Tavern
+        - button "Notifications" [ref=f12e111]
+        - button "Account menu" [ref=f12e115]
+      - navigation "Breadcrumb" [ref=f12e116]:
+        - list [ref=f12e117]:
+          - listitem [ref=f12e118]:
+            - link "Payroll" [ref=f12e119] [cursor=pointer]:
+              - /url: /app/payroll
+          - listitem [ref=f12e120]:
+            - generic [ref=f12e123]: Day Split
+      - main [ref=f12e124]:
+        - generic [ref=f12e125]:
+          - generic [ref=f12e126]:
+            - generic [ref=f12e127]:
+              - heading "Payroll" [level=1] [ref=f12e128]
+              - paragraph [ref=f12e129]: Calculate wages, tips, and manage staff pay
+            - link "Run Payroll" [ref=f12e130] [cursor=pointer]:
+              - /url: /app/payroll/review
+          - navigation "Payroll sections" [ref=f12e135]:
+            - generic [ref=f12e136]:
+              - link "Pay Run" [ref=f12e137] [cursor=pointer]:
+                - /url: /app/payroll
+              - link "Day Split" [ref=f12e138] [cursor=pointer]:
+                - /url: /app/payroll/split
+              - link "Employees" [ref=f12e139] [cursor=pointer]:
+                - /url: /app/payroll/employees
+              - link "Direct Deposit" [ref=f12e140] [cursor=pointer]:
+                - /url: /app/payroll/direct-deposit
+              - link "Review" [ref=f12e141] [cursor=pointer]:
+                - /url: /app/payroll/review
+          - generic [ref=f12e144]:
+            - generic [ref=f12e145]:
+              - button [ref=f12e146]
+              - generic [ref=f12e149]: Thu Aug 20, 2026
+              - button [ref=f12e150]
+              - textbox [ref=f12e153]: 2026-08-20
+              - button "Cash tips" [ref=f12e155]
+            - paragraph [ref=f12e159]: Loading…
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f12e165] [cursor=pointer]

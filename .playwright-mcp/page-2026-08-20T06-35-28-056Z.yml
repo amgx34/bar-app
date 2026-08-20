@@ -1,0 +1,162 @@
+- generic [ref=f16e1]:
+  - link "Skip to content" [ref=f16e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - main [ref=f16e4]:
+    - generic [ref=f16e5]:
+      - button "Toggle Sidebar" [ref=f16e6]
+      - generic [ref=f16e8]: Rail
+      - generic [ref=f16e9]: Demo Bar — The Tipsy Tavern
+      - 'button "Theme: Dark. Switch to System." [ref=f16e10] [cursor=pointer]'
+      - button "Notifications" [ref=f16e14]
+      - button "Account menu" [ref=f16e18]
+    - navigation "Breadcrumb" [ref=f16e19]:
+      - list [ref=f16e20]:
+        - listitem [ref=f16e21]:
+          - link "Payroll" [ref=f16e22] [cursor=pointer]:
+            - /url: /app/payroll
+        - listitem [ref=f16e23]:
+          - generic [ref=f16e26]: Employees
+    - main [ref=f16e27]:
+      - generic [ref=f16e28]:
+        - generic [ref=f16e29]:
+          - generic [ref=f16e30]:
+            - heading "Payroll" [level=1] [ref=f16e31]
+            - paragraph [ref=f16e32]: Calculate wages, tips, and manage staff pay
+          - link "Run Payroll" [ref=f16e33] [cursor=pointer]:
+            - /url: /app/payroll/review
+        - navigation "Payroll sections" [ref=f16e38]:
+          - generic [ref=f16e39]:
+            - link "Pay Run" [ref=f16e40] [cursor=pointer]:
+              - /url: /app/payroll
+            - link "Day Split" [ref=f16e41] [cursor=pointer]:
+              - /url: /app/payroll/split
+            - link "Employees" [ref=f16e42] [cursor=pointer]:
+              - /url: /app/payroll/employees
+            - link "Direct Deposit" [ref=f16e43] [cursor=pointer]:
+              - /url: /app/payroll/direct-deposit
+            - link "Review" [ref=f16e44] [cursor=pointer]:
+              - /url: /app/payroll/review
+        - generic [ref=f16e47]:
+          - generic [ref=f16e48]:
+            - generic [ref=f16e56]:
+              - paragraph [ref=f16e57]: 7 employees
+              - paragraph [ref=f16e58]: 7 configured
+            - generic [ref=f16e59]:
+              - generic [ref=f16e60]:
+                - generic [ref=f16e61]: "Set all tips:"
+                - button "Pool" [ref=f16e62]
+                - button "Individual" [ref=f16e63]
+                - button "Sales %" [ref=f16e64]
+              - button "Add Employee" [ref=f16e65]
+          - table [ref=f16e68]:
+            - rowgroup [ref=f16e69]:
+              - row [ref=f16e70]:
+                - columnheader "Name" [ref=f16e71]
+                - columnheader "Role" [ref=f16e72]
+                - columnheader "Hourly Rate" [ref=f16e73]
+                - columnheader "Tip Mode" [ref=f16e74]
+                - columnheader "Status" [ref=f16e75]
+                - columnheader "Actions" [ref=f16e76]
+            - rowgroup [ref=f16e77]:
+              - row [ref=f16e78]:
+                - cell "Alex Torres" [ref=f16e79]
+                - cell "barback" [ref=f16e80]
+                - cell "$13.00" [ref=f16e82]
+                - cell "Barback 15%" [ref=f16e83]
+                - cell "Active" [ref=f16e84]
+                - cell [ref=f16e90]:
+                  - generic [ref=f16e91]:
+                    - button "Edit" [ref=f16e92]
+                    - button [ref=f16e93]
+              - row [ref=f16e94]:
+                - cell "Danny Rivera" [ref=f16e95]
+                - cell "bartender" [ref=f16e96]
+                - cell "$15.00" [ref=f16e98]
+                - cell "Individual" [ref=f16e99]
+                - cell "Active" [ref=f16e100]
+                - cell [ref=f16e106]:
+                  - generic [ref=f16e107]:
+                    - button "Edit" [ref=f16e108]
+                    - button [ref=f16e109]
+              - row [ref=f16e110]:
+                - cell "Jordan Park" [ref=f16e111]
+                - cell "barback" [ref=f16e112]
+                - cell "$13.00" [ref=f16e114]
+                - cell "Barback 15%" [ref=f16e115]
+                - cell "Active" [ref=f16e116]
+                - cell [ref=f16e122]:
+                  - generic [ref=f16e123]:
+                    - button "Edit" [ref=f16e124]
+                    - button [ref=f16e125]
+              - row [ref=f16e126]:
+                - cell "Kayla Chen" [ref=f16e127]
+                - cell "bartender" [ref=f16e128]
+                - cell "$15.00" [ref=f16e130]
+                - cell "Pool" [ref=f16e131]
+                - cell "Active" [ref=f16e132]
+                - cell [ref=f16e138]:
+                  - generic [ref=f16e139]:
+                    - button "Edit" [ref=f16e140]
+                    - button [ref=f16e141]
+              - row [ref=f16e142]:
+                - cell "Lisa Taylor" [ref=f16e143]
+                - cell "manager" [ref=f16e144]
+                - cell "$18.00" [ref=f16e146]
+                - cell "Not Tipped" [ref=f16e147]
+                - cell "Active" [ref=f16e148]
+                - cell [ref=f16e154]:
+                  - generic [ref=f16e155]:
+                    - button "Edit" [ref=f16e156]
+                    - button [ref=f16e157]
+              - row [ref=f16e158]:
+                - cell "Mike Santos" [ref=f16e159]
+                - cell "security" [ref=f16e160]
+                - cell "$14.00" [ref=f16e162]
+                - cell "—" [ref=f16e163]
+                - cell "Active" [ref=f16e164]
+                - cell [ref=f16e170]:
+                  - generic [ref=f16e171]:
+                    - button "Edit" [ref=f16e172]
+                    - button [ref=f16e173]
+              - row [ref=f16e174]:
+                - cell "Wes Berns" [ref=f16e175]
+                - cell "bartender" [ref=f16e176]
+                - cell "$15.00" [ref=f16e178]
+                - cell "Pool" [ref=f16e179]
+                - cell "Active" [ref=f16e180]
+                - cell [ref=f16e186]:
+                  - generic [ref=f16e187]:
+                    - button "Edit" [ref=f16e188]
+                    - button [ref=f16e189]
+  - dialog "More sections" [ref=f16e191]:
+    - generic [ref=f16e192]:
+      - paragraph [ref=f16e193]: More
+      - button "Close" [ref=f16e194]
+    - list [ref=f16e198]:
+      - listitem [ref=f16e199]:
+        - link "Tips" [ref=f16e200] [cursor=pointer]:
+          - /url: /app/tips
+      - listitem [ref=f16e204]:
+        - link "Tax" [ref=f16e205] [cursor=pointer]:
+          - /url: /app/tax
+      - listitem [ref=f16e208]:
+        - link "Reps" [ref=f16e209] [cursor=pointer]:
+          - /url: /app/reps
+      - listitem [ref=f16e215]:
+        - link "Settings" [ref=f16e216] [cursor=pointer]:
+          - /url: /app/settings
+  - navigation "Primary" [ref=f16e220]:
+    - generic [ref=f16e221]:
+      - link "Home" [ref=f16e222] [cursor=pointer]:
+        - /url: /app/dashboard
+      - link "Inventory" [ref=f16e226] [cursor=pointer]:
+        - /url: /app/inventory
+      - link "Payroll" [ref=f16e231] [cursor=pointer]:
+        - /url: /app/payroll
+      - link "Books" [ref=f16e235] [cursor=pointer]:
+        - /url: /app/books
+      - button "More sections" [expanded] [active] [ref=f16e238]: More
+  - button "Quick actions" [ref=f16e244]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f16e251] [cursor=pointer]
+  - alert [ref=f16e255]

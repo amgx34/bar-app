@@ -7,6 +7,7 @@ import { AppHeader } from '@/app/(app)/app/_components/app-header';
 import { BottomNav } from '@/app/(app)/app/_components/bottom-nav';
 import { MobileFab } from '@/app/(app)/app/_components/mobile-fab';
 import { RouteFocus } from '@/app/(app)/app/_components/route-focus';
+import { Breadcrumbs } from '@/app/(app)/app/_components/breadcrumbs';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // getAuthUser and getCurrentOrg are both memoized per request (lib/org.ts),
@@ -54,10 +55,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           />
           {/* tabIndex={-1} makes this a programmatic focus target for the skip
               link and for the route-change focus move. */}
+          {/* Renders nothing above depth 2, so top-level pages are unchanged. */}
+          <Breadcrumbs />
+
           <main
             id="main-content"
             tabIndex={-1}
-            className="flex-1 pb-bottom-nav md:pb-0 focus:outline-none"
+            className="flex flex-1 min-w-0 flex-col pb-bottom-nav md:pb-0 focus:outline-none"
           >
             {children}
           </main>

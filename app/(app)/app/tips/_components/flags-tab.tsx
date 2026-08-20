@@ -1,5 +1,6 @@
-'use client';
-
+// No hooks, no handlers, no browser APIs — and tips/page.tsx renders it
+// directly from the server. The 'use client' here was shipping a purely
+// presentational table, and its icons, to the browser for nothing.
 import { AlertTriangle, ShieldCheck, Info } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -55,7 +56,7 @@ export default function FlagsTab({ serverStats, populationMean, populationStdDev
         </CardHeader>
         <CardContent className="px-4 pb-4 text-sm text-muted-foreground space-y-1">
           <p>
-            Each bartender's nightly tip % (tips ÷ sales) is compared against the bar's
+            Each bartender&rsquo;s nightly tip % (tips ÷ sales) is compared against the bar&rsquo;s
             overall distribution. Servers whose <strong className="text-foreground">average
             tip %</strong> sits more than <strong className="text-foreground">2 standard
             deviations</strong> above the mean are flagged as potential anomalies.

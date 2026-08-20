@@ -3,8 +3,20 @@ import { getCurrentOrg } from '@/lib/org';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { InventoryTable, type ItemRow } from './_components/inventory-table';
 import { InventoryHeader } from './_components/inventory-header';
-import { InventoryNav } from './_components/inventory-nav';
-import { InventoryDashboard, type DashboardUsageLog, type DashboardItem } from './_components/inventory-dashboard';
+import dynamicImport from 'next/dynamic';
+import type { DashboardUsageLog, DashboardItem } from './_components/inventory-dashboard';
+
+// The only chart component in the app still imported statically, which pulled
+// the whole of recharts (~330KB) into the Items route — the most-visited
+// inventory page, where the charts sit inside a collapsible panel and are
+// hidden entirely below `sm`. Every other chart in the app was already loaded
+// this way; this one was the outlier.
+//
+// The types above stay a normal `import type`: they are erased at compile time
+// and never reach the bundle.
+const InventoryDashboard = dynamicImport(
+  () => import('./_components/inventory-dashboard').then((m) => ({ default: m.InventoryDashboard })),
+);
 
 export const revalidate = 0; // always fresh
 
@@ -77,7 +89,6 @@ export default async function InventoryPage({
         defaultPourOz={org.bar_settings?.default_pour_oz ?? 1.5}
         bottleSizesMl={org.bar_settings?.bottle_sizes_ml ?? [375, 750, 1000, 1750]}
       />
-      <InventoryNav />
       <InventoryTable
         items={(items ?? []) as unknown as ItemRow[]}
         categories={categories ?? []}
