@@ -162,10 +162,15 @@ export default function EmployeesTab({ employees: initialEmployees }: EmployeesT
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead className="pl-4">Name</TableHead>
-                <TableHead>Role</TableHead>
+                {/* Six nowrap columns measured 571px inside a 343px card, so a
+                    phone had to swipe sideways to reach Edit. Role and status
+                    ride under the name below `sm`; tip mode is the one column
+                    a manager does not need on a phone, so it waits for `md`.
+                    Rate and Actions stay — they are why this screen is open. */}
+                <TableHead className="hidden sm:table-cell">Role</TableHead>
                 <TableHead className="text-right">Hourly Rate</TableHead>
-                <TableHead>Tip Mode</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead className="hidden md:table-cell">Tip Mode</TableHead>
+                <TableHead className="hidden sm:table-cell">Status</TableHead>
                 <TableHead className="pr-4 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -177,8 +182,22 @@ export default function EmployeesTab({ employees: initialEmployees }: EmployeesT
                     key={employee.id}
                     className={incomplete ? 'bg-yellow-50/40 dark:bg-yellow-950/10' : ''}
                   >
-                    <TableCell className="pl-4 font-medium">{employee.name}</TableCell>
-                    <TableCell>
+                    <TableCell className="pl-4 font-medium whitespace-normal">
+                      {employee.name}
+                      {/* Same two facts as the hidden columns, stacked. */}
+                      <span className="mt-1 flex flex-wrap items-center gap-1.5 sm:hidden">
+                        <span className="text-xs font-normal capitalize text-muted-foreground">
+                          {employee.role ?? 'No role'}
+                        </span>
+                        {incomplete && (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-700 dark:text-yellow-400">
+                            <AlertTriangle className="h-3 w-3" />
+                            Incomplete
+                          </span>
+                        )}
+                      </span>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       {employee.role ? (
                         <span
                           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
@@ -198,12 +217,12 @@ export default function EmployeesTab({ employees: initialEmployees }: EmployeesT
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                       {employee.role === 'security'
                         ? <span className="text-muted-foreground/40">—</span>
                         : TIP_MODE_LABELS[employee.tip_mode] ?? 'Pool'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       {incomplete ? (
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-700 dark:text-yellow-400">
                           <AlertTriangle className="h-3.5 w-3.5" />

@@ -83,20 +83,28 @@ export function RepsTable({ reps: initialReps, role, defaultOrderId }: Props) {
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead className="pl-5">Name</TableHead>
-                <TableHead>Company</TableHead>
+                {/* Company gets its own column only once there is room for one.
+                    Below `sm` it rides under the name instead — as its own
+                    column it forced 208px of nowrap text and pushed the table
+                    to 557px inside a 341px card, so a phone had to swipe
+                    sideways to reach the Order button. */}
+                <TableHead className="hidden sm:table-cell">Company</TableHead>
                 <TableHead className="hidden sm:table-cell">Contact</TableHead>
                 <TableHead className="hidden md:table-cell">Note</TableHead>
-                <TableHead className="text-center w-20">Products</TableHead>
+                <TableHead className="text-center w-14 sm:w-20">Products</TableHead>
                 <TableHead className="pr-5 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {reps.map((rep) => (
                 <TableRow key={rep.id}>
-                  <TableCell className="pl-5">
+                  <TableCell className="pl-5 whitespace-normal">
                     <p className="font-medium">{rep.name}</p>
+                    <p className="text-xs text-muted-foreground sm:hidden">
+                      {rep.company ?? '—'}
+                    </p>
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
+                  <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
                     {rep.company ?? '—'}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">

@@ -65,8 +65,11 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
 
       {/* ── Sticky header bar ─────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-30 border-b bg-card/95 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+        {/* Wraps below `sm`. Back + title + the two export buttons need 364px
+            and a 320px phone has 288px, so a fixed h-14 single row pushed
+            the NACHA button off-screen with no way to scroll to it. */}
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 sm:h-14 sm:flex-nowrap sm:py-0">
+          <div className="flex min-w-0 items-center gap-3">
             <Link
               href={`/app/payroll?tab=payroll&startDate=${startDate}&endDate=${endDate}`}
               className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"

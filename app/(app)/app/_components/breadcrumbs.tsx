@@ -34,7 +34,14 @@ export function Breadcrumbs() {
                   {crumb.breadcrumb ?? crumb.label}
                 </span>
               ) : (
-                <Link href={crumb.href} className="transition-colors hover:text-foreground">
+                // The negative margin is what keeps this honest: the crumb needs
+                // a 36px touch target on a phone (as inline text it measured
+                // 16px), but a 36px-tall row of 12px text reads as a banner.
+                // Padding grows the hit area, the margin gives the space back.
+                <Link
+                  href={crumb.href}
+                  className="-my-2 inline-flex min-h-9 items-center py-2 transition-colors hover:text-foreground"
+                >
                   {crumb.breadcrumb ?? crumb.label}
                 </Link>
               )}

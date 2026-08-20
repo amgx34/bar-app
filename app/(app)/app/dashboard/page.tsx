@@ -353,10 +353,14 @@ export default async function DashboardPage() {
       </div>
 
       {/* ── 4. Main grid ───────────────────────────────────────────────────── */}
+      {/* `min-w-0` on both columns is load-bearing. A grid item defaults to
+          min-width:auto, so it refuses to shrink below its widest content —
+          these two measured 345px inside a 282px grid on a 320px phone and
+          dragged the whole page into horizontal scroll. */}
       <div className="grid lg:grid-cols-5 gap-5">
 
         {/* Left: Inventory Health (3/5) */}
-        <div className="lg:col-span-3 space-y-5">
+        <div className="lg:col-span-3 min-w-0 space-y-5">
 
           {/* Par compliance + Low stock */}
           <Card>
@@ -478,7 +482,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* Right: Activity + Last Night (2/5) */}
-        <div className="lg:col-span-2 space-y-5">
+        <div className="lg:col-span-2 min-w-0 space-y-5">
 
           {/* Recent Activity */}
           <Card className="flex flex-col">
@@ -611,11 +615,16 @@ export default async function DashboardPage() {
             {/* Mini table */}
             <div className="mt-4 divide-y">
               {nightsData.map((n) => (
-                <div key={n.nightDate} className="flex items-center gap-3 py-2 text-sm">
-                  <span className="text-muted-foreground w-32 shrink-0 text-xs">{fmtDate(n.nightDate)}</span>
-                  <span className="font-medium tabular-nums w-24 text-right shrink-0">{fmtMoney(n.totalSales)}</span>
-                  <span className="text-cyan-600 tabular-nums w-20 text-right shrink-0">{fmtMoney(n.totalTips)}</span>
-                  <span className={`text-xs tabular-nums font-medium w-12 text-right shrink-0 ${n.tipPercent >= 15 ? 'text-emerald-600' : n.tipPercent >= 12 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                // The four columns were fixed-width and shrink-0, totalling
+                // 388px inside a card that has 280px on a 320px phone, so the
+                // whole page scrolled sideways. The date now takes the slack
+                // and truncates; the figures keep fixed widths so they stay
+                // decimal-aligned, just narrower until there is room.
+                <div key={n.nightDate} className="flex items-center gap-2 py-2 text-sm sm:gap-3">
+                  <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">{fmtDate(n.nightDate)}</span>
+                  <span className="font-medium tabular-nums w-20 text-right shrink-0 sm:w-24">{fmtMoney(n.totalSales)}</span>
+                  <span className="text-cyan-600 tabular-nums w-16 text-right shrink-0 sm:w-20">{fmtMoney(n.totalTips)}</span>
+                  <span className={`text-xs tabular-nums font-medium w-11 text-right shrink-0 sm:w-12 ${n.tipPercent >= 15 ? 'text-emerald-600' : n.tipPercent >= 12 ? 'text-amber-500' : 'text-muted-foreground'}`}>
                     {n.tipPercent.toFixed(1)}%
                   </span>
                 </div>

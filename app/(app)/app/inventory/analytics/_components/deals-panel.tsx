@@ -167,9 +167,9 @@ export function DealsPanel({ data }: { data: DealsAnalytics }) {
                   <tr className="border-b border-border bg-muted/40 text-left">
                     <th className="py-2 pl-4 pr-3 font-medium">Deal</th>
                     <th className="px-3 py-2 text-right font-medium">Sold</th>
-                    <th className="px-3 py-2 text-right font-medium">Per day</th>
-                    <th className="px-3 py-2 text-right font-medium">Revenue</th>
-                    <th className="px-3 py-2 text-right font-medium">Cost to pour</th>
+                    <th className="hidden sm:table-cell px-3 py-2 text-right font-medium">Per day</th>
+                    <th className="hidden sm:table-cell px-3 py-2 text-right font-medium">Revenue</th>
+                    <th className="hidden md:table-cell px-3 py-2 text-right font-medium">Cost to pour</th>
                     <th className="px-3 py-2 text-right font-medium">Margin</th>
                     <th className="py-2 pl-3 pr-4 font-medium">Verdict</th>
                   </tr>
@@ -191,11 +191,11 @@ export function DealsPanel({ data }: { data: DealsAnalytics }) {
                       <td className="px-3 py-2.5 text-right tabular-nums">
                         {Math.round(d.unitsSold).toLocaleString()}
                       </td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                      <td className="hidden sm:table-cell px-3 py-2.5 text-right tabular-nums text-muted-foreground">
                         {d.unitsPerDaySold > 0 ? d.unitsPerDaySold.toFixed(1) : '—'}
                       </td>
-                      <td className="px-3 py-2.5 text-right tabular-nums">{money0(d.revenue)}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                      <td className="hidden sm:table-cell px-3 py-2.5 text-right tabular-nums">{money0(d.revenue)}</td>
+                      <td className="hidden md:table-cell px-3 py-2.5 text-right tabular-nums text-muted-foreground">
                         {d.costPerUnit === null ? '—' : money0(d.cost)}
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums font-medium">

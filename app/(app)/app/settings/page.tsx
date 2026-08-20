@@ -69,7 +69,7 @@ export default async function SettingsPage({
       </div>
 
       {/* Tab nav */}
-      <div className="border-b overflow-x-auto">
+      <div className="border-b overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex gap-6 min-w-max">
           {TABS.map(({ key, label }) => (
             <a

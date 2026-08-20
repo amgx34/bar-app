@@ -62,13 +62,16 @@ export default async function TaxPage({
       </div>
 
       {/* Tabs */}
-      <div className="border-b">
-        <div className="flex gap-8">
+      {/* Scrolls rather than spilling. With a plain `flex gap-8` the last tab
+          ran past a 320px screen with no scroller to reach it — on Tips that
+          hid "Well Performance" entirely. Same treatment as Settings. */}
+      <div className="border-b overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex gap-6 min-w-max">
           {TABS.map(({ key, label }) => (
             <a
               key={key}
               href={`/app/tax?tab=${key}`}
-              className={`px-1 pb-4 text-sm font-medium border-b-2 transition-colors ${
+              className={`px-1 pb-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 tab === key
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground'

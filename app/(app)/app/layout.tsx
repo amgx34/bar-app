@@ -61,9 +61,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <main
             id="main-content"
             tabIndex={-1}
-            className="flex flex-1 min-w-0 flex-col pb-bottom-nav md:pb-0 focus:outline-none"
+            className="flex flex-1 min-w-0 flex-col pb-content-bottom md:pb-0 focus:outline-none"
           >
-            {children}
+            {/* min-w-0 wrapper, not decoration.
+                This <main> is a flex column, so whatever a page renders becomes
+                a flex item with the default `min-width: auto` — it sizes to its
+                own min-content and quietly grows past the viewport. On a 384px
+                phone the dashboard came out 452px wide and its Low Stock and
+                Tip Rate cards were cut off the right edge.
+                Fixed here rather than on each page so a new route cannot
+                reintroduce it by forgetting.
+                Deliberately a BLOCK, not another flex column: a flex child is
+                itself a flex item and inherits the same `min-width: auto`, so
+                wrapping flex-in-flex changed nothing. */}
+            <div className="w-full min-w-0 flex-1">{children}</div>
           </main>
         </SidebarInset>
       </SidebarProvider>

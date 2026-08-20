@@ -242,14 +242,18 @@ export default async function InventoryAnalyticsPage() {
           <PourCostChart data={data.pourCosts} />
           {data.pourCosts.length > 0 && (
             <div className="mt-4 overflow-x-auto">
+              {/* Bottle and pour size are configuration, and they are on the
+                  item itself. The two cost columns are the answer this table
+                  exists to give, so on a phone they are the two that stay —
+                  five columns measured 459px inside a 343px card. */}
               <table className="w-full text-xs">
-                <thead><tr className="text-muted-foreground border-b"><th className="text-left py-1.5 font-medium">Item</th><th className="text-right py-1.5 font-medium">Bottle</th><th className="text-right py-1.5 font-medium">Pour</th><th className="text-right py-1.5 font-medium">$/oz</th><th className="text-right py-1.5 font-medium">$/pour</th></tr></thead>
+                <thead><tr className="text-muted-foreground border-b"><th className="text-left py-1.5 font-medium">Item</th><th className="hidden sm:table-cell text-right py-1.5 font-medium">Bottle</th><th className="hidden sm:table-cell text-right py-1.5 font-medium">Pour</th><th className="text-right py-1.5 font-medium">$/oz</th><th className="text-right py-1.5 font-medium">$/pour</th></tr></thead>
                 <tbody>
                   {data.pourCosts.map((p) => (
                     <tr key={p.name} className="border-b last:border-0">
-                      <td className="py-1.5 font-medium max-w-[180px] truncate">{p.name}</td>
-                      <td className="py-1.5 text-right tabular-nums text-muted-foreground">{p.bottleSizeMl}ml</td>
-                      <td className="py-1.5 text-right tabular-nums text-muted-foreground">{p.pourSizeOz}oz</td>
+                      <td className="py-1.5 font-medium max-w-[120px] sm:max-w-[180px] truncate">{p.name}</td>
+                      <td className="hidden sm:table-cell py-1.5 text-right tabular-nums text-muted-foreground">{p.bottleSizeMl}ml</td>
+                      <td className="hidden sm:table-cell py-1.5 text-right tabular-nums text-muted-foreground">{p.pourSizeOz}oz</td>
                       <td className="py-1.5 text-right tabular-nums">${p.costPerOz.toFixed(3)}</td>
                       <td className="py-1.5 text-right tabular-nums font-semibold text-violet-600">${p.costPerPour.toFixed(3)}</td>
                     </tr>

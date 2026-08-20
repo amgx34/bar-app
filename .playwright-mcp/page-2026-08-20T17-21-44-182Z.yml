@@ -1,0 +1,27 @@
+- generic [active] [ref=f8e1]:
+  - link "Skip to content" [ref=f8e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - main [ref=f8e4]:
+    - generic [ref=f8e5]:
+      - button "Toggle Sidebar" [ref=f8e6]
+      - generic [ref=f8e8]: Rail
+      - generic [ref=f8e9]: Demo Bar — The Tipsy Tavern
+      - 'button "Theme: Dark. Switch to System." [ref=f8e10] [cursor=pointer]'
+      - button "Notifications" [ref=f8e14]
+      - button "Account menu" [ref=f8e18]
+    - main [ref=f8e19]
+  - navigation "Primary" [ref=f8e46]:
+    - generic [ref=f8e47]:
+      - link "Home" [ref=f8e48] [cursor=pointer]:
+        - /url: /app/dashboard
+      - link "Inventory" [ref=f8e52] [cursor=pointer]:
+        - /url: /app/inventory
+      - link "Payroll" [ref=f8e57] [cursor=pointer]:
+        - /url: /app/payroll
+      - link "Books" [ref=f8e61] [cursor=pointer]:
+        - /url: /app/books
+      - button "More sections" [ref=f8e64]: More
+  - button "Quick actions" [ref=f8e70]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f8e77] [cursor=pointer]
+  - alert [ref=f8e81]

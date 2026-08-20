@@ -1,0 +1,70 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=e3]:
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - generic [ref=e9]:
+          - generic [ref=e10]: Overview
+          - list [ref=e12]:
+            - listitem [ref=e13]:
+              - link "Dashboard" [ref=e14] [cursor=pointer]:
+                - /url: /app/dashboard
+        - separator [ref=e19]
+        - generic [ref=e20]:
+          - generic [ref=e21]: Stock
+          - list [ref=e23]:
+            - listitem [ref=e24]:
+              - button "Inventory" [ref=e25] [cursor=pointer]
+        - separator [ref=e33]
+        - generic [ref=e34]:
+          - generic [ref=e35]: People & Pay
+          - list [ref=e37]:
+            - listitem [ref=e38]:
+              - button "Payroll" [ref=e39] [cursor=pointer]
+        - separator [ref=e46]
+        - generic [ref=e47]:
+          - generic [ref=e48]: Money
+          - list [ref=e50]:
+            - listitem [ref=e51]:
+              - link "Books" [ref=e52] [cursor=pointer]:
+                - /url: /app/books
+            - listitem [ref=e56]:
+              - link "Tips" [ref=e57] [cursor=pointer]:
+                - /url: /app/tips
+            - listitem [ref=e62]:
+              - link "Tax" [ref=e63] [cursor=pointer]:
+                - /url: /app/tax
+        - separator [ref=e67]
+        - generic [ref=e68]:
+          - generic [ref=e69]: Ordering
+          - list [ref=e71]:
+            - listitem [ref=e72]:
+              - link "Reps" [ref=e73] [cursor=pointer]:
+                - /url: /app/reps
+        - separator [ref=e80]
+        - generic [ref=e81]:
+          - generic [ref=e82]: Setup
+          - list [ref=e84]:
+            - listitem [ref=e85]:
+              - link "Settings" [ref=e86] [cursor=pointer]:
+                - /url: /app/settings
+      - button "Toggle Sidebar" [ref=e91]
+    - main [ref=e92]:
+      - generic [ref=e93]:
+        - button "Toggle Sidebar" [ref=e94]
+        - generic [ref=e96]: Rail
+        - generic [ref=e97]: Demo Bar — The Tipsy Tavern
+        - 'button "Theme: Dark. Switch to System." [ref=e98] [cursor=pointer]'
+        - button "Notifications" [ref=e102]
+        - button "Account menu" [ref=e106]
+      - main [ref=e107]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e139] [cursor=pointer]:
+    - generic [ref=e142]:
+      - text: Rendering
+      - generic [ref=e143]:
+        - generic [ref=e144]: .
+        - generic [ref=e145]: .
+        - generic [ref=e146]: .
+  - alert [ref=e147]

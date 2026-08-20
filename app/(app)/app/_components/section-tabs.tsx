@@ -29,10 +29,14 @@ export function SectionTabs({ tabs }: { tabs?: NavLink[] }) {
       aria-label={`${section?.root.label ?? 'Section'} sections`}
       className="border-b border-border/60 bg-card"
     >
-      {/* Scrolls rather than wraps: five tabs do not fit 375px, and a wrapped
-          strip stops reading as one control. The scrollbar is hidden because a
-          horizontal bar under a tab row reads as a broken layout. */}
-      <div className="flex overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* Scrolls rather than wraps: a wrapped strip stops reading as one
+          control. The scrollbar is hidden because a horizontal bar under a tab
+          row reads as a broken layout.
+          
+          `gap-1` is not decoration. Without it the links' padding boxes butt
+          together, and on a real phone "Direct Deposit" and "Review" render as
+          one run-on string — measured touching at x=305 on a 390px device. */}
+      <div className="flex gap-1 overflow-x-auto px-4 sm:px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map(({ label, href }, index) => {
           // The first tab IS the section root, so it must match exactly —
           // otherwise it stays active on every child route and two tabs light
@@ -45,7 +49,10 @@ export function SectionTabs({ tabs }: { tabs?: NavLink[] }) {
               href={href}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors duration-200',
+                // min-h-11 keeps every tab a 44px touch target, which the
+                // 12px vertical padding alone did not guarantee at small text
+                // sizes.
+                'flex min-h-11 items-center whitespace-nowrap border-b-2 px-3 text-sm font-medium transition-colors duration-200 sm:px-4',
                 active
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground',
