@@ -23,6 +23,11 @@ export type BarSettings = {
 
   // ── Tip configuration ─────────────────────────────────────────────────
   barback_tip_pct?:     number;              // % of nightly tip pool to barbacks (default 15)
+  /**
+   * How the barback cut is divided. 'hours' (default) matches the bartender
+   * pool; 'equal' is a flat tip-out per barback regardless of shift length.
+   */
+  barback_split_method?: 'hours' | 'equal';
   opener_bonus_type?:   'none' | 'fixed' | 'percentage' | 'hours';
   /** Dollars (fixed), percent of the pool (percentage), or hours (hours). */
   opener_bonus_value?:  number;

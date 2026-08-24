@@ -105,6 +105,7 @@ export async function updateTipPaySettings(data: {
   opener_bonus_value: number;
   default_hourly_rate: number;
   hourly_rates:       HourlyRates;
+  barback_split_method?: 'hours' | 'equal';
   overtime_enabled?:    boolean;
   overtime_multiplier?: number;
 }) {

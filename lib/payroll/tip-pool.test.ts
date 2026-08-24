@@ -5,6 +5,7 @@ import {
   barbackFractionFromSettings,
   normalizePayType,
   splitBarbackTips,
+  barbackSplitFromSettings,
 } from './tip-pool';
 
 /**
@@ -227,5 +228,92 @@ describe('splitBarbackTips and zero-hour shifts', () => {
       barbackShifts: [{ employeeId: 'a', payType: 'percentage' }],
     });
     expect(r.tipsByEmployee.get('a')).toBeCloseTo(150);
+  });
+});
+
+describe('barbackSplitFromSettings', () => {
+  it('defaults to splitting by hours, like the bartender pool', () => {
+    expect(barbackSplitFromSettings({})).toBe('hours');
+    expect(barbackSplitFromSettings({ barback_split_method: null })).toBe('hours');
+  });
+
+  it('honours an explicit equal split', () => {
+    expect(barbackSplitFromSettings({ barback_split_method: 'equal' })).toBe('equal');
+  });
+
+  it('treats anything unrecognised as hours rather than guessing', () => {
+    expect(barbackSplitFromSettings({ barback_split_method: 'sideways' })).toBe('hours');
+  });
+});
+
+describe('splitBarbackTips by hours', () => {
+  const s = (employeeId: string, hours: number) =>
+    ({ employeeId, payType: 'percentage' as const, hours });
+
+  it('weights the cut by hours worked', () => {
+    // 6h and 2h -> 3:1. Equal headcount would have paid them $75 each.
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15, method: 'hours',
+      barbackShifts: [s('long', 6), s('short', 2)],
+    });
+    expect(r.tipsByEmployee.get('long')).toBeCloseTo(112.5);
+    expect(r.tipsByEmployee.get('short')).toBeCloseTo(37.5);
+    expect(r.poolTips).toBeCloseTo(850);
+  });
+
+  it('still splits equally when asked to', () => {
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15, method: 'equal',
+      barbackShifts: [s('long', 6), s('short', 2)],
+    });
+    expect(r.tipsByEmployee.get('long')).toBeCloseTo(75);
+    expect(r.tipsByEmployee.get('short')).toBeCloseTo(75);
+  });
+
+  it('adds up two shifts by the same barback', () => {
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15, method: 'hours',
+      barbackShifts: [s('a', 3), s('a', 5)],
+    });
+    expect(r.tipsByEmployee.get('a')).toBeCloseTo(150);
+  });
+
+  it('gives an hourly barback nothing and does not enlarge the others', () => {
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15, method: 'hours',
+      barbackShifts: [
+        { employeeId: 'paid', payType: 'percentage', hours: 5 },
+        { employeeId: 'wage', payType: 'hourly', hours: 5 },
+      ],
+    });
+    expect(r.tipsByEmployee.get('wage')).toBeUndefined();
+    // Half the cut, because the hourly barback still held their slot.
+    expect(r.tipsByEmployee.get('paid')).toBeCloseTo(75);
+    expect(r.returnedToPool).toBeCloseTo(75);
+  });
+
+  it('falls back to an equal split when no hours were recorded', () => {
+    // Weighting by hours is impossible here, and paying nobody would be worse:
+    // they worked, the hours just were not entered.
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15, method: 'hours',
+      barbackShifts: [
+        { employeeId: 'a', payType: 'percentage' },
+        { employeeId: 'b', payType: 'percentage' },
+      ],
+    });
+    expect(r.tipsByEmployee.get('a')).toBeCloseTo(75);
+    expect(r.tipsByEmployee.get('b')).toBeCloseTo(75);
+  });
+
+  it('conserves the night whichever method is used', () => {
+    for (const method of ['hours', 'equal'] as const) {
+      const r = splitBarbackTips({
+        dailyTips: 1234.56, barbackFraction: 0.15, method,
+        barbackShifts: [s('a', 7.25), s('b', 1.5), s('c', 4)],
+      });
+      const paid = [...r.tipsByEmployee.values()].reduce((t, v) => t + v, 0);
+      expect(paid + r.poolTips).toBeCloseTo(1234.56, 6);
+    }
   });
 });

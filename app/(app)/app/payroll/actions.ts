@@ -7,9 +7,11 @@ import {
   classifyTipRole,
   tipExclusionReason,
   barbackFractionFromSettings,
+  barbackSplitFromSettings,
   splitBarbackTips,
   normalizePayType,
   type BarbackPayType,
+  type BarbackSplitMethod,
   type TipRole,
 } from '@/lib/payroll/tip-pool';
 import {
@@ -523,6 +525,7 @@ export async function computePayroll(
   // Configurable barback cut (Settings → Tip & Pay → Barback tip %).
   // Falls back to 15 % if not set.
   const barbackFrac = barbackFractionFromSettings(org.bar_settings ?? {});
+  const barbackSplitMethod = barbackSplitFromSettings(org.bar_settings ?? {});
 
   // Configurable since the app was built, but never applied to anything until
   // now — see lib/payroll/adjustments.ts for how each type is funded.
@@ -701,6 +704,7 @@ export async function computePayroll(
       const barbackSplit = splitBarbackTips({
         dailyTips,
         barbackFraction: barbackFrac,
+        method: barbackSplitMethod,
         barbackShifts: barbackShiftsToday.map((s) => ({
           employeeId: s.employee_id,
           payType: normalizePayType(employeeById.get(s.employee_id)?.pay_type),
@@ -899,6 +903,8 @@ export interface DaySplitEmployee {
 
 export interface DaySplitData {
   date: string;
+  /** How the barback cut is divided. Sent so this screen cannot diverge. */
+  barbackSplitMethod: BarbackSplitMethod;
   totalTips: number;
   totalSales: number;
   employees: DaySplitEmployee[];
@@ -983,6 +989,7 @@ export async function getDaySplitData(date: string): Promise<DaySplitData | null
     employees,
     openerBonus: openerBonusFromSettings(org.bar_settings ?? {}),
     barbackFraction: barbackFractionFromSettings(org.bar_settings ?? {}),
+    barbackSplitMethod: barbackSplitFromSettings(org.bar_settings ?? {}),
   };
 }
 

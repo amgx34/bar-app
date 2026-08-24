@@ -116,6 +116,8 @@ export function TipPayTab({ role, settings }: Props) {
     } as Required<HourlyRates>,
     // Absent means enabled: every pay run before this setting existed paid
     // time-and-a-half, and opening this screen must not change that.
+    // Defaults to 'hours', matching the bartender pool.
+    barback_split_method: (settings.barback_split_method ?? 'hours') as 'hours' | 'equal',
     overtime_enabled:    settings.overtime_enabled !== false,
     overtime_multiplier: settings.overtime_multiplier ?? 1.5,
   });
@@ -208,9 +210,36 @@ export function TipPayTab({ role, settings }: Props) {
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Each night, barbacks collectively receive {form.barback_tip_pct}% of the tip pool split equally by headcount.
+            Each night, barbacks collectively receive {form.barback_tip_pct}% of the tip pool,
+            {form.barback_split_method === 'hours' ? ' split between them by hours worked' : ' split equally between them'}.
             The remaining {bartenderPool}% goes to the bartender pool, distributed by hours worked.
           </p>
+
+          <div className="space-y-2 border-t pt-4">
+            <Label className="text-sm">How the barback cut is divided</Label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {([
+                ['hours', 'By hours worked', 'Same rule as the bartender pool. Somebody who worked eight hours takes four times what somebody who worked two did.'],
+                ['equal', 'Equally between them', 'A flat tip-out per barback, whatever the length of the shift.'],
+              ] as const).map(([value, label, desc]) => (
+                <button
+                  key={value}
+                  type="button"
+                  disabled={!canEdit}
+                  aria-pressed={form.barback_split_method === value}
+                  onClick={() => canEdit && setForm({ ...form, barback_split_method: value })}
+                  className={`rounded-lg border p-3 text-left transition-colors disabled:opacity-60 ${
+                    form.barback_split_method === value
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-muted-foreground/40'
+                  }`}
+                >
+                  <span className="block text-sm font-medium">{label}</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">{desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 

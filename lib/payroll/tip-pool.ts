@@ -24,7 +24,7 @@
 export type TipRole =
   /** Shares the bartender pool, by hours worked. */
   | 'pool'
-  /** Shares the barback pool, equally by headcount. */
+  /** Shares the barback cut — by hours by default, see BarbackSplitMethod. */
   | 'barback'
   /** Takes no part in the nightly pool at all. */
   | 'none';
@@ -121,6 +121,27 @@ export function normalizePayType(raw: string | null | undefined): BarbackPayType
   return raw?.trim().toLowerCase() === 'hourly' ? 'hourly' : 'percentage';
 }
 
+/**
+ * How the barback cut is divided between the barbacks who worked.
+ *
+ * 'hours' matches the bartender pool: somebody who worked eight hours takes
+ * four times what somebody who worked two did. This is the default because
+ * splitting one pool by hours and the other by headcount meant two people on
+ * the same night were paid on different principles, and the barback who came in
+ * for the last hour of a Saturday took the same cut as the one who set up.
+ *
+ * 'equal' is the older behaviour, kept because some bars genuinely run it that
+ * way — a fixed nightly tip-out per barback regardless of length of shift.
+ */
+export type BarbackSplitMethod = 'hours' | 'equal';
+
+/** Reads the org setting. Anything unrecognised means the default. */
+export function barbackSplitFromSettings(settings: {
+  barback_split_method?: string | null;
+}): BarbackSplitMethod {
+  return settings?.barback_split_method === 'equal' ? 'equal' : 'hours';
+}
+
 export type BarbackShift = {
   employeeId: string;
   payType: BarbackPayType;
@@ -167,8 +188,10 @@ export function splitBarbackTips(input: {
   dailyTips: number;
   barbackFraction: number;
   barbackShifts: BarbackShift[];
+  method?: BarbackSplitMethod;
 }): BarbackSplit {
   const { dailyTips, barbackFraction } = input;
+  const method = input.method ?? 'hours';
   const tipsByEmployee = new Map<string, number>();
 
   // A zeroed shift is not a slot. Dropping it here rather than skipping it in
@@ -182,15 +205,32 @@ export function splitBarbackTips(input: {
   }
 
   const barbackCut = dailyTips * barbackFraction;
-  const perSlot = barbackCut / barbackShifts.length;
+
+  // Each shift's claim on the cut. By hours, that is its share of the hours all
+  // the barbacks worked; equally, it is one slot each.
+  //
+  // The total hours include HOURLY barbacks' shifts on purpose. They hold their
+  // slot without claiming it, which is what stops moving one barback to a wage
+  // from enlarging everybody else — see the class comment above.
+  const totalHours = barbackShifts.reduce((t, s) => t + (Number(s.hours) || 0), 0);
+
+  // Weighting by hours is impossible when none were recorded. Paying nobody
+  // would be the wrong answer — they worked, the hours simply were not entered
+  // — so fall back to an equal split rather than returning the cut to the bar.
+  const byHours = method === 'hours' && totalHours > 0;
 
   let paid = 0;
   for (const shift of barbackShifts) {
+    const claim = byHours
+      ? ((Number(shift.hours) || 0) / totalHours) * barbackCut
+      : barbackCut / barbackShifts.length;
+
     if (shift.payType === 'hourly') continue;
+
     // `+=`, not `set`: a split shift is two rows for the same person and they
-    // hold both slots.
-    tipsByEmployee.set(shift.employeeId, (tipsByEmployee.get(shift.employeeId) ?? 0) + perSlot);
-    paid += perSlot;
+    // hold both claims.
+    tipsByEmployee.set(shift.employeeId, (tipsByEmployee.get(shift.employeeId) ?? 0) + claim);
+    paid += claim;
   }
 
   const returnedToPool = barbackCut - paid;
