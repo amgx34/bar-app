@@ -110,7 +110,9 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
               Payroll
             </Link>
           </nav>
-          <h1 className="text-2xl font-bold">Pay Period Review</h1>
+          {/* h2, not h1: the Payroll layout already supplies the page's h1, and
+              two h1s leave a screen reader with no single page title. */}
+          <h2 className="text-2xl font-bold">Pay Period Review</h2>
           <p className="text-muted-foreground">{periodLabel} · {org.name}</p>
         </div>
 

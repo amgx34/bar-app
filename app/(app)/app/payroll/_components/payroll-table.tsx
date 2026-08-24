@@ -166,7 +166,23 @@ export default function PayrollTable({
               <div key={entry.employeeId} className="rounded-xl border bg-card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-medium">{entry.employeeName}</p>
+                    <p className="font-medium">
+                      <span className="align-middle">{entry.employeeName}</span>
+                      {entry.payType === 'hourly' && (
+                      /* Without this an hourly barback's $0 tips reads as a
+                         broken split rather than the arrangement they are on.
+                         The title is load-bearing: such a person CAN still hold
+                         tips, because a manual transfer is a deliberate act and
+                         is applied after the split. "Hourly only" alone next to
+                         a non-zero figure reads as a contradiction. */
+                      <span
+                        title="Paid an hourly wage and draws nothing from the tip pool. Tips moved to them by hand still apply."
+                        className="ml-2 inline-flex items-center rounded-full bg-muted px-2 py-0.5 align-middle text-[11px] font-medium text-muted-foreground"
+                      >
+                        No pool share
+                      </span>
+                    )}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {entry.totalHours.toFixed(2)} hrs @ ${entry.hourlyRate.toFixed(2)}
                     </p>
@@ -302,7 +318,16 @@ export default function PayrollTable({
                   key={entry.employeeId}
                   className={i % 2 === 1 ? 'bg-muted/20' : ''}
                 >
-                  <TableCell className="pl-4 font-medium">{entry.employeeName}</TableCell>
+                  <TableCell className="pl-4 font-medium whitespace-normal">
+                    <span className="align-middle">{entry.employeeName}</span>
+                    {entry.payType === 'hourly' && (
+                      /* Without this an hourly barback's $0 tips reads as a
+                         broken split rather than the arrangement they are on. */
+                      <span className="ml-2 inline-flex items-center rounded-full bg-muted px-2 py-0.5 align-middle text-[11px] font-medium text-muted-foreground">
+                        Hourly only
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {entry.regularHours.toFixed(2)}
                   </TableCell>

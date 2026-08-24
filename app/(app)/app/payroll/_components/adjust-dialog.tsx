@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { Clock, ArrowLeftRight, Sunrise, UserMinus, Unlock } from 'lucide-react';
+import { Clock, ArrowLeftRight, Sunrise, UserMinus, Unlock, HandCoins } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -13,10 +13,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { FormStatus } from '@/components/ui/form-status';
-import { adjustShiftHours, transferTips, setOpener, removeFromShift, revertShiftToPos } from '../adjust-actions';
+import { adjustShiftHours, transferTips, setOpener, removeFromShift, revertShiftToPos, removeTipsFromPool } from '../adjust-actions';
 import type { PayrollEntry } from '../actions';
 
-type Mode = 'hours' | 'transfer' | 'opener' | 'remove' | 'revert';
+type Mode = 'hours' | 'transfer' | 'opener' | 'remove' | 'revert' | 'payout';
 
 // Mirrors the `reason` schema in adjust-actions.ts. Kept in step with it on
 // purpose: the server is still the authority, but a server rejection reaches
@@ -62,6 +62,13 @@ function validate(
 
   if (mode === 'transfer') {
     if (!fields.counterparty) return 'Choose who the tips are moving to.';
+    const amount = Number(fields.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return 'Enter an amount greater than zero.';
+    }
+  }
+
+  if (mode === 'payout') {
     const amount = Number(fields.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
       return 'Enter an amount greater than zero.';
@@ -202,6 +209,22 @@ export function AdjustDialog({
       return;
     }
 
+    if (mode === 'payout') {
+      run(
+        () => removeTipsFromPool({
+          shiftDate,
+          amount: Number(amount),
+          // Attributed to the row the dialog was opened from, because that is
+          // who the cash went to. The action accepts null for a removal that
+          // belongs to nobody; there is no way to express that from here yet.
+          employeeId: entry.employeeId,
+          reason,
+        }),
+        `${entry.employeeName} cashed out`,
+      );
+      return;
+    }
+
     if (mode === 'remove') {
       run(
         () => removeFromShift({ employeeId: entry.employeeId, shiftDate, reason }),
@@ -220,6 +243,7 @@ export function AdjustDialog({
     { key: 'hours', label: 'Hours', icon: Clock },
     { key: 'transfer', label: 'Move tips', icon: ArrowLeftRight },
     { key: 'opener', label: 'Opener', icon: Sunrise },
+    { key: 'payout', label: 'Cash out', icon: HandCoins },
     { key: 'remove', label: 'Remove', icon: UserMinus },
     { key: 'revert', label: 'Unlock', icon: Unlock },
   ];
@@ -325,6 +349,27 @@ export function AdjustDialog({
               <p className="text-xs text-muted-foreground">
                 Taken off {entry.employeeName} and given to the person you choose.
                 The night&rsquo;s total is unchanged.
+              </p>
+            </>
+          )}
+
+          {mode === 'payout' && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="adj-payout">Amount ($)</Label>
+                <Input
+                  id="adj-payout" type="number" min="0" step="0.01"
+                  inputMode="decimal" placeholder="0.00"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Records that {entry.employeeName} was handed this much of their own tips
+                in cash, so it comes off their payroll figure and not off anybody
+                else&rsquo;s. Applied after any transfers, so cashing somebody out for
+                everything they had means their final figure. The reason stays on the
+                pay run.
               </p>
             </>
           )}

@@ -40,6 +40,18 @@ const transferSchema = z.object({
   reason,
 });
 
+/**
+ * A removal has no counterparty and MAY have no employee: a garnishment shrinks
+ * the pool without being anybody's share. `employeeId` is therefore optional
+ * rather than required-and-fudged.
+ */
+const tipRemovalSchema = z.object({
+  shiftDate: isoDate,
+  amount: z.number().positive('Enter an amount greater than zero').max(100000),
+  employeeId: z.string().uuid().nullish(),
+  reason,
+});
+
 const openerSchema = z.object({
   employeeId: z.string().uuid(),
   shiftDate: isoDate,
@@ -185,6 +197,60 @@ export async function transferTips(raw: unknown): Promise<void> {
 
   revalidatePath('/app/payroll');
   revalidatePath('/app/tips');
+}
+
+/**
+ * Records tips paid out in cash, and logs why.
+ *
+ * TWO SHAPES, DECIDED BY employeeId
+ *
+ * With an employee: that person was handed their own tips in cash. It comes off
+ * THEIR payroll figure only, after transfers. Nobody else's share moves, because
+ * that money was never anyone else's.
+ *
+ * Without one: a claim against the house pool — a garnishment — which comes off
+ * the night before the barback cut and the bartender split, so everybody earns
+ * proportionally less.
+ *
+ * Stored as a row in payroll_adjustments rather than its own table: that log
+ * already carries the date, amount, reason and author, and the payroll screen
+ * already reads it.
+ */
+export async function removeTipsFromPool(raw: unknown): Promise<string> {
+  const { org, role } = await getCurrentOrg();
+  if (!canManagePayroll(role)) throw new Error('Not authorized');
+
+  const input = tipRemovalSchema.parse(raw);
+  const user = await getAuthUser();
+  const supabase = createAdminClient();
+
+  // Only when one is named. An unattributed removal is legitimate here, so this
+  // must not become a required lookup.
+  if (input.employeeId) {
+    await assertEmployeesInOrg(supabase, org.id, [input.employeeId]);
+  }
+
+  const amount = Math.round(input.amount * 100) / 100;
+
+  const { error } = await supabase.from('payroll_adjustments').insert({
+    organization_id: org.id,
+    shift_date: input.shiftDate,
+    kind: 'tip_removal',
+    employee_id: input.employeeId ?? null,
+    counterparty_employee_id: null,
+    amount,
+    reason: input.reason,
+    created_by: user?.id ?? null,
+  });
+
+  if (error) throw new Error(`Could not record that removal: ${error.message}`);
+
+  revalidatePath('/app/payroll');
+  revalidatePath('/app/tips');
+
+  return input.employeeId
+    ? `$${amount.toFixed(2)} cashed out`
+    : `$${amount.toFixed(2)} removed from that night's pool`;
 }
 
 /**

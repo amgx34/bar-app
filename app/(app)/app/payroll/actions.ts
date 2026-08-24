@@ -7,15 +7,22 @@ import {
   classifyTipRole,
   tipExclusionReason,
   barbackFractionFromSettings,
+  splitBarbackTips,
+  normalizePayType,
+  type BarbackPayType,
   type TipRole,
 } from '@/lib/payroll/tip-pool';
 import {
   applyTipTransfers,
+  applyTipRemovals,
+  applyEmployeeRemovals,
   openerBonus,
   openerBonusFromSettings,
   type OpenerBonusConfig,
   type TipTransfer,
+  type TipRemoval,
 } from '@/lib/payroll/adjustments';
+import { overtimeFromSettings, overtimePay } from '@/lib/payroll/overtime';
 import { ParsedEmployeeShift, parseDate } from '@/lib/csv-parsers/parse-employee-shifts';
 import { ParsedZReport } from '@/lib/csv-parsers/parse-z-reports';
 import { ParsedZReportText } from '@/lib/csv-parsers/parse-z-report-text';
@@ -40,6 +47,8 @@ export interface Employee {
   role: string | null;
   hourly_rate: number | null;
   tip_mode: TipMode;
+  /** 'hourly' means paid a wage instead of a tip cut. Barbacks only, in practice. */
+  pay_type?: BarbackPayType | null;
 }
 
 export interface SaveEmployeePayload {
@@ -48,6 +57,7 @@ export interface SaveEmployeePayload {
   role: string;
   hourly_rate: number;
   tip_mode: TipMode;
+  pay_type?: BarbackPayType;
 }
 
 /**
@@ -72,6 +82,9 @@ export async function saveEmployee(payload: SaveEmployeePayload): Promise<Employ
         role: payload.role,
         hourly_rate: payload.hourly_rate,
         tip_mode: payload.tip_mode,
+        // Normalised rather than trusted: the column is NOT NULL, and an
+        // undefined here would blank a deliberate 'hourly' arrangement.
+        pay_type: normalizePayType(payload.pay_type),
       })
       .eq('id', payload.id)
       .eq('organization_id', org.id)
@@ -88,6 +101,7 @@ export async function saveEmployee(payload: SaveEmployeePayload): Promise<Employ
         role: payload.role,
         hourly_rate: payload.hourly_rate,
         tip_mode: payload.tip_mode,
+        pay_type: normalizePayType(payload.pay_type),
       })
       .select()
       .single();
@@ -484,6 +498,12 @@ export interface PayrollEntry {
   /** Base rate plus tips per hour — what the time was actually worth. */
   effectiveHourlyRate: number;
   totalCompensation: number;
+  /**
+   * Which arrangement paid this person beyond their wage. 'hourly' means they
+   * drew nothing from the tip pool. Shown in payroll so a zero tip figure reads
+   * as a deliberate arrangement rather than a missing split.
+   */
+  payType: BarbackPayType;
 }
 
 /**
@@ -503,11 +523,13 @@ export async function computePayroll(
   // Configurable barback cut (Settings → Tip & Pay → Barback tip %).
   // Falls back to 15 % if not set.
   const barbackFrac = barbackFractionFromSettings(org.bar_settings ?? {});
-  const poolFrac    = 1 - barbackFrac;
 
   // Configurable since the app was built, but never applied to anything until
   // now — see lib/payroll/adjustments.ts for how each type is funded.
   const openerCfg = openerBonusFromSettings(org.bar_settings ?? {});
+  // Defaults to 1.5x enabled, which is what every pay run did before the
+  // setting existed — see lib/payroll/overtime.ts.
+  const overtimeCfg = overtimeFromSettings(org.bar_settings ?? {});
 
   try {
     // Fetch all employees for the organization
@@ -613,7 +635,14 @@ export async function computePayroll(
       .eq('organization_id', org.id)
       .eq('kind', 'tip_transfer')
       .gte('shift_date', startDate)
-      .lte('shift_date', endDate);
+      .lte('shift_date', endDate)
+      // Chronological, and NOT optional. Transfers are capped at what the
+      // sender holds at that moment, so the order they are applied in changes
+      // the result. Without an ORDER BY, Postgres returns them in whatever
+      // order it likes and the same pay period could total differently between
+      // two runs. Oldest first, because each transfer was entered against the
+      // balance as it stood then.
+      .order('created_at', { ascending: true });
 
     const tipTransfers: TipTransfer[] = (adjustmentRows ?? []).map((r) => ({
       fromEmployeeId: r.employee_id as string,
@@ -621,12 +650,41 @@ export async function computePayroll(
       amount: Number(r.amount) || 0,
     }));
 
+    // Tips taken out of the pool — a legally required cash payout, say. Fetched
+    // per night because they come off the top before that night is split.
+    const { data: removalRows } = await supabase
+      .from('payroll_adjustments')
+      .select('shift_date, employee_id, amount, reason')
+      .eq('organization_id', org.id)
+      .eq('kind', 'tip_removal')
+      .gte('shift_date', startDate)
+      .lte('shift_date', endDate);
+
+    const removalsByDate = new Map<string, TipRemoval[]>();
+    for (const r of removalRows ?? []) {
+      const date = r.shift_date as string;
+      const list = removalsByDate.get(date) ?? [];
+      list.push({
+        amount: Number(r.amount) || 0,
+        employeeId: (r.employee_id as string | null) ?? null,
+        reason: (r.reason as string) ?? '',
+      });
+      removalsByDate.set(date, list);
+    }
+
     const employeeTipAmounts = new Map<string, number>(
       payrollEmployees.map((e) => [e.id, 0])
     );
 
     for (const report of zReports || []) {
-      const dailyTips = (report.cash_tips || 0) + (report.cc_tips || 0);
+      // Removals come off BEFORE the barback cut and the bartender split, so a
+      // court-ordered payout shrinks the night for everybody proportionally
+      // rather than coming out of one person's share.
+      const removal = applyTipRemovals(
+        (report.cash_tips || 0) + (report.cc_tips || 0),
+        removalsByDate.get(report.report_date) ?? [],
+      );
+      const dailyTips = removal.tipsAfterRemoval;
       if (dailyTips <= 0) continue;
 
       const dayShifts = shiftsByDate.get(report.report_date) || [];
@@ -637,20 +695,25 @@ export async function computePayroll(
         return !!emp && classifyTipRole({ role: emp.role, tipMode: emp.tip_mode }) === 'barback';
       });
 
-      let poolTips: number;
+      // A barback on `pay_type = 'hourly'` is paid a wage instead of a tip cut,
+      // so they hold a slot in the split but do not claim it — see
+      // splitBarbackTips for why the slot is not simply removed.
+      const barbackSplit = splitBarbackTips({
+        dailyTips,
+        barbackFraction: barbackFrac,
+        barbackShifts: barbackShiftsToday.map((s) => ({
+          employeeId: s.employee_id,
+          payType: normalizePayType(employeeById.get(s.employee_id)?.pay_type),
+          // Zeroed hours mean "Remove from shift" was used; that is not a slot.
+          hours: (s.regular_hours || 0) + (s.overtime_hours || 0),
+        })),
+      });
 
-      if (barbackShiftsToday.length > 0) {
-        const perBarback = (dailyTips * barbackFrac) / barbackShiftsToday.length;
-        barbackShiftsToday.forEach((s) => {
-          employeeTipAmounts.set(
-            s.employee_id,
-            (employeeTipAmounts.get(s.employee_id) || 0) + perBarback
-          );
-        });
-        poolTips = dailyTips * poolFrac;
-      } else {
-        poolTips = dailyTips;
+      for (const [employeeId, amount] of barbackSplit.tipsByEmployee) {
+        employeeTipAmounts.set(employeeId, (employeeTipAmounts.get(employeeId) || 0) + amount);
       }
+
+      const poolTips = barbackSplit.poolTips;
 
       // Regular pool: tip_mode='pool', not barback role/mode, not security/manager, not no_tip
       const poolShiftsToday = dayShifts.filter((s) => {
@@ -729,6 +792,17 @@ export async function computePayroll(
     // the total (see lib/payroll/adjustments.ts), so the night still reconciles
     // against the Z report — only the holder changes.
     const adjustedTips = applyTipTransfers(employeeTipAmounts, tipTransfers);
+
+    // Cash-outs come off AFTER transfers. Somebody paid out "for everything they
+    // had" was paid their final figure, so deducting before the transfers land
+    // would measure against a number they never actually held.
+    //
+    // Only removals naming an employee are applied here. The unattributed ones
+    // were already taken off each night's pool inside the loop above, and
+    // deducting them a second time would remove the same money twice.
+    const allRemovals = [...removalsByDate.values()].flat();
+    const cashedOut = applyEmployeeRemovals(adjustedTips, allRemovals);
+    const finalTips = cashedOut.tipsByEmployee;
     // ────────────────────────────────────────────────────────────────────────
 
     // Build payroll entries
@@ -753,9 +827,9 @@ export async function computePayroll(
         employeeShifts[0]?.hourly_rate || employee.hourly_rate || 0;
 
       const regularPay = regularHours * hourlyRate;
-      const overtimePay = overtimeHours * hourlyRate * 1.5;
+      const otPay = overtimePay(overtimeHours, hourlyRate, overtimeCfg);
 
-      const tipAmount = adjustedTips.get(employee.id) || 0;
+      const tipAmount = finalTips.get(employee.id) || 0;
 
       // Opener bonus hours are paid by the bar at the employee's own rate, on
       // top of the hours they actually worked, and never as overtime — they
@@ -763,7 +837,7 @@ export async function computePayroll(
       const bonusHours = openerBonusHours.get(employee.id) || 0;
       const bonusPay = bonusHours * hourlyRate;
 
-      const totalCompensation = regularPay + overtimePay + bonusPay + tipAmount;
+      const totalCompensation = regularPay + otPay + bonusPay + tipAmount;
 
       // What the shift was actually worth per hour. Bartenders judge a night by
       // this rather than by the base rate, and it is the number that shows a
@@ -783,11 +857,12 @@ export async function computePayroll(
         overtimeHours,
         hourlyRate,
         regularPay,
-        overtimePay,
+        overtimePay: otPay,
         tipAmount,
         tipsPerHour,
         effectiveHourlyRate,
         totalCompensation,
+        payType: normalizePayType(employee.pay_type),
       });
     }
 
@@ -815,6 +890,11 @@ export interface DaySplitEmployee {
   tipRole: TipRole;
   /** Why they are not in the split, when they are not. Null when they are. */
   excludedReason: string | null;
+  /**
+   * Barbacks only in practice: 'hourly' means they are paid a wage instead of a
+   * tip cut, so they show a zero share here deliberately.
+   */
+  payType: BarbackPayType;
 }
 
 export interface DaySplitData {
@@ -851,7 +931,7 @@ export async function getDaySplitData(date: string): Promise<DaySplitData | null
     // tip_mode is what decides whether somebody shares the pool at all. It was
     // not selected, so the split silently included people the pay run pays
     // nothing — managers, security, and anyone set to Not Tipped.
-    .select('employee_id, regular_hours, overtime_hours, employees(id, name, role, tip_mode)')
+    .select('employee_id, regular_hours, overtime_hours, employees(id, name, role, tip_mode, pay_type)')
     .eq('organization_id', org.id)
     .eq('shift_date', date);
 
@@ -870,6 +950,7 @@ export async function getDaySplitData(date: string): Promise<DaySplitData | null
   for (const shift of shifts) {
     const emp = (shift.employees as unknown as {
       id: string; name: string; role: string | null; tip_mode: string | null;
+      pay_type?: string | null;
     } | null);
     if (!emp) continue;
     if (DAY_SPLIT_EXCLUDED.has(emp.name.toLowerCase().trim())) continue;
@@ -886,6 +967,7 @@ export async function getDaySplitData(date: string): Promise<DaySplitData | null
         hours,
         tipRole: classifyTipRole(participant),
         excludedReason: tipExclusionReason(participant),
+        payType: normalizePayType(emp.pay_type),
       });
     }
   }

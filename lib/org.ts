@@ -30,6 +30,16 @@ export type BarSettings = {
   // ── Per-role hourly rates ─────────────────────────────────────────────
   hourly_rates?: HourlyRates;
 
+  // ── Overtime ──────────────────────────────────────────────────────────
+  /**
+   * Absent or true means overtime is paid at a premium, which is what every
+   * pay run did before this setting existed. Only an explicit false disables
+   * it, and disabling pays those hours at the base rate — never nothing.
+   */
+  overtime_enabled?: boolean;
+  /** Premium multiplier when enabled. Defaults to 1.5 (federal FLSA). */
+  overtime_multiplier?: number;
+
   // ── Inventory / pour defaults ─────────────────────────────────────────
   default_pour_oz?: number;                  // default spirit pour size in oz (e.g. 1.5)
   bottle_sizes_ml?: number[];               // sizes to offer in item form

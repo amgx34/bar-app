@@ -121,13 +121,13 @@ export default function PayrollTab({
           the viewport and the whole of Payroll scrolled sideways. */}
       <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => navigateWeek('prev')}>
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0" aria-label="Previous week" onClick={() => navigateWeek('prev')}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="text-sm font-medium min-w-[170px] text-center">
             {formatWeekLabel(startDate, endDate)}
           </span>
-          <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => navigateWeek('next')}>
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0" aria-label="Next week" onClick={() => navigateWeek('next')}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>

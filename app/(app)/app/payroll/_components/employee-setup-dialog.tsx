@@ -55,6 +55,7 @@ export default function EmployeeSetupDialog({
   const [formData, setFormData] = useState<{
     name: string;
     role: string;
+    payType: 'percentage' | 'hourly';
     hourlyRate: string;
     tipMode: TipMode;
   }>({
@@ -62,6 +63,7 @@ export default function EmployeeSetupDialog({
     role: employee?.role ?? '',
     hourlyRate: employee?.hourly_rate?.toString() ?? '',
     tipMode: employee?.tip_mode ?? 'pool',
+    payType: employee?.pay_type ?? 'percentage',
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -89,6 +91,7 @@ export default function EmployeeSetupDialog({
         role: formData.role,
         hourly_rate: parseFloat(formData.hourlyRate),
         tip_mode: formData.tipMode,
+        pay_type: formData.payType,
       });
       toast.success(isNew ? `${saved.name} added` : 'Changes saved');
       onSave(saved);
@@ -196,6 +199,37 @@ export default function EmployeeSetupDialog({
                 <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
                 <p className="text-muted-foreground">{TIP_MODE_INFO[formData.tipMode]}</p>
               </div>
+
+              {/* Only a barback can be on this arrangement, so asking everyone
+                  would be a question with one right answer. Bartender pay is
+                  governed by Tip Distribution above. */}
+              {(formData.role === 'barback' || formData.tipMode === 'barback') && (
+                <div className="space-y-2 pt-1">
+                  <Label htmlFor="payType">Barback Pay</Label>
+                  <Select
+                    value={formData.payType}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, payType: value as 'percentage' | 'hourly' })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percentage">Hourly wage + share of tips</SelectItem>
+                      <SelectItem value="hourly">Hourly wage only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex gap-2 rounded-lg bg-muted p-3 text-sm">
+                    <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                    <p className="text-muted-foreground">
+                      {formData.payType === 'hourly'
+                        ? 'Paid their hourly rate and nothing from the tip pool. Their share goes back to the bartenders rather than to the other barbacks.'
+                        : 'Paid their hourly rate plus an equal share of the barback cut. This is the default.'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

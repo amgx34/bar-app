@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { getDaySplitData, DaySplitData, DaySplitEmployee } from '../actions';
 import { openerBonus, type OpenerBonusConfig } from '@/lib/payroll/adjustments';
+import { splitBarbackTips } from '@/lib/payroll/tip-pool';
 import { CashTipsButton } from './cash-tips-card';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -27,10 +28,15 @@ function fmtDate(iso: string) {
 
 // ── Toggle (sliding switch) ────────────────────────────────────────────────────
 
-function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+function Toggle({ on, onChange, disabled, label }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label?: string }) {
   return (
     <button
       type="button"
+      // role=switch + aria-checked is what makes this read as a control with a
+      // state rather than an unnamed button.
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
       onClick={() => !disabled && onChange(!on)}
       disabled={disabled}
       className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none disabled:opacity-40 ${
@@ -69,15 +75,20 @@ function computeSplit(
   const barbacks   = active.filter((e) => e.tipRole === 'barback');
   const openers    = bartenders.filter((e) => states[e.id]?.opener);
 
-  // Only taken when somebody is actually barbacking. It used to come off the
-  // top regardless, so on a night with no barback on shift that share simply
-  // vanished from the split — nobody was paid it and nothing said so.
-  const barbackPool = barbacks.length > 0 ? totalTips * barbackFraction : 0;
+  // Only taken when somebody is actually barbacking, and only for the barbacks
+  // who are on a percentage deal — the same function the pay run uses, so a
+  // barback moved to hourly shows the identical figure on both screens.
+  const barbackSplit = splitBarbackTips({
+    dailyTips: totalTips,
+    barbackFraction,
+    barbackShifts: barbacks.map((e) => ({ employeeId: e.id, payType: e.payType, hours: e.hours })),
+  });
 
   // What the bartenders share before the opener's cut. The pay run funds the
   // bonus from this same figure, so basing the preview on total tips instead
   // is what made the two screens disagree.
-  const poolTips = Math.max(0, totalTips - barbackPool);
+  const poolTips = Math.max(0, barbackSplit.poolTips);
+  const barbackPool = totalTips - poolTips;
 
   const bonus = openers.length > 0
     ? openerBonus(bonusConfig, poolTips)
@@ -89,7 +100,6 @@ function computeSplit(
   const bartenderPool = Math.max(0, poolTips - openerPool);
 
   const totalBartenderHours = bartenders.reduce((s, e) => s + e.hours, 0);
-  const activeBarbackCount  = barbacks.length;
 
   const shares: Record<string, number> = {};
 
@@ -105,7 +115,8 @@ function computeSplit(
   }
 
   for (const emp of barbacks) {
-    shares[emp.id] = activeBarbackCount > 0 ? barbackPool / activeBarbackCount : 0;
+    // Absent from the map means an hourly barback, who draws nothing here.
+    shares[emp.id] = barbackSplit.tipsByEmployee.get(emp.id) ?? 0;
   }
 
   return {
@@ -199,11 +210,11 @@ export default function DaySplitTab({ canEdit = false }: { canEdit?: boolean }) 
     <div className="space-y-6">
       {/* Date nav */}
       <div className="flex flex-wrap items-center gap-3">
-        <button onClick={() => setDate(addDays(date, -1))} className="flex h-8 w-8 items-center justify-center rounded-md border hover:bg-muted transition-colors">
+        <button aria-label="Previous day" onClick={() => setDate(addDays(date, -1))} className="flex h-8 w-8 items-center justify-center rounded-md border hover:bg-muted transition-colors">
           <ChevronLeft className="h-4 w-4" />
         </button>
         <span className="text-sm font-medium min-w-[180px] text-center sm:min-w-[220px]">{fmtDate(date)}</span>
-        <button onClick={() => setDate(addDays(date, 1))} className="flex h-8 w-8 items-center justify-center rounded-md border hover:bg-muted transition-colors">
+        <button aria-label="Next day" onClick={() => setDate(addDays(date, 1))} className="flex h-8 w-8 items-center justify-center rounded-md border hover:bg-muted transition-colors">
           <ChevronRight className="h-4 w-4" />
         </button>
         <input
@@ -316,6 +327,7 @@ export default function DaySplitTab({ canEdit = false }: { canEdit?: boolean }) 
                           <td className="px-3 py-3 sm:px-4 text-center">
                             <Toggle
                               on={isOpener}
+                              label={`Mark ${emp.name} as opener`}
                               onChange={() => active && toggleOpener(emp.id)}
                               disabled={!active}
                             />
@@ -325,6 +337,7 @@ export default function DaySplitTab({ canEdit = false }: { canEdit?: boolean }) 
                           </td>
                           <td className="px-3 py-3 sm:px-4 text-center">
                             <button
+                              aria-label={active ? `Remove ${emp.name} from this night` : `Add ${emp.name} to this night`}
                               onClick={() => toggleActive(emp.id)}
                               className={`flex h-6 w-6 items-center justify-center rounded-full transition-colors mx-auto ${
                                 active
@@ -374,6 +387,7 @@ export default function DaySplitTab({ canEdit = false }: { canEdit?: boolean }) 
                           </td>
                           <td className="px-3 py-3 sm:px-4 text-center">
                             <button
+                              aria-label={active ? `Remove ${emp.name} from this night` : `Add ${emp.name} to this night`}
                               onClick={() => toggleActive(emp.id)}
                               className={`flex h-6 w-6 items-center justify-center rounded-full transition-colors mx-auto ${
                                 active

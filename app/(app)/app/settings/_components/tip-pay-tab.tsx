@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Save, Info } from 'lucide-react';
+import { describeOvertime, overtimePay } from '@/lib/payroll/overtime';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -113,6 +114,10 @@ export function TipPayTab({ role, settings }: Props) {
       security:  settings.hourly_rates?.security  ?? 14,
       other:     settings.hourly_rates?.other     ?? 13,
     } as Required<HourlyRates>,
+    // Absent means enabled: every pay run before this setting existed paid
+    // time-and-a-half, and opening this screen must not change that.
+    overtime_enabled:    settings.overtime_enabled !== false,
+    overtime_multiplier: settings.overtime_multiplier ?? 1.5,
   });
   const [saving, setSaving] = useState(false);
   const canEdit = role === 'owner' || role === 'manager';
@@ -280,6 +285,71 @@ export function TipPayTab({ role, settings }: Props) {
               <p className="text-xs text-muted-foreground">{desc}</p>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Overtime */}
+      <div className="rounded-xl border bg-card p-5 space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest">Overtime</h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            How hours recorded as overtime are paid
+          </p>
+        </div>
+
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <Label htmlFor="ot-enabled" className="text-sm">Pay an overtime premium</Label>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Turning this off does not stop overtime being paid &mdash; those hours were
+              worked and are still owed. They are paid at the base rate instead of a
+              premium.
+            </p>
+          </div>
+          <button
+            id="ot-enabled"
+            type="button"
+            role="switch"
+            aria-checked={form.overtime_enabled}
+            aria-label="Pay an overtime premium"
+            disabled={!canEdit}
+            onClick={() => canEdit && setForm({ ...form, overtime_enabled: !form.overtime_enabled })}
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-40 ${
+              form.overtime_enabled ? 'bg-primary' : 'bg-muted-foreground/30'
+            }`}
+          >
+            <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
+              form.overtime_enabled ? 'translate-x-6' : 'translate-x-1'
+            }`} />
+          </button>
+        </div>
+
+        {form.overtime_enabled && (
+          <div className="space-y-1.5">
+            <Label htmlFor="ot-multiplier" className="text-sm">Multiplier</Label>
+            <Input
+              id="ot-multiplier" type="number" min={1} max={5} step="0.25"
+              disabled={!canEdit}
+              value={form.overtime_multiplier}
+              onChange={(e) =>
+                setForm({ ...form, overtime_multiplier: Math.min(5, Math.max(1, Number(e.target.value) || 1)) })
+              }
+              className="max-w-32"
+            />
+            <p className="text-xs text-muted-foreground">
+              1.5 is federal time-and-a-half. Cannot go below 1 &mdash; overtime is never
+              worth less than a normal hour.
+            </p>
+          </div>
+        )}
+
+        <div className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
+          {describeOvertime({ enabled: form.overtime_enabled, multiplier: form.overtime_multiplier })}
+          {' '}An employee on $20/hr working 10 overtime hours earns{' '}
+          <span className="font-medium text-foreground">
+            ${overtimePay(10, 20, { enabled: form.overtime_enabled, multiplier: form.overtime_multiplier }).toFixed(2)}
+          </span>{' '}
+          for them.
         </div>
       </div>
 

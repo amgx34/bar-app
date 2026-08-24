@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Rail")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.1.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.1.0+5ca75aa2484a60c40ad644dc168326bf5266ee72")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.1.0+417b29579639671ad3a5686969b19d8aed40800d")]
 [assembly: System.Reflection.AssemblyProductAttribute("Rail 2Touch Agent Installer")]
 [assembly: System.Reflection.AssemblyTitleAttribute("rail-setup")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.1.0.0")]

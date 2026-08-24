@@ -249,6 +249,9 @@ export default function EmployeesTab({ employees: initialEmployees }: EmployeesT
                           size="sm"
                           variant="ghost"
                           className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          // Named per row: a screen reader hears seven identical
+                          // "button" nodes otherwise, with no way to tell whose.
+                          aria-label={`Delete ${employee.name}`}
                           onClick={() => handleDelete(employee)}
                           disabled={deletingId === employee.id}
                         >

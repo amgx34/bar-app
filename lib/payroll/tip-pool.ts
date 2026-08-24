@@ -99,3 +99,104 @@ export function barbackFractionFromSettings(settings: {
   const pct = Math.min(100, Math.max(0, Number(settings?.barback_tip_pct ?? 15)));
   return pct / 100;
 }
+
+/**
+ * How a barback is compensated for the night.
+ *
+ * `percentage` is the historical arrangement and stays the default: they draw a
+ * share of the barback cut on top of their hourly wage. `hourly` means the wage
+ * is the whole deal — they take no part of the tip pool.
+ */
+export type BarbackPayType = 'percentage' | 'hourly';
+
+/**
+ * Reads `employees.pay_type` defensively.
+ *
+ * Anything that is not literally 'hourly' means percentage. That direction is
+ * deliberate: the column was added after these rows existed, so NULL is the
+ * common case and must mean "unchanged". A typo must not silently stop paying
+ * somebody their tips.
+ */
+export function normalizePayType(raw: string | null | undefined): BarbackPayType {
+  return raw?.trim().toLowerCase() === 'hourly' ? 'hourly' : 'percentage';
+}
+
+export type BarbackShift = {
+  employeeId: string;
+  payType: BarbackPayType;
+  /**
+   * Hours worked on the night. Optional: `undefined` means nobody recorded any,
+   * which is not the same as a deliberate zero and must still be paid.
+   *
+   * An explicit 0 is how "Remove from shift" marks somebody as not having
+   * worked — it zeroes the hours rather than deleting the row. The barback cut
+   * splits by HEADCOUNT, so without checking this a barback logged as not
+   * working still collected a full share, while a bartender in the same state
+   * correctly collected nothing because their pool is hours-weighted.
+   */
+  hours?: number;
+};
+
+export type BarbackSplit = {
+  /** Tips owed out of the barback cut, by employee. Only percentage barbacks appear. */
+  tipsByEmployee: Map<string, number>;
+  /** What is left for the bartender pool once the barback cut is taken. */
+  poolTips: number;
+  /** Part of the barback cut nobody claimed, because they are on hourly. */
+  returnedToPool: number;
+};
+
+/**
+ * Divides a night's tips between the barback cut and the bartender pool.
+ *
+ * EVERY barback shift holds a slot, whether or not that barback takes tips.
+ * Only percentage barbacks are paid theirs; an hourly barback's slot goes back
+ * to the bartenders.
+ *
+ * That is the whole subtlety. The obvious implementation — filter the hourly
+ * barbacks out and divide by who is left — pays the remaining barback the FULL
+ * cut, so a bar that moves one of its two barbacks onto hourly ends up paying
+ * that person a wage AND handing the other barback double. Sizing the slots by
+ * headcount first makes moving somebody to hourly cost the bar nothing extra
+ * and cost the other barback nothing at all.
+ *
+ * The total is conserved: paid tips + poolTips always equals dailyTips, because
+ * payroll has to reconcile against the Z report.
+ */
+export function splitBarbackTips(input: {
+  dailyTips: number;
+  barbackFraction: number;
+  barbackShifts: BarbackShift[];
+}): BarbackSplit {
+  const { dailyTips, barbackFraction } = input;
+  const tipsByEmployee = new Map<string, number>();
+
+  // A zeroed shift is not a slot. Dropping it here rather than skipping it in
+  // the loop matters: a removed barback must not shrink the share of the ones
+  // who did work.
+  const barbackShifts = input.barbackShifts.filter((s) => s.hours === undefined || s.hours > 0);
+
+  // No barback worked, so there is no cut to take and the pool is the night.
+  if (barbackShifts.length === 0) {
+    return { tipsByEmployee, poolTips: dailyTips, returnedToPool: 0 };
+  }
+
+  const barbackCut = dailyTips * barbackFraction;
+  const perSlot = barbackCut / barbackShifts.length;
+
+  let paid = 0;
+  for (const shift of barbackShifts) {
+    if (shift.payType === 'hourly') continue;
+    // `+=`, not `set`: a split shift is two rows for the same person and they
+    // hold both slots.
+    tipsByEmployee.set(shift.employeeId, (tipsByEmployee.get(shift.employeeId) ?? 0) + perSlot);
+    paid += perSlot;
+  }
+
+  const returnedToPool = barbackCut - paid;
+  return {
+    tipsByEmployee,
+    poolTips: dailyTips - paid,
+    returnedToPool,
+  };
+}

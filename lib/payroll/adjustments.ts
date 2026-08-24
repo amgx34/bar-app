@@ -45,8 +45,23 @@ export function applyTipTransfers(
     if (!(t.amount > 0)) continue;
     if (t.fromEmployeeId === t.toEmployeeId) continue;
 
-    out.set(t.fromEmployeeId, (out.get(t.fromEmployeeId) ?? 0) - t.amount);
-    out.set(t.toEmployeeId, (out.get(t.toEmployeeId) ?? 0) + t.amount);
+    // Capped at what the sender holds RIGHT NOW, and the recipient gets only
+    // what actually moved.
+    //
+    // A transfer is entered against the figures of the moment, and those
+    // figures move afterwards: an hours correction, a switch to hourly pay, a
+    // shift removed. Uncapped, a sender whose earnings later fell below what
+    // they gave away finishes on a negative tip figure, which flows straight
+    // into total compensation and pays them LESS than their wage.
+    //
+    // Capping still conserves the night — it moves less, never more — and it
+    // cannot invent money that was not earned.
+    const held = Math.max(0, out.get(t.fromEmployeeId) ?? 0);
+    const moved = Math.min(t.amount, held);
+    if (moved <= 0) continue;
+
+    out.set(t.fromEmployeeId, held - moved);
+    out.set(t.toEmployeeId, (out.get(t.toEmployeeId) ?? 0) + moved);
   }
 
   return out;
@@ -128,4 +143,142 @@ export function openerBonusFromSettings(settings: {
     type: valid.includes(type as OpenerBonusType) ? (type as OpenerBonusType) : 'none',
     value: Number(settings.opener_bonus_value) || 0,
   };
+}
+
+/**
+ * Money taken out of a night's tips before anybody's share is worked out.
+ *
+ * The case this exists for is a court-ordered or otherwise legally required
+ * payout handed over in cash: it leaves the pool, so it must not be split, and
+ * it has to be explainable months later.
+ */
+export type TipRemoval = {
+  /** Always positive. Non-positive and non-finite values are ignored. */
+  amount: number;
+  /**
+   * Who the cash went to, when that is a specific person. Null when the money
+   * simply left the pool — the pool, not an individual, is what shrank.
+   */
+  employeeId: string | null;
+  /** Required by the table. This is the whole point of logging it separately. */
+  reason: string;
+};
+
+export type TipRemovalResult = {
+  /** What is left to split between barbacks and the bartender pool. */
+  tipsAfterRemoval: number;
+  /** What actually came out, after clamping. */
+  removed: number;
+  /**
+   * Removals asked for more than the night made. The figure is clamped, but the
+   * caller should say so — silently paying out less than was recorded is how a
+   * legal payout goes missing.
+   */
+  overdrawn: boolean;
+};
+
+/**
+ * Takes removals off the top of a night's tips.
+ *
+ * Applied BEFORE the barback cut and the bartender split, so a removal shrinks
+ * everybody's share proportionally rather than coming out of one pocket. That
+ * is what "removed from the pool" means: the night is simply smaller.
+ *
+ * Clamped at zero. A negative pool would hand every bartender a negative share
+ * and the pay run would stop reconciling against the Z report, which is a much
+ * worse failure than a clamped figure plus a warning.
+ */
+export function applyTipRemovals(
+  dailyTips: number,
+  removals: TipRemoval[],
+): TipRemovalResult {
+  const requested = removals.reduce((sum, r) => {
+    // A removal attributed to a person is a CASH-OUT, not a shrinking of the
+    // night: that money was always going to be theirs, it just left the
+    // building as cash instead of on a paycheck. Taking it off the pool here
+    // would make everyone else's share smaller to pay one person, and would
+    // then be deducted a second time by applyEmployeeRemovals.
+    if (r.employeeId !== null && r.employeeId !== undefined) return sum;
+    const n = Number(r.amount);
+    // Junk in one row must not poison the night's total.
+    return Number.isFinite(n) && n > 0 ? sum + n : sum;
+  }, 0);
+
+  const available = Math.max(0, Number(dailyTips) || 0);
+  const removed = Math.min(requested, available);
+
+  return {
+    tipsAfterRemoval: available - removed,
+    removed,
+    overdrawn: requested > available,
+  };
+}
+
+/** Below this, a difference is float noise rather than a real discrepancy. */
+const HALF_CENT = 0.005;
+
+export type EmployeeRemovalResult = {
+  /** The split, with each person's cash-out deducted. */
+  tipsByEmployee: Map<string, number>;
+  /** Total actually taken out, after clamping. */
+  removed: number;
+  /** Cash-outs larger than the person held. Clamped, but the caller must say so. */
+  overdrawn: { employeeId: string; requested: number; applied: number }[];
+};
+
+/**
+ * Deducts a cash-out from the person who was handed the cash.
+ *
+ * TWO KINDS OF REMOVAL, AND WHY THEY DIFFER
+ *
+ * A removal with no employee is a claim against the HOUSE pool — a garnishment
+ * — so it comes off the night before anybody's share is worked out and everyone
+ * earns proportionally less. applyTipRemovals does that.
+ *
+ * A removal naming an employee is that person being paid their own tips in
+ * cash. Nobody else's share changes, because that money was never anyone
+ * else's. Taking it off the pool instead would quietly move the cost of paying
+ * one bartender onto all the others.
+ *
+ * APPLIED AFTER TRANSFERS
+ *
+ * A manual transfer changes who holds what, so somebody cashed out "for all
+ * they had" was cashed out for their FINAL figure. Deducting before transfers
+ * would measure against a number they never actually held.
+ *
+ * Clamped at zero: tips are not a debt, and a negative figure here would flow
+ * straight into total compensation and pay somebody a reduced wage.
+ */
+export function applyEmployeeRemovals(
+  tips: Map<string, number>,
+  removals: TipRemoval[],
+): EmployeeRemovalResult {
+  const out = new Map(tips);
+  const overdrawn: { employeeId: string; requested: number; applied: number }[] = [];
+
+  // Summed per person first: two cash-outs on one night must not each be
+  // clamped against the full balance and remove more than was there.
+  const wanted = new Map<string, number>();
+  for (const r of removals) {
+    if (r.employeeId === null || r.employeeId === undefined) continue;
+    const n = Number(r.amount);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    wanted.set(r.employeeId, (wanted.get(r.employeeId) ?? 0) + n);
+  }
+
+  let removed = 0;
+  for (const [employeeId, requested] of wanted) {
+    const held = Math.max(0, out.get(employeeId) ?? 0);
+    const applied = Math.min(requested, held);
+    out.set(employeeId, held - applied);
+    removed += applied;
+    // Half a cent of tolerance. A share worked out as a fraction of a pool is
+    // never exactly the round figure somebody counted into an envelope: cashing
+    // a barback out for $117.20 when the split gives them $117.1975 is the same
+    // money, and flagging it would put a permanent "removed more than they had"
+    // warning on a correct pay run.
+    if (requested - held > HALF_CENT) overdrawn.push({ employeeId, requested, applied });
+  }
+
+  return { tipsByEmployee: out, removed, overdrawn };
 }

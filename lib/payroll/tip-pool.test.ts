@@ -3,6 +3,8 @@ import {
   classifyTipRole,
   tipExclusionReason,
   barbackFractionFromSettings,
+  normalizePayType,
+  splitBarbackTips,
 } from './tip-pool';
 
 /**
@@ -93,5 +95,137 @@ describe('barbackFractionFromSettings', () => {
   it('clamps values outside 0-100 rather than inverting the split', () => {
     expect(barbackFractionFromSettings({ barback_tip_pct: 150 })).toBe(1);
     expect(barbackFractionFromSettings({ barback_tip_pct: -10 })).toBe(0);
+  });
+});
+
+describe('normalizePayType', () => {
+  it('defaults to percentage when unset', () => {
+    // The whole feature is opt-in. An employee row that predates the column,
+    // or a blank value, must keep taking their tip cut exactly as before.
+    expect(normalizePayType(null)).toBe('percentage');
+    expect(normalizePayType(undefined)).toBe('percentage');
+    expect(normalizePayType('')).toBe('percentage');
+  });
+
+  it('reads hourly, case- and space-insensitively', () => {
+    expect(normalizePayType('hourly')).toBe('hourly');
+    expect(normalizePayType(' Hourly ')).toBe('hourly');
+    expect(normalizePayType('HOURLY')).toBe('hourly');
+  });
+
+  it('treats an unrecognised value as percentage rather than guessing', () => {
+    expect(normalizePayType('salaried')).toBe('percentage');
+  });
+});
+
+describe('splitBarbackTips', () => {
+  const pct = (employeeId: string) => ({ employeeId, payType: 'percentage' as const });
+  const hr = (employeeId: string) => ({ employeeId, payType: 'hourly' as const });
+
+  it('splits the cut equally when every barback is on percentage', () => {
+    const r = splitBarbackTips({ dailyTips: 1000, barbackFraction: 0.15, barbackShifts: [pct('a'), pct('b')] });
+    expect(r.tipsByEmployee.get('a')).toBeCloseTo(75);
+    expect(r.tipsByEmployee.get('b')).toBeCloseTo(75);
+    expect(r.poolTips).toBeCloseTo(850);
+    expect(r.returnedToPool).toBeCloseTo(0);
+  });
+
+  it('does NOT enlarge the other barback when one goes hourly', () => {
+    // The whole point. Filtering the hourly barback out of the divisor would
+    // pay `b` the full 15% AND pay `a` an hourly wage for the same night.
+    const r = splitBarbackTips({ dailyTips: 1000, barbackFraction: 0.15, barbackShifts: [hr('a'), pct('b')] });
+    expect(r.tipsByEmployee.get('a')).toBeUndefined();
+    expect(r.tipsByEmployee.get('b')).toBeCloseTo(75);
+    expect(r.returnedToPool).toBeCloseTo(75);
+    expect(r.poolTips).toBeCloseTo(925);
+  });
+
+  it('gives the bartenders the whole night when the only barback is hourly', () => {
+    const r = splitBarbackTips({ dailyTips: 1000, barbackFraction: 0.15, barbackShifts: [hr('a')] });
+    expect(r.tipsByEmployee.size).toBe(0);
+    expect(r.poolTips).toBeCloseTo(1000);
+  });
+
+  it('behaves exactly as before when no barback worked', () => {
+    const r = splitBarbackTips({ dailyTips: 1000, barbackFraction: 0.15, barbackShifts: [] });
+    expect(r.poolTips).toBeCloseTo(1000);
+    expect(r.returnedToPool).toBeCloseTo(0);
+  });
+
+  it('conserves the night total in every arrangement', () => {
+    // Payroll reconciles against the Z report. If a split invents or loses a
+    // cent, the night stops balancing and nobody can tell where it went.
+    for (const shifts of [
+      [pct('a'), pct('b')],
+      [hr('a'), pct('b')],
+      [hr('a'), hr('b')],
+      [pct('a'), pct('b'), hr('c')],
+      [],
+    ]) {
+      const r = splitBarbackTips({ dailyTips: 1234.56, barbackFraction: 0.15, barbackShifts: shifts });
+      const paid = [...r.tipsByEmployee.values()].reduce((s, v) => s + v, 0);
+      expect(paid + r.poolTips).toBeCloseTo(1234.56, 6);
+    }
+  });
+
+  it('adds up two shifts by the same barback on one night', () => {
+    // A split shift is two rows for one person; they hold two slots and must
+    // be paid for both, not overwritten by the second.
+    const r = splitBarbackTips({ dailyTips: 1000, barbackFraction: 0.15, barbackShifts: [pct('a'), pct('a')] });
+    expect(r.tipsByEmployee.get('a')).toBeCloseTo(150);
+    expect(r.poolTips).toBeCloseTo(850);
+  });
+
+  it('pays nothing and keeps the total when the night made no tips', () => {
+    const r = splitBarbackTips({ dailyTips: 0, barbackFraction: 0.15, barbackShifts: [pct('a')] });
+    expect(r.tipsByEmployee.get('a')).toBeCloseTo(0);
+    expect(r.poolTips).toBeCloseTo(0);
+  });
+});
+
+describe('splitBarbackTips and zero-hour shifts', () => {
+  const shift = (employeeId: string, hours: number) =>
+    ({ employeeId, payType: 'percentage' as const, hours });
+
+  it('does not pay a barback whose hours were zeroed', () => {
+    // "Remove from shift" sets hours to 0; it does not delete the row. The
+    // barback cut splits by headcount, so without this a barback marked as not
+    // working still collected a full share — which is exactly how somebody
+    // logged as "wasnt working" was paid $117.20.
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15,
+      barbackShifts: [shift('worked', 6), shift('removed', 0)],
+    });
+    expect(r.tipsByEmployee.get('removed')).toBeUndefined();
+    expect(r.tipsByEmployee.get('worked')).toBeCloseTo(150);
+  });
+
+  it('does not shrink the other barbacks when one is removed', () => {
+    // The removed shift is not a slot at all, so the remaining barback takes
+    // the whole cut rather than half of it.
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15,
+      barbackShifts: [shift('a', 5), shift('b', 0)],
+    });
+    expect(r.tipsByEmployee.get('a')).toBeCloseTo(150);
+    expect(r.poolTips).toBeCloseTo(850);
+  });
+
+  it('gives the night to the bartenders when every barback was removed', () => {
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15,
+      barbackShifts: [shift('a', 0), shift('b', 0)],
+    });
+    expect(r.tipsByEmployee.size).toBe(0);
+    expect(r.poolTips).toBeCloseTo(1000);
+  });
+
+  it('still pays when hours are simply not recorded', () => {
+    // undefined is "we do not know", which is not the same as a deliberate zero.
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15,
+      barbackShifts: [{ employeeId: 'a', payType: 'percentage' }],
+    });
+    expect(r.tipsByEmployee.get('a')).toBeCloseTo(150);
   });
 });

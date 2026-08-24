@@ -105,6 +105,8 @@ export async function updateTipPaySettings(data: {
   opener_bonus_value: number;
   default_hourly_rate: number;
   hourly_rates:       HourlyRates;
+  overtime_enabled?:    boolean;
+  overtime_multiplier?: number;
 }) {
   const { org, role } = await getCurrentOrg();
   assertEditor(role);

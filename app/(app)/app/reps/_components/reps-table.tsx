@@ -141,7 +141,10 @@ export function RepsTable({ reps: initialReps, role, defaultOrderId }: Props) {
                         <Send className="h-3.5 w-3.5" /> Order
                       </Button>
                       <DropdownMenu>
-                        <DropdownMenuTrigger className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none">
+                        <DropdownMenuTrigger
+                          aria-label={`More actions for ${rep.name}`}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none"
+                        >
                           <MoreHorizontal className="h-4 w-4" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">

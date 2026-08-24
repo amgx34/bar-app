@@ -11,6 +11,7 @@ import {
   loadWeeklyTrend,
   LEGACY_TAB_ROUTES,
 } from './_shared';
+import { resolvePayPeriod } from '@/lib/date-range';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,9 +31,13 @@ export default async function PayRunPage({
     redirect(LEGACY_TAB_ROUTES[legacyTab]);
   }
 
-  const week = defaultWeek();
-  const startDate = (params.startDate as string) || week.start;
-  const endDate = (params.endDate as string) || week.end;
+  // Validated, not trusted: these come off the query string and flow into a
+  // date comparison, where `?startDate=banana` produced a 500.
+  const { start: startDate, end: endDate } = resolvePayPeriod(
+    params.startDate,
+    params.endDate,
+    defaultWeek(),
+  );
 
   const { org, role } = await getCurrentOrg();
   if (!org?.id) return <div className="p-6">Organization not found</div>;

@@ -1,6 +1,6 @@
 import {
   Home, Package, CircleDollarSign, Receipt, Settings, BookOpen, Users,
-  Scale, ClipboardCheck, TrendingUp, CalendarRange, UserCog, Landmark,
+  Scale, ClipboardCheck, TrendingUp, CalendarRange, UserCog, Landmark, Layers,
   Banknote, FileCheck2,
 } from 'lucide-react';
 
@@ -76,6 +76,15 @@ export const SECTIONS: NavSection[] = [
       { label: 'Direct Deposit', href: '/app/payroll/direct-deposit',  icon: Banknote },
       // Previously reachable only from a button on the pay run.
       { label: 'Review',         href: '/app/payroll/review',          icon: FileCheck2 },
+    ],
+  },
+  {
+    group: 'Money',
+    root: { label: 'Sales', href: '/app/sales', icon: TrendingUp },
+    tabs: [
+      { label: 'Overview',   href: '/app/sales',            icon: TrendingUp },
+      { label: 'Categories', href: '/app/sales/categories', icon: Layers },
+      { label: 'Margins',    href: '/app/sales/margins',    icon: Scale },
     ],
   },
   {
