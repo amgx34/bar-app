@@ -315,7 +315,8 @@ export function AdjustDialog({
               </div>
               <p className="text-xs text-muted-foreground">
                 Replaces what the POS recorded for that night. The original figure
-                is kept in the log.
+                is kept in the log. Both boxes count as hours worked &mdash; overtime
+                is worked out across the whole week, on anything past 40 hours.
               </p>
             </>
           )}

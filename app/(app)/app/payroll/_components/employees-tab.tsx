@@ -27,7 +27,7 @@ const ROLE_STYLES: Record<string, string> = {
 
 const TIP_MODE_LABELS: Record<string, string> = {
   pool: 'Pool',
-  barback: 'Barback 15%',
+  barback: 'Barback',
   individual: 'Individual',
   sales_pct: 'Sales %',
   no_tip: 'Not Tipped',

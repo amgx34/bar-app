@@ -96,14 +96,44 @@ export function resolvePayPeriod(
   rawEnd: unknown,
   fallback: { start: string; end: string },
 ): { start: string; end: string } {
+  return payPeriodFromParams(rawStart, rawEnd) ?? fallback;
+}
+
+/**
+ * The pay period a query string actually names, or null when it names none.
+ *
+ * The null is what separates "show me this week" from "show me the default
+ * week": a link that carries no dates must let the page choose, while a link
+ * carrying junk must not quietly become a different period. resolvePayPeriod
+ * turns that null into a fallback; payRunHref leaves it off the URL entirely.
+ */
+export function payPeriodFromParams(
+  rawStart: unknown,
+  rawEnd: unknown,
+): { start: string; end: string } | null {
   const start = isIsoDate(rawStart) ? rawStart : null;
   const end = isIsoDate(rawEnd) ? rawEnd : null;
 
   // Both or neither. Honouring one half of a broken range would silently show
   // a period nobody asked for — a week starting where they said and ending
   // somewhere else entirely.
-  if (!start || !end) return fallback;
+  if (!start || !end) return null;
 
   // Accept a reversed range rather than rejecting it; the intent is obvious.
   return start <= end ? { start, end } : { start: end, end: start };
+}
+
+/**
+ * A link to a Payroll screen that keeps the week you are looking at.
+ *
+ * "Run Payroll" used to be a bare path, so the review screen fell back to the
+ * current week and a bar could browse a previous week but never run one. The
+ * link is rendered from a shared layout that sits above tabs with no week on
+ * screen at all, hence the bare-path case: no period to carry is a real answer,
+ * and the destination defaulting to this week is correct there.
+ */
+export function payRunHref(path: string, rawStart: unknown, rawEnd: unknown): string {
+  const period = payPeriodFromParams(rawStart, rawEnd);
+  if (!period) return path;
+  return `${path}?startDate=${period.start}&endDate=${period.end}`;
 }

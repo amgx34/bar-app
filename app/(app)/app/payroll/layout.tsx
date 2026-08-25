@@ -1,6 +1,6 @@
-import Link from 'next/link';
-import { ClipboardCheck } from 'lucide-react';
+import { Suspense } from 'react';
 import { SectionTabs } from '../_components/section-tabs';
+import { RunPayrollLink, RunPayrollLinkFallback } from './_components/run-payroll-link';
 
 /**
  * Payroll's shell: one heading, one call to action, one tab strip.
@@ -9,9 +9,10 @@ import { SectionTabs } from '../_components/section-tabs';
  * move between tabs, and so no page can accidentally render a second copy — the
  * failure that had two different tab rows stacked on Inventory.
  *
- * The Run Payroll link carries no dates. The review screen defaults to the
- * current pay week on its own, and passing a stale range from whichever tab you
- * happened to be on would be worse than letting it choose.
+ * The Run Payroll link carries the week the Pay Run is showing, so a previous
+ * week can actually be run rather than only looked at. On the tabs that show no
+ * week it carries nothing and the review screen defaults to the current one —
+ * see run-payroll-link.tsx.
  */
 export default function PayrollLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -24,13 +25,11 @@ export default function PayrollLayout({ children }: { children: React.ReactNode 
           </p>
         </div>
 
-        <Link
-          href="/app/payroll/review"
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
-        >
-          <ClipboardCheck className="h-4 w-4" aria-hidden />
-          Run Payroll
-        </Link>
+        {/* Suspense because reading the query string opts this subtree out of
+            prerendering; without it the button is missing from the initial HTML. */}
+        <Suspense fallback={<RunPayrollLinkFallback />}>
+          <RunPayrollLink />
+        </Suspense>
       </div>
 
       <SectionTabs />

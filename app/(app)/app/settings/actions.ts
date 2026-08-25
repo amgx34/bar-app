@@ -106,6 +106,8 @@ export async function updateTipPaySettings(data: {
   default_hourly_rate: number;
   hourly_rates:       HourlyRates;
   barback_split_method?: 'hours' | 'equal';
+  barback_tiers_enabled?: boolean;
+  barback_tip_tiers?: Array<{ minCount: number; pct: number }>;
   overtime_enabled?:    boolean;
   overtime_multiplier?: number;
 }) {
@@ -537,8 +539,12 @@ export async function syncToastShifts(days = 7): Promise<{ upserted: number; new
         organization_id: org.id,
         employee_id:     empId,
         shift_date:      shiftDate,
-        regular_hours:   Math.round(Math.min(hoursWorked, 8) * 100) / 100,
-        overtime_hours:  Math.round(Math.max(hoursWorked - 8, 0) * 100) / 100,
+        // Hours as worked, with no split. Overtime is a weekly rule applied by
+        // the pay run (splitWeeklyOvertime), and a bar's shifts do not fit an
+        // eight-hour day: a close runs past midnight, so this used to book
+        // three hours of premium on an ordinary eleven-hour Friday.
+        regular_hours:   Math.round(hoursWorked * 100) / 100,
+        overtime_hours:  0,
       }, { onConflict: 'organization_id,employee_id,shift_date' });
       upserted++;
     }

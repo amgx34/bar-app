@@ -142,6 +142,88 @@ export function barbackSplitFromSettings(settings: {
   return settings?.barback_split_method === 'equal' ? 'equal' : 'hours';
 }
 
+/**
+ * A bigger cut when more barbacks are on.
+ *
+ * A bar that runs one barback on a Tuesday and three on a Saturday is not
+ * running the same arrangement on both nights: one person covering the whole
+ * bar alone is worth more of the night than one of three sharing it. Before
+ * this, the only way to say that was to edit the slider between shifts, which
+ * nobody remembers to do and which silently re-prices every unreviewed night.
+ *
+ * `minCount` is a floor, not an exact match: the tier that applies is the
+ * highest one whose `minCount` is at or below tonight's headcount, so the last
+ * row means "this many or more" without a second field that can contradict it.
+ *
+ * `fraction`, not a percentage, because that is the unit splitBarbackTips
+ * speaks. The conversion happens once, in the settings reader below, for the
+ * same reason the pour conversion lives in one place: two units with the same
+ * name is how a 15% cut becomes a 1500% one.
+ */
+export type BarbackTier = { minCount: number; fraction: number };
+
+/**
+ * Reads the tier table off org settings, or an empty list when there is none.
+ *
+ * Empty is the important return value: it means "no tier applies", and every
+ * caller falls back to the flat `barback_tip_pct` slider. So a bar that never
+ * touches this feature, a bar that half-configures it, and a bar that switches
+ * it off all keep being paid exactly what they were paid yesterday.
+ *
+ * The toggle is checked rather than inferred from a non-empty list because
+ * switching the feature off must not throw the table away — an operator who
+ * turns tiers off for a week expects their rows to still be there after.
+ */
+export function barbackTiersFromSettings(settings: {
+  barback_tiers_enabled?: boolean | null;
+  barback_tip_tiers?: Array<{ minCount?: number | null; pct?: number | null }> | null;
+}): BarbackTier[] {
+  if (settings?.barback_tiers_enabled !== true) return [];
+
+  const rows = Array.isArray(settings?.barback_tip_tiers) ? settings.barback_tip_tiers : [];
+  const byCount = new Map<number, BarbackTier>();
+
+  for (const row of rows) {
+    const minCount = Math.floor(Number(row?.minCount));
+    const pct = Number(row?.pct);
+
+    // A tier for zero barbacks can never be reached — the cut is only taken
+    // when somebody barbacked — and a row with no percentage says nothing.
+    // Both are half-finished UI rows, not instructions to pay nothing.
+    if (!Number.isFinite(minCount) || minCount < 1) continue;
+    if (row?.pct === null || row?.pct === undefined || !Number.isFinite(pct)) continue;
+
+    // Clamped like the flat slider: a hand-edited 140% must not hand the
+    // barbacks more than the night took.
+    byCount.set(minCount, { minCount, fraction: Math.min(100, Math.max(0, pct)) / 100 });
+  }
+
+  return [...byCount.values()].sort((a, b) => a.minCount - b.minCount);
+}
+
+/**
+ * The cut for a night that `count` barbacks worked.
+ *
+ * Deliberately order-independent rather than trusting the list to be sorted:
+ * this is called with tiers straight off a JSON settings column, and a row
+ * order nobody can see is a poor thing to hang somebody's pay on.
+ */
+function fractionForBarbackCount(
+  tiers: BarbackTier[],
+  count: number,
+  fallback: number,
+): number {
+  let match: BarbackTier | undefined;
+  for (const tier of tiers) {
+    if (tier.minCount <= count && (match === undefined || tier.minCount > match.minCount)) {
+      match = tier;
+    }
+  }
+  // No row covers this headcount — tiers that start at two say nothing about a
+  // one-barback night. They still worked, so the flat slider pays them.
+  return match ? match.fraction : fallback;
+}
+
 export type BarbackShift = {
   employeeId: string;
   payType: BarbackPayType;
@@ -165,6 +247,21 @@ export type BarbackSplit = {
   poolTips: number;
   /** Part of the barback cut nobody claimed, because they are on hourly. */
   returnedToPool: number;
+  /**
+   * The cut actually taken, as a fraction — the tier that matched, or the flat
+   * slider when none did. Returned so the screens can SHOW which rule applied
+   * ("2 barbacks — 15%"); a tiered figure that appears without explanation is
+   * indistinguishable from a miscalculation.
+   *
+   * Zero when nobody barbacked, because no cut was taken at all.
+   */
+  appliedFraction: number;
+  /**
+   * How many barbacks the tier was chosen on: distinct PEOPLE who worked, not
+   * shifts. One person clocking a split shift is one barback, and a barback
+   * removed from the shift is none.
+   */
+  barbackCount: number;
 };
 
 /**
@@ -181,30 +278,55 @@ export type BarbackSplit = {
  * headcount first makes moving somebody to hourly cost the bar nothing extra
  * and cost the other barback nothing at all.
  *
+ * The SIZE of the cut is settled here too, not by the caller, because it can
+ * depend on how many barbacks worked (see BarbackTier) and this is the only
+ * place that knows — zero-hour shifts are dropped below, and the engine and the
+ * Day Split screen would otherwise each have to re-derive the headcount and
+ * agree. That is precisely the drift this file exists to prevent.
+ *
  * The total is conserved: paid tips + poolTips always equals dailyTips, because
  * payroll has to reconcile against the Z report.
  */
 export function splitBarbackTips(input: {
   dailyTips: number;
+  /** The flat cut. Used when no tier matches tonight's headcount. */
   barbackFraction: number;
   barbackShifts: BarbackShift[];
   method?: BarbackSplitMethod;
+  /** Headcount tiers, if the bar runs them. Empty means the flat cut always. */
+  tiers?: BarbackTier[];
 }): BarbackSplit {
   const { dailyTips, barbackFraction } = input;
   const method = input.method ?? 'hours';
+  const tiers = input.tiers ?? [];
   const tipsByEmployee = new Map<string, number>();
 
   // A zeroed shift is not a slot. Dropping it here rather than skipping it in
   // the loop matters: a removed barback must not shrink the share of the ones
-  // who did work.
+  // who did work — nor count toward the tier that sizes the cut.
   const barbackShifts = input.barbackShifts.filter((s) => s.hours === undefined || s.hours > 0);
+
+  // Distinct people, not shifts. A barback who clocks out for a break and back
+  // in is two rows and one barback, and counting rows would push a quiet
+  // Tuesday onto the two-barback tier.
+  const barbackCount = new Set(barbackShifts.map((s) => s.employeeId)).size;
 
   // No barback worked, so there is no cut to take and the pool is the night.
   if (barbackShifts.length === 0) {
-    return { tipsByEmployee, poolTips: dailyTips, returnedToPool: 0 };
+    return {
+      tipsByEmployee,
+      poolTips: dailyTips,
+      returnedToPool: 0,
+      appliedFraction: 0,
+      barbackCount: 0,
+    };
   }
 
-  const barbackCut = dailyTips * barbackFraction;
+  // Hourly barbacks are counted in the headcount on purpose, exactly as they
+  // hold a slot below. Excluding them would shrink the cut AND hand back their
+  // share — charging the bar's other barbacks twice for one person's deal.
+  const appliedFraction = fractionForBarbackCount(tiers, barbackCount, barbackFraction);
+  const barbackCut = dailyTips * appliedFraction;
 
   // Each shift's claim on the cut. By hours, that is its share of the hours all
   // the barbacks worked; equally, it is one slot each.
@@ -238,5 +360,7 @@ export function splitBarbackTips(input: {
     tipsByEmployee,
     poolTips: dailyTips - paid,
     returnedToPool,
+    appliedFraction,
+    barbackCount,
   };
 }

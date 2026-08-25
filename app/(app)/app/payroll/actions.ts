@@ -8,9 +8,11 @@ import {
   tipExclusionReason,
   barbackFractionFromSettings,
   barbackSplitFromSettings,
+  barbackTiersFromSettings,
   splitBarbackTips,
   normalizePayType,
   type BarbackPayType,
+  type BarbackTier,
   type BarbackSplitMethod,
   type TipRole,
 } from '@/lib/payroll/tip-pool';
@@ -24,7 +26,7 @@ import {
   type TipTransfer,
   type TipRemoval,
 } from '@/lib/payroll/adjustments';
-import { overtimeFromSettings, overtimePay } from '@/lib/payroll/overtime';
+import { overtimeFromSettings, overtimePay, splitWeeklyOvertime } from '@/lib/payroll/overtime';
 import { ParsedEmployeeShift, parseDate } from '@/lib/csv-parsers/parse-employee-shifts';
 import { ParsedZReport } from '@/lib/csv-parsers/parse-z-reports';
 import { ParsedZReportText } from '@/lib/csv-parsers/parse-z-report-text';
@@ -526,6 +528,9 @@ export async function computePayroll(
   // Falls back to 15 % if not set.
   const barbackFrac = barbackFractionFromSettings(org.bar_settings ?? {});
   const barbackSplitMethod = barbackSplitFromSettings(org.bar_settings ?? {});
+  // Empty unless the bar runs headcount tiers, in which case barbackFrac above
+  // is only the fallback for a night no tier covers.
+  const barbackTiers = barbackTiersFromSettings(org.bar_settings ?? {});
 
   // Configurable since the app was built, but never applied to anything until
   // now — see lib/payroll/adjustments.ts for how each type is funded.
@@ -705,6 +710,7 @@ export async function computePayroll(
         dailyTips,
         barbackFraction: barbackFrac,
         method: barbackSplitMethod,
+        tiers: barbackTiers,
         barbackShifts: barbackShiftsToday.map((s) => ({
           employeeId: s.employee_id,
           payType: normalizePayType(employeeById.get(s.employee_id)?.pay_type),
@@ -817,13 +823,20 @@ export async function computePayroll(
 
       if (employeeShifts.length === 0) continue;
 
-      let regularHours = 0;
-      let overtimeHours = 0;
-
-      employeeShifts.forEach((shift) => {
-        regularHours += shift.regular_hours || 0;
-        overtimeHours += shift.overtime_hours || 0;
-      });
+      // Overtime is decided HERE, weekly, rather than trusted from whatever each
+      // importer stored per shift. Every source split it per day — the Toast
+      // sync at a flat eight hours, the POS feeds by their own daily rule — so
+      // an eleven-hour close paid a premium inside a thirty-hour week, and what
+      // somebody earned depended on which importer their hours came through.
+      //
+      // The stored split is still read, but only summed back into the total:
+      // hours worked is the part every source gets right. See splitWeeklyOvertime.
+      const { regularHours, overtimeHours } = splitWeeklyOvertime(
+        employeeShifts.map((shift) => ({
+          date: shift.shift_date,
+          hours: (shift.regular_hours || 0) + (shift.overtime_hours || 0),
+        })),
+      );
 
       const totalHours = regularHours + overtimeHours;
 
@@ -921,6 +934,13 @@ export interface DaySplitData {
    * any bar that moved the slider saw a preview that did not match its wages.
    */
   barbackFraction: number;
+  /**
+   * Headcount tiers, when the bar runs them. The cut then depends on how many
+   * barbacks worked the night, so barbackFraction above is only the fallback —
+   * sending one without the other is how this screen would start disagreeing
+   * with the pay run again.
+   */
+  barbackTiers: BarbackTier[];
 }
 
 const DAY_SPLIT_EXCLUDED = new Set(['front door']);
@@ -990,6 +1010,7 @@ export async function getDaySplitData(date: string): Promise<DaySplitData | null
     openerBonus: openerBonusFromSettings(org.bar_settings ?? {}),
     barbackFraction: barbackFractionFromSettings(org.bar_settings ?? {}),
     barbackSplitMethod: barbackSplitFromSettings(org.bar_settings ?? {}),
+    barbackTiers: barbackTiersFromSettings(org.bar_settings ?? {}),
   };
 }
 

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { getDaySplitData, DaySplitData, DaySplitEmployee } from '../actions';
 import { openerBonus, type OpenerBonusConfig } from '@/lib/payroll/adjustments';
-import { splitBarbackTips, type BarbackSplitMethod } from '@/lib/payroll/tip-pool';
+import { splitBarbackTips, type BarbackSplitMethod, type BarbackTier } from '@/lib/payroll/tip-pool';
 import { CashTipsButton } from './cash-tips-card';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -64,6 +64,7 @@ function computeSplit(
   bonusConfig: OpenerBonusConfig,
   barbackFraction: number,
   barbackSplitMethod: BarbackSplitMethod,
+  barbackTiers: BarbackTier[],
 ) {
   // Membership comes from tipRole, decided server-side by the same function the
   // pay run uses. Filtering on `role !== 'barback'` here is what used to put
@@ -83,6 +84,7 @@ function computeSplit(
     dailyTips: totalTips,
     barbackFraction,
     method: barbackSplitMethod,
+    tiers: barbackTiers,
     barbackShifts: barbacks.map((e) => ({ employeeId: e.id, payType: e.payType, hours: e.hours })),
   });
 
@@ -131,6 +133,10 @@ function computeSplit(
     bonusHoursEach: bonus.bonusHours,
     bonusType: bonusConfig.type,
     bonusValue: bonusConfig.value,
+    // The cut the tier actually chose, so the headings can say WHICH rule ran
+    // tonight rather than quoting the flat slider a tiered bar no longer uses.
+    appliedFraction: barbackSplit.appliedFraction,
+    barbackCount: barbackSplit.barbackCount,
   };
 }
 
@@ -185,6 +191,7 @@ export default function DaySplitTab({ canEdit = false }: { canEdit?: boolean }) 
   const {
     shares, bartenderPool, barbackPool, openerPool,
     hasOpener, bonusHoursEach, bonusType, bonusValue,
+    appliedFraction, barbackCount,
   } = useMemo(() => {
     if (!data) {
       return {
@@ -192,11 +199,12 @@ export default function DaySplitTab({ canEdit = false }: { canEdit?: boolean }) 
         bartenderPool: 0, barbackPool: 0, openerPool: 0,
         hasOpener: false, bonusHoursEach: 0,
         bonusType: 'none' as OpenerBonusConfig['type'], bonusValue: 0,
+        appliedFraction: 0, barbackCount: 0,
       };
     }
     return computeSplit(
       data.employees, states, data.totalTips, data.openerBonus, data.barbackFraction,
-      data.barbackSplitMethod,
+      data.barbackSplitMethod, data.barbackTiers,
     );
   }, [data, states]);
 
@@ -268,7 +276,7 @@ export default function DaySplitTab({ canEdit = false }: { canEdit?: boolean }) 
               <p className="text-2xl font-bold tabular-nums mt-1 text-cyan-700 dark:text-cyan-300">${barbackPool.toFixed(2)}</p>
               <p className="text-xs text-muted-foreground">
                 {barbackPool > 0
-                  ? `${(data.barbackFraction * 100).toFixed(0)}% of tips`
+                  ? `${(appliedFraction * 100).toFixed(0)}% of tips`
                   : 'no barback on shift'}
               </p>
             </div>
@@ -364,8 +372,15 @@ export default function DaySplitTab({ canEdit = false }: { canEdit?: boolean }) 
           {barbacks.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Barbacks — {(data.barbackFraction * 100).toFixed(0)}%{' '}
+                Barbacks — {(appliedFraction * 100).toFixed(0)}%{' '}
                 {data.barbackSplitMethod === 'hours' ? 'split by hours' : 'split equally'}
+                {/* Only worth saying when the cut DEPENDS on the headcount —
+                    otherwise it reads as a rule that is not actually running. */}
+                {data.barbackTiers.length > 0 && (
+                  <span className="normal-case font-normal text-muted-foreground/80">
+                    {' '}&middot; {barbackCount} {barbackCount === 1 ? 'barback' : 'barbacks'} on tonight
+                  </span>
+                )}
               </h3>
               <div className="overflow-x-auto rounded-xl border">
                 <table className="w-full text-sm">

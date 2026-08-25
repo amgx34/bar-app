@@ -28,6 +28,14 @@ export type BarSettings = {
    * pool; 'equal' is a flat tip-out per barback regardless of shift length.
    */
   barback_split_method?: 'hours' | 'equal';
+  /**
+   * Bigger cut when more barbacks work. Off by default; when off, or when no
+   * row covers the night's headcount, barback_tip_pct governs as it always has.
+   * Percentages here, fractions everywhere downstream — see BarbackTier.
+   */
+  barback_tiers_enabled?: boolean;
+  /** Highest matching row wins, so the last one means "this many or more". */
+  barback_tip_tiers?: Array<{ minCount: number; pct: number }>;
   opener_bonus_type?:   'none' | 'fixed' | 'percentage' | 'hours';
   /** Dollars (fixed), percent of the pool (percentage), or hours (hours). */
   opener_bonus_value?:  number;

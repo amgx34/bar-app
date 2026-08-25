@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { resolveDateRange, addDays, isIsoDate, todayIso, resolvePayPeriod } from './date-range';
+import {
+  resolveDateRange, addDays, isIsoDate, todayIso, resolvePayPeriod,
+  payPeriodFromParams, payRunHref,
+} from './date-range';
 
 const TODAY = '2026-08-20';
 
@@ -125,5 +128,59 @@ describe('resolvePayPeriod', () => {
     expect(resolvePayPeriod('2026-08-16', '2026-08-16', FALLBACK).start).toBe('2026-08-16');
     expect(resolvePayPeriod('2024-01-01', '2024-01-07', FALLBACK))
       .toEqual({ start: '2024-01-01', end: '2024-01-07' });
+  });
+});
+
+/**
+ * Carrying the chosen pay week between the Payroll screens.
+ *
+ * The Pay Run could always browse a previous week, but "Run Payroll" was a bare
+ * link, so the review screen fell back to the current week and there was no way
+ * to run payroll for any period but this one. The link has to carry the period
+ * — and refuse to carry a broken one, because these values come off the query
+ * string and end up in a Postgres date comparison.
+ */
+describe('payPeriodFromParams', () => {
+  it('reads a period the query string genuinely names', () => {
+    expect(payPeriodFromParams('2026-08-10', '2026-08-16'))
+      .toEqual({ start: '2026-08-10', end: '2026-08-16' });
+  });
+
+  it('returns null when neither date is given', () => {
+    expect(payPeriodFromParams(undefined, undefined)).toBeNull();
+  });
+
+  it('returns null for half a range rather than inventing the other end', () => {
+    expect(payPeriodFromParams('2026-08-10', undefined)).toBeNull();
+    expect(payPeriodFromParams(undefined, '2026-08-16')).toBeNull();
+  });
+
+  it('returns null for junk, which must never reach a date comparison', () => {
+    expect(payPeriodFromParams('banana', '2026-08-16')).toBeNull();
+    expect(payPeriodFromParams('2026-02-30', '2026-08-16')).toBeNull();
+  });
+
+  it('accepts a reversed range, since the intent is obvious', () => {
+    expect(payPeriodFromParams('2026-08-16', '2026-08-10'))
+      .toEqual({ start: '2026-08-10', end: '2026-08-16' });
+  });
+});
+
+describe('payRunHref', () => {
+  it('carries the week being viewed', () => {
+    expect(payRunHref('/app/payroll/review', '2026-08-10', '2026-08-16'))
+      .toBe('/app/payroll/review?startDate=2026-08-10&endDate=2026-08-16');
+  });
+
+  it('stays bare when no week is being viewed, so the page picks its default', () => {
+    // This is the Employees and Direct Deposit tabs, where no week is on screen
+    // to carry — the review screen choosing the current week is right there.
+    expect(payRunHref('/app/payroll/review', undefined, undefined))
+      .toBe('/app/payroll/review');
+  });
+
+  it('drops a malformed period rather than passing it on', () => {
+    expect(payRunHref('/app/payroll/review', 'banana', 'kiwi'))
+      .toBe('/app/payroll/review');
   });
 });

@@ -71,3 +71,82 @@ export function describeOvertime(cfg: OvertimeConfig): string {
     ? `Overtime hours are paid at ${cfg.multiplier}x the base rate.`
     : 'Overtime hours are paid at the base rate, with no premium.';
 }
+
+/**
+ * Hours past this in a single workweek are overtime. Federal FLSA.
+ *
+ * A WEEK, not a day. Bar shifts do not fit an eight-hour day — a close runs
+ * past midnight and ten or eleven hours is an ordinary shift — so a daily
+ * threshold paid a premium on weeks that never reached full time. Worse, each
+ * importer applied its own daily rule, so what somebody earned depended on
+ * whether their hours arrived from the Toast sync, the POS agent, an emailed Z
+ * report or a manager typing them in.
+ */
+export const WEEKLY_OVERTIME_THRESHOLD = 40;
+
+/** One shift's worth of hours. `date` is `YYYY-MM-DD`. */
+export type WorkedShift = { date: string; hours: number };
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The Monday that starts the workweek containing `iso`, or null if unreadable.
+ *
+ * Monday, and Sunday closing the week, to match `defaultWeek()` — a bar's
+ * Sunday trade belongs to the week that preceded it, not the one about to
+ * start. Done in UTC so a clock change cannot move a shift into another week
+ * and silently re-price it.
+ */
+function weekStartOf(iso: string): string | null {
+  if (typeof iso !== 'string' || !ISO_DATE.test(iso)) return null;
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (Number.isNaN(dt.getTime())) return null;
+  const day = dt.getUTCDay();
+  dt.setUTCDate(dt.getUTCDate() - (day === 0 ? 6 : day - 1));
+  return dt.toISOString().slice(0, 10);
+}
+
+/**
+ * Splits hours worked into regular and overtime, one workweek at a time.
+ *
+ * The threshold is applied PER WEEK rather than across the whole pay period.
+ * Running a fortnight in one go would otherwise turn two ordinary thirty-hour
+ * weeks into twenty hours of overtime, and a bar that runs payroll monthly
+ * would owe a premium on almost everything.
+ *
+ * Total hours are conserved: an hour is always paid, and this only decides at
+ * which rate. Hours whose date cannot be read are paid as regular rather than
+ * dropped or awarded a premium on a week nobody can identify.
+ */
+export function splitWeeklyOvertime(
+  shifts: WorkedShift[],
+  threshold: number = WEEKLY_OVERTIME_THRESHOLD,
+): { regularHours: number; overtimeHours: number } {
+  const byWeek = new Map<string, number>();
+  let undated = 0;
+
+  for (const shift of shifts ?? []) {
+    const hours = Number(shift?.hours);
+    // Junk and negatives are not hours. Skipped rather than summed, because a
+    // NaN here would spread through the whole employee's pay.
+    if (!Number.isFinite(hours) || hours <= 0) continue;
+
+    const week = weekStartOf(shift?.date);
+    if (week === null) {
+      undated += hours;
+      continue;
+    }
+    byWeek.set(week, (byWeek.get(week) ?? 0) + hours);
+  }
+
+  let regularHours = undated;
+  let overtimeHours = 0;
+
+  for (const weekHours of byWeek.values()) {
+    regularHours += Math.min(weekHours, threshold);
+    overtimeHours += Math.max(weekHours - threshold, 0);
+  }
+
+  return { regularHours, overtimeHours };
+}

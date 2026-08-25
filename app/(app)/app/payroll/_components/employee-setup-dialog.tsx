@@ -35,7 +35,7 @@ const TIP_MODE_INFO: Record<string, string> = {
   pool: 'Tips are pooled and distributed proportionally based on hours worked',
   individual: 'Each employee keeps their own tracked tips (requires per-employee tip data in Z report imports)',
   sales_pct: "Tips are distributed based on each employee's sales percentage from Z report data",
-  barback: '15% of each night\'s total tip pool is split equally among all barbacks on shift',
+  barback: 'Shares the barback cut of each night’s tip pool. How big that cut is, whether it grows when more barbacks work, and how it is divided between them are set in Settings → Tip & Pay',
   no_tip: 'Employee receives no tip payout — completely excluded from all tip calculations',
 };
 
@@ -189,7 +189,7 @@ export default function EmployeeSetupDialog({
                   {formData.role !== 'manager' && (
                     <SelectItem value="pool">Pool (split by hours)</SelectItem>
                   )}
-                  <SelectItem value="barback">Barback (15% of nightly pool)</SelectItem>
+                  <SelectItem value="barback">Barback (share of nightly pool)</SelectItem>
                   <SelectItem value="individual">Individual Tips</SelectItem>
                   <SelectItem value="sales_pct">Tips by Sales %</SelectItem>
                   <SelectItem value="no_tip">Not Tipped</SelectItem>
@@ -224,8 +224,8 @@ export default function EmployeeSetupDialog({
                     <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
                     <p className="text-muted-foreground">
                       {formData.payType === 'hourly'
-                        ? 'Paid their hourly rate and nothing from the tip pool. Their share goes back to the bartenders rather than to the other barbacks.'
-                        : 'Paid their hourly rate plus an equal share of the barback cut. This is the default.'}
+                        ? 'Paid their hourly rate and nothing from the tip pool. Their share goes back to the bartenders rather than to the other barbacks, and they still count toward the barback headcount.'
+                        : 'Paid their hourly rate plus a share of the barback cut. This is the default.'}
                     </p>
                   </div>
                 </div>

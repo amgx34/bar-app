@@ -174,6 +174,11 @@ export function AddToShiftDialog({
             </div>
           </div>
 
+          <p className="text-xs text-muted-foreground">
+            Both boxes count as hours worked &mdash; overtime is worked out across the
+            whole week, on anything past 40 hours.
+          </p>
+
           <div className="space-y-1.5">
             <Label htmlFor="add-reason">Reason</Label>
             <Input

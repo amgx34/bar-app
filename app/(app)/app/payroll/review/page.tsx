@@ -1,26 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowLeft, ChevronLeft, Clock, DollarSign, Users, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Clock, DollarSign, Users, AlertTriangle } from 'lucide-react';
 import { computePayroll } from '../actions';
 import { getCurrentOrg } from '@/lib/org';
+import { defaultWeek } from '../_shared';
+import { addDays, payRunHref, resolvePayPeriod } from '@/lib/date-range';
 import { PayrollReviewClient } from './_components/payroll-review-client';
 
 export const dynamic = 'force-dynamic';
 
 type SearchParams = Promise<{ startDate?: string; endDate?: string }>;
-
-function pad(n: number) { return String(n).padStart(2, '0'); }
-function toDate(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
-
-function getWeekBounds() {
-  const today = new Date();
-  const day   = today.getDay();
-  const mon   = new Date(today);
-  mon.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
-  const sun = new Date(mon);
-  sun.setDate(mon.getDate() + 6);
-  return { start: toDate(mon), end: toDate(sun) };
-}
 
 function fmtDateRange(start: string, end: string) {
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -40,9 +29,11 @@ export const metadata: Metadata = { title: 'Pay Period Review' };
 export default async function PayrollReviewPage({ searchParams }: { searchParams: SearchParams }) {
   const params    = await searchParams;
   const { org }   = await getCurrentOrg();
-  const defaults  = getWeekBounds();
-  const startDate = params.startDate ?? defaults.start;
-  const endDate   = params.endDate   ?? defaults.end;
+  const { start: startDate, end: endDate } = resolvePayPeriod(
+    params.startDate,
+    params.endDate,
+    defaultWeek(),
+  );
 
   const entries = await computePayroll(startDate, endDate);
 
@@ -114,6 +105,32 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
               two h1s leave a screen reader with no single page title. */}
           <h2 className="text-2xl font-bold">Pay Period Review</h2>
           <p className="text-muted-foreground">{periodLabel} · {org.name}</p>
+
+          {/* Moving a week from here rather than only from the Pay Run: this is
+              the screen you are on when you notice you are running the wrong
+              period, and going back to change it lost the review you had open. */}
+          <div className="flex items-center gap-2 pt-2">
+            <Link
+              href={payRunHref('/app/payroll/review', addDays(startDate, -7), addDays(endDate, -7))}
+              aria-label="Previous week"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors hover:bg-muted"
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden />
+            </Link>
+            <Link
+              href={payRunHref('/app/payroll/review', addDays(startDate, 7), addDays(endDate, 7))}
+              aria-label="Next week"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors hover:bg-muted"
+            >
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            </Link>
+            <Link
+              href="/app/payroll/review"
+              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              This week
+            </Link>
+          </div>
         </div>
 
         {/* KPI strip */}

@@ -6,6 +6,7 @@ import {
   normalizePayType,
   splitBarbackTips,
   barbackSplitFromSettings,
+  barbackTiersFromSettings,
 } from './tip-pool';
 
 /**
@@ -315,5 +316,168 @@ describe('splitBarbackTips by hours', () => {
       const paid = [...r.tipsByEmployee.values()].reduce((t, v) => t + v, 0);
       expect(paid + r.poolTips).toBeCloseTo(1234.56, 6);
     }
+  });
+});
+
+/**
+ * Tiered barback cuts.
+ *
+ * Some bars pay a bigger cut when more barbacks are on: one barback takes 10%
+ * of the night, but two working the same Saturday share 15%. Without tiers the
+ * only way to express that was to edit the slider between shifts.
+ *
+ * The tests below pin down the two things that are easy to get wrong: WHICH
+ * barbacks count toward the headcount, and what happens when no tier matches.
+ */
+describe('barbackTiersFromSettings', () => {
+  it('reads nothing while the toggle is off, so the flat slider still governs', () => {
+    expect(barbackTiersFromSettings({
+      barback_tiers_enabled: false,
+      barback_tip_tiers: [{ minCount: 1, pct: 10 }],
+    })).toEqual([]);
+  });
+
+  it('reads nothing when the toggle is on but no tier was configured', () => {
+    expect(barbackTiersFromSettings({ barback_tiers_enabled: true })).toEqual([]);
+  });
+
+  it('converts percentages to fractions and sorts by headcount', () => {
+    expect(barbackTiersFromSettings({
+      barback_tiers_enabled: true,
+      barback_tip_tiers: [{ minCount: 3, pct: 20 }, { minCount: 1, pct: 10 }],
+    })).toEqual([
+      { minCount: 1, fraction: 0.1 },
+      { minCount: 3, fraction: 0.2 },
+    ]);
+  });
+
+  it('drops rows that could never match a real night', () => {
+    // A tier for "zero barbacks" is a row that can never be reached — the cut
+    // is only taken when somebody barbacked.
+    expect(barbackTiersFromSettings({
+      barback_tiers_enabled: true,
+      barback_tip_tiers: [
+        { minCount: 0, pct: 10 },
+        { minCount: 2, pct: null },
+        { minCount: 2, pct: 15 },
+      ],
+    })).toEqual([{ minCount: 2, fraction: 0.15 }]);
+  });
+
+  it('clamps a percentage outside 0-100 rather than inverting the split', () => {
+    expect(barbackTiersFromSettings({
+      barback_tiers_enabled: true,
+      barback_tip_tiers: [{ minCount: 1, pct: 140 }],
+    })).toEqual([{ minCount: 1, fraction: 1 }]);
+  });
+});
+
+describe('splitBarbackTips with headcount tiers', () => {
+  const tiers = [
+    { minCount: 1, fraction: 0.10 },
+    { minCount: 2, fraction: 0.15 },
+    { minCount: 3, fraction: 0.20 },
+  ];
+  const p = (employeeId: string, hours: number) =>
+    ({ employeeId, payType: 'percentage' as const, hours });
+
+  it('takes the cut named by tonight’s headcount', () => {
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15, method: 'equal', tiers,
+      barbackShifts: [p('a', 5), p('b', 5)],
+    });
+    expect(r.appliedFraction).toBeCloseTo(0.15);
+    expect(r.poolTips).toBeCloseTo(850);
+  });
+
+  it('pays the one-barback tier when only one worked', () => {
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15, method: 'equal', tiers,
+      barbackShifts: [p('a', 5)],
+    });
+    expect(r.appliedFraction).toBeCloseTo(0.10);
+    expect(r.tipsByEmployee.get('a')).toBeCloseTo(100);
+  });
+
+  it('holds at the top tier when more barbacks work than any row names', () => {
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15, method: 'equal', tiers,
+      barbackShifts: [p('a', 5), p('b', 5), p('c', 5), p('d', 5)],
+    });
+    expect(r.appliedFraction).toBeCloseTo(0.20);
+    expect(r.barbackCount).toBe(4);
+  });
+
+  it('falls back to the flat slider when no tier covers the headcount', () => {
+    // Tiers that start at two leave a one-barback night undescribed. Paying
+    // nothing would be the wrong answer — they worked.
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15, method: 'equal',
+      tiers: [{ minCount: 2, fraction: 0.25 }],
+      barbackShifts: [p('a', 5)],
+    });
+    expect(r.appliedFraction).toBeCloseTo(0.15);
+    expect(r.tipsByEmployee.get('a')).toBeCloseTo(150);
+  });
+
+  it('counts people, not shifts, so a split shift is still one barback', () => {
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15, method: 'equal', tiers,
+      barbackShifts: [p('a', 3), p('a', 4)],
+    });
+    expect(r.barbackCount).toBe(1);
+    expect(r.appliedFraction).toBeCloseTo(0.10);
+    expect(r.tipsByEmployee.get('a')).toBeCloseTo(100);
+  });
+
+  it('drops to the lower tier when a barback is removed from the shift', () => {
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15, method: 'equal', tiers,
+      barbackShifts: [p('a', 5), p('removed', 0)],
+    });
+    expect(r.barbackCount).toBe(1);
+    expect(r.appliedFraction).toBeCloseTo(0.10);
+  });
+
+  it('counts an hourly barback toward the tier, then returns their share', () => {
+    // The tier sizes the cut by who is working the floor. The hourly barback
+    // holds their slot and hands it back to the bartenders — the same rule as
+    // the flat cut, so moving somebody to hourly never shrinks the cut AND
+    // takes their slot.
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15, method: 'equal', tiers,
+      barbackShifts: [p('paid', 5), { employeeId: 'wage', payType: 'hourly', hours: 5 }],
+    });
+    expect(r.barbackCount).toBe(2);
+    expect(r.appliedFraction).toBeCloseTo(0.15);
+    expect(r.tipsByEmployee.get('paid')).toBeCloseTo(75);
+    expect(r.returnedToPool).toBeCloseTo(75);
+  });
+
+  it('conserves the night under tiers', () => {
+    const r = splitBarbackTips({
+      dailyTips: 1234.56, barbackFraction: 0.15, method: 'hours', tiers,
+      barbackShifts: [p('a', 7.25), p('b', 1.5), p('c', 4)],
+    });
+    const paid = [...r.tipsByEmployee.values()].reduce((t, v) => t + v, 0);
+    expect(paid + r.poolTips).toBeCloseTo(1234.56, 6);
+  });
+
+  it('behaves exactly as before when no tiers are configured', () => {
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15, method: 'equal', tiers: [],
+      barbackShifts: [p('a', 5), p('b', 5)],
+    });
+    expect(r.appliedFraction).toBeCloseTo(0.15);
+    expect(r.tipsByEmployee.get('a')).toBeCloseTo(75);
+  });
+
+  it('reports no cut at all when nobody barbacked', () => {
+    const r = splitBarbackTips({
+      dailyTips: 1000, barbackFraction: 0.15, tiers, barbackShifts: [],
+    });
+    expect(r.barbackCount).toBe(0);
+    expect(r.appliedFraction).toBe(0);
+    expect(r.poolTips).toBeCloseTo(1000);
   });
 });
