@@ -1,6 +1,6 @@
 import Groq from 'groq-sdk';
 import type { AIParsedInventoryItem } from './parse-inventory-with-ai';
-import { MAX_MODEL_INPUT_CHARS, AiUnavailableError } from './guardrails';
+import { boundModelInput, callModel, enforceAiQuota, wrapUntrustedContent } from './guardrails';
 
 const client = new Groq();
 
@@ -14,6 +14,8 @@ const client = new Groq();
  * Every field here is a SUGGESTION. Nothing reaches the database without
  * passing through the review step, and pasted text is attacker-controlled — see
  * guardrails.ts — so the server action validates all of it again with zod.
+ * Reuses shared injection defenses: quota enforcement, input bounding, and
+ * untrusted content wrapping.
  */
 export interface AIParsedShipment {
   vendor_name: string | null;
@@ -92,25 +94,25 @@ export async function parseShipmentWithAI(text: string): Promise<AIParsedShipmen
     throw new Error('GROQ_API_KEY is not set. Get a free key at console.groq.com and add it to .env.local.');
   }
 
-  let completion;
-  try {
-    completion = await client.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        {
-          role: 'user',
-          content: `Read this supplier invoice:\n\n${text.slice(0, MAX_MODEL_INPUT_CHARS)}`,
-        },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0,
-    });
-  } catch {
-    // The provider failing is not the operator's file being wrong, and telling
-    // them to fix a good file is the least useful thing we could say.
-    throw new AiUnavailableError();
-  }
+  // Bound the spend before the call, and the payload before it is sent.
+  await enforceAiQuota();
+  const bounded = boundModelInput(text);
+
+  const completion = await callModel(() => client.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      {
+        role: 'user',
+        content: wrapUntrustedContent(
+          bounded,
+          'Read the supplier invoice below.',
+        ),
+      },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0,
+  }));
 
   const raw = completion.choices[0]?.message?.content ?? '';
 
@@ -118,6 +120,8 @@ export async function parseShipmentWithAI(text: string): Promise<AIParsedShipmen
   try {
     parsed = JSON.parse(raw) as Record<string, unknown>;
   } catch {
+    // Model output is untrusted too — never echo it into an error surfaced to
+    // the user, since a crafted file can choose what it says.
     throw new Error('Could not read that invoice — check the text you pasted, or enter it by hand.');
   }
 
