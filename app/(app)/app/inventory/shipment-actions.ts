@@ -248,13 +248,27 @@ export async function postShipment(raw: unknown): Promise<{ shipmentId: string; 
     throw new Error(`Could not read this org's inventory items: ${existingItemsError.message}`);
   }
 
-  const itemByName = new Map<string, { id: string; current_stock: number }>();
-  const itemBySku = new Map<string, { id: string; current_stock: number }>();
+  const itemByName = new Map<string, string>();
+  const itemBySku = new Map<string, string>();
   for (const it of existingItems ?? []) {
-    itemByName.set(String(it.name).trim().toLowerCase(), { id: it.id, current_stock: Number(it.current_stock ?? 0) });
-    if (it.sku) {
-      itemBySku.set(String(it.sku).trim().toLowerCase(), { id: it.id, current_stock: Number(it.current_stock ?? 0) });
-    }
+    itemByName.set(String(it.name).trim().toLowerCase(), it.id);
+    if (it.sku) itemBySku.set(String(it.sku).trim().toLowerCase(), it.id);
+  }
+
+  // The single source of truth for "what will this item's current_stock be
+  // after everything processed so far in this loop" — consulted, and
+  // written back to, by BOTH the existingId path and the name/SKU path
+  // below. Without exactly one shared map, an invoice with two lines for
+  // the same product — one matched by id, one by name, or both by name —
+  // each computed their new stock from a figure captured before either line
+  // ran: 10 + 5 then 10 + 7 lands at 17, not 22, while both usage_logs rows
+  // still post as if it had. Seeded from the same scoped read as the maps
+  // above, so it starts out in-org for every key it will ever be asked
+  // about via the name/SKU path; the existingId path seeds it too, the
+  // first time it sees a given id, from its own scoped per-id read.
+  const stockByItemId = new Map<string, number>();
+  for (const it of existingItems ?? []) {
+    stockByItemId.set(it.id, Number(it.current_stock ?? 0));
   }
 
   async function resolveCategoryId(name: string | null): Promise<string | null> {
@@ -275,7 +289,6 @@ export async function postShipment(raw: unknown): Promise<{ shipmentId: string; 
 
   for (const line of input.lines) {
     let itemId: string | null = null;
-    let priorStock = 0;
 
     if (line.existingId) {
       // line.existingId came from the client's review step, not from a query
@@ -291,8 +304,16 @@ export async function postShipment(raw: unknown): Promise<{ shipmentId: string; 
         .maybeSingle();
 
       if (current) {
-        itemId = current.id;
-        priorStock = Number(current.current_stock ?? 0);
+        const verifiedId: string = current.id;
+        itemId = verifiedId;
+        // Seed the shared map only the first time this loop sees this item.
+        // If an earlier line already touched it — matched by name, or by a
+        // different existingId aliasing the same item — stockByItemId
+        // already holds the truer, more current figure, and this read (a
+        // snapshot from the moment this query ran) must not clobber it.
+        if (!stockByItemId.has(verifiedId)) {
+          stockByItemId.set(verifiedId, Number(current.current_stock ?? 0));
+        }
       }
       // Else: the id does not belong to this org, or does not exist at all.
       // Falling through is fine — the name/SKU resolution just below is the
@@ -308,11 +329,7 @@ export async function postShipment(raw: unknown): Promise<{ shipmentId: string; 
       // brand-new product, check whether this org already has one by name
       // (SKU as a fallback) — see the comment above itemByName/itemBySku for
       // why skipping this is what caused the unique-constraint abort.
-      const nameMatch = itemByName.get(nameKey) ?? (skuKey ? itemBySku.get(skuKey) : undefined);
-      if (nameMatch) {
-        itemId = nameMatch.id;
-        priorStock = nameMatch.current_stock;
-      }
+      itemId = itemByName.get(nameKey) ?? (skuKey ? itemBySku.get(skuKey) : undefined) ?? null;
     }
 
     if (!itemId) {
@@ -339,16 +356,19 @@ export async function postShipment(raw: unknown): Promise<{ shipmentId: string; 
       const newItemId: string = created.id;
       itemId = newItemId;
 
-      // Register it in the same-name/SKU maps immediately: an invoice can
-      // list one product across two lines (a split delivery), and without
-      // this a second line for the item this loop JUST created would not
-      // see it either, and would try to insert the same name again —
-      // exactly the unique-constraint abort this whole block exists to
-      // prevent.
-      itemByName.set(nameKey, { id: newItemId, current_stock: line.quantity });
-      if (skuKey) itemBySku.set(skuKey, { id: newItemId, current_stock: line.quantity });
+      // Register it in the same-name/SKU maps, and seed its stock in the
+      // shared map, immediately: an invoice can list one product across two
+      // lines (a split delivery), and without this a second line for the
+      // item this loop JUST created would not see it either, and would try
+      // to insert the same name again — exactly the unique-constraint abort
+      // this whole block exists to prevent.
+      itemByName.set(nameKey, newItemId);
+      if (skuKey) itemBySku.set(skuKey, newItemId);
+      stockByItemId.set(newItemId, line.quantity);
     } else {
-      const update: Record<string, unknown> = { current_stock: priorStock + line.quantity };
+      const priorStock = stockByItemId.get(itemId) ?? 0;
+      const newStock = priorStock + line.quantity;
+      const update: Record<string, unknown> = { current_stock: newStock };
       // Cost price only moves when the human ticked applyCost in review — a
       // line nobody confirmed must never silently reprice the item.
       if (line.applyCost && line.unitCost !== null) update.cost_price = line.unitCost;
@@ -365,6 +385,11 @@ export async function postShipment(raw: unknown): Promise<{ shipmentId: string; 
       if (updateError) {
         throw new Error(`Could not update "${line.name}": ${updateError.message}`);
       }
+
+      // Write the new total back so the NEXT line — however it resolves to
+      // this same item — sees it, instead of the figure this line started
+      // from.
+      stockByItemId.set(itemId, newStock);
     }
 
     // admin-scope-ok: `itemId` above is one of three things, all in-org: a
@@ -423,13 +448,6 @@ export async function voidShipment(shipmentId: string): Promise<void> {
     .maybeSingle();
 
   if (!shipment) throw new Error('Shipment not found');
-  // This guard only fires once EVERY line has been reversed — voided_at is
-  // set at the very end of this function, after the loop below completes
-  // without throwing. That ordering is what makes it safe to keep: a retry
-  // after a partial failure (row 3 of 5 hits a transient error, say) finds
-  // voided_at still null and is allowed back in to finish the rest, rather
-  // than being permanently refused with two lines reversed and three not.
-  if (shipment.voided_at) throw new Error('Shipment is already voided');
 
   // Only 'delivery' rows are this shipment's original lines. The reversal
   // rows this function writes below share the same shipment_id but carry
@@ -472,9 +490,55 @@ export async function voidShipment(shipmentId: string): Promise<void> {
   }
 
   const alreadyReversedItemIds = new Set((alreadyReversedRows ?? []).map((r) => r.item_id));
+  const remainingItemIds = [...qtyByItem.keys()].filter((id) => !alreadyReversedItemIds.has(id));
 
-  for (const [itemId, quantity] of qtyByItem) {
-    if (alreadyReversedItemIds.has(itemId)) continue;
+  // The guard is keyed off the per-item markers, not the voided_at column:
+  // "every item already has its reversal" is what "fully voided" actually
+  // means. Refusing only here — never on voided_at alone — is what turns a
+  // retry after a partial failure into a resume instead of a permanent
+  // lockout.
+  if (remainingItemIds.length === 0) {
+    throw new Error('Shipment is already voided');
+  }
+
+  if (!shipment.voided_at) {
+    // Claim voided_at atomically, conditional on it still being NULL. Two
+    // concurrent calls (a double-clicked Void) can both reach this point
+    // having both seen remainingItemIds.length > 0 — they both read before
+    // either wrote. Only one of these conditional updates can match a row:
+    // .is('voided_at', null) means the second writer's update matches
+    // nothing and gets null back below.
+    const { data: claimed, error: claimError } = await supabase
+      .from('inventory_shipments')
+      .update({ voided_at: new Date().toISOString(), voided_by: user?.id ?? null })
+      .eq('id', shipmentId)
+      .eq('organization_id', org.id)
+      .is('voided_at', null)
+      .select('id')
+      .maybeSingle();
+
+    if (claimError) throw new Error(`Could not void that shipment: ${claimError.message}`);
+
+    if (!claimed) {
+      // Lost the race — another call claimed it a moment ago and owns
+      // finishing the reversal. Do not also reverse: if that call is
+      // still running, this would double-decrement; if it already
+      // crashed partway, a later call (this one retried, or anyone else)
+      // will see voided_at set and resume the remaining items exactly as
+      // below. Still revalidate — the winner's write is what the UI
+      // should reflect either way.
+      revalidatePath('/app/inventory');
+      revalidatePath('/app/inventory/shipments');
+      revalidatePath('/app/books');
+      return;
+    }
+  }
+  // Else: voided_at was already set by an earlier, partial attempt — this is
+  // a resume, not a fresh void. No re-claim needed; the per-item markers
+  // above (remainingItemIds) are what make it safe to just continue.
+
+  for (const itemId of remainingItemIds) {
+    const quantity = qtyByItem.get(itemId)!;
 
     // admin-scope-ok: `itemId` is a key of qtyByItem, built from usage_logs
     // rows filtered by .eq('organization_id', org.id) above, so it is always
@@ -492,21 +556,18 @@ export async function voidShipment(shipmentId: string): Promise<void> {
     // unreversed and tries again — harmlessly, since it will still be gone.
     if (!item) continue;
 
-    // Not clamped to zero: if this item has since been sold through, a
-    // negative count is real information — an over-sold position caused by
-    // voiding a delivery whose stock already left the building — not a bug
-    // to paper over.
-    const newStock = Number(item.current_stock ?? 0) - quantity;
-
-    // admin-scope-ok: `item` was fetched immediately above by `itemId`,
-    // itself in-org per the comment on that lookup.
-    const { error: stockError } = await supabase
-      .from('inventory_items')
-      .update({ current_stock: newStock })
-      .eq('id', itemId);
-
-    if (stockError) throw new Error(`Could not reverse stock: ${stockError.message}`);
-
+    // The reversal log is written BEFORE the stock update, not after —
+    // deliberately, not by default. Neither ordering of two sequential
+    // writes is atomic; this chooses which failure a crash between them
+    // produces. Marker-first means a crash leaves stock un-reversed while
+    // the log says it was: a delivery that still looks like it is on the
+    // shelf, which the next physical count catches. Marker-after (the
+    // reverse) would mean a crash leaves the marker missing after stock was
+    // already decremented, so a retry — reading "not yet reversed" from the
+    // marker — decrements it AGAIN: phantom shrinkage that reads like
+    // theft. The first failure is recoverable by counting; the second is
+    // not. Do not swap this back.
+    //
     // reason: 'other', deliberately NOT 'recount' as the original brief for
     // this file specified — overruled on review. SHRINKAGE_REASONS in both
     // app/(app)/app/inventory/analytics/actions.ts and
@@ -527,21 +588,22 @@ export async function voidShipment(shipmentId: string): Promise<void> {
     });
 
     if (reversalError) throw new Error(`Could not log the void: ${reversalError.message}`);
+
+    // Not clamped to zero: if this item has since been sold through, a
+    // negative count is real information — an over-sold position caused by
+    // voiding a delivery whose stock already left the building — not a bug
+    // to paper over.
+    const newStock = Number(item.current_stock ?? 0) - quantity;
+
+    // admin-scope-ok: `item` was fetched immediately above by `itemId`,
+    // itself in-org per the comment on that lookup.
+    const { error: stockError } = await supabase
+      .from('inventory_items')
+      .update({ current_stock: newStock })
+      .eq('id', itemId);
+
+    if (stockError) throw new Error(`Could not reverse stock: ${stockError.message}`);
   }
-
-  // Only reached once every item above has either been reversed just now,
-  // was already reversed by a prior attempt, or was permanently skipped
-  // (deleted item) — never partway through a fresh failure.
-  //
-  // admin-scope-ok: `shipmentId` was confirmed above with
-  // .eq('organization_id', org.id), and the function throws when it is
-  // missing, so this id is always in-org.
-  const { error: voidError } = await supabase
-    .from('inventory_shipments')
-    .update({ voided_at: new Date().toISOString(), voided_by: user?.id ?? null })
-    .eq('id', shipmentId);
-
-  if (voidError) throw new Error(`Could not void that shipment: ${voidError.message}`);
 
   revalidatePath('/app/inventory');
   revalidatePath('/app/inventory/shipments');
@@ -564,8 +626,12 @@ export type ShipmentSummary = {
   voided: boolean;
 };
 
-/** A generous but bounded page size — see the comment on `safeLimit` below. */
-const MAX_SHIPMENTS_LIMIT = 200;
+/**
+ * A generous but bounded page size — see the comment on `safeLimit` below.
+ * Kept modest deliberately: this many shipments means this many concurrent
+ * per-shipment queries just below, all against the same pooler.
+ */
+const MAX_SHIPMENTS_LIMIT = 50;
 
 /**
  * Recent shipments for the list screen, newest invoice first.
