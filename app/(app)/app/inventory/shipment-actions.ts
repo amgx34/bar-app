@@ -112,10 +112,18 @@ export async function parseShipmentText(text: string): Promise<ShipmentReview> {
   const parsed = await parseShipmentWithAI(text);
   const supabase = createAdminClient();
 
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from('inventory_items')
     .select('id, name, sku, cost_price')
     .eq('organization_id', org.id);
+
+  // An error here must not be swallowed: silently treating it as "no
+  // existing items" would make every line in the invoice look new, and
+  // postShipment's own duplicate-name defense depends on this same read
+  // working correctly.
+  if (existingError) {
+    throw new Error(`Could not read this org's inventory items: ${existingError.message}`);
+  }
 
   // Matched by exact lowercased name first, SKU second — a distributor's SKU
   // is stable across relabels but plenty of invoice lines don't carry one.
@@ -208,13 +216,46 @@ export async function postShipment(raw: unknown): Promise<{ shipmentId: string; 
   // importInventoryItems in inventory/actions.ts rather than imported: it is a
   // closure over this catMap and this supabase client, not a standalone
   // function that could be called from elsewhere.
-  const { data: existingCats } = await supabase
+  const { data: existingCats, error: existingCatsError } = await supabase
     .from('inventory_categories')
     .select('id, name')
     .eq('organization_id', org.id);
 
+  if (existingCatsError) {
+    throw new Error(`Could not read this org's categories: ${existingCatsError.message}`);
+  }
+
   const catMap = new Map<string, string>();
   for (const c of existingCats ?? []) catMap.set(c.name.toLowerCase(), c.id);
+
+  // inventory_items carries UNIQUE (organization_id, name). Every line below
+  // is checked against this org's real items by lowercased name (SKU as a
+  // fallback) before it is allowed anywhere near the create branch — the same
+  // resolution parseShipmentText already does. Without this, a line whose
+  // existingId is null (a hand-typed shipment never has one) or fails the
+  // per-line re-verification below, but whose name happens to match a real
+  // item — a manager typing "Tito's Handmade Vodka 750ml" again, or a stale
+  // id surviving a delete-and-recreate — falls straight into an insert that
+  // trips the unique constraint. That throw would abort this loop midway
+  // with the header and the earlier lines already committed: a partial
+  // financial document with no way to finish or cleanly retry it.
+  const { data: existingItems, error: existingItemsError } = await supabase
+    .from('inventory_items')
+    .select('id, name, sku, current_stock')
+    .eq('organization_id', org.id);
+
+  if (existingItemsError) {
+    throw new Error(`Could not read this org's inventory items: ${existingItemsError.message}`);
+  }
+
+  const itemByName = new Map<string, { id: string; current_stock: number }>();
+  const itemBySku = new Map<string, { id: string; current_stock: number }>();
+  for (const it of existingItems ?? []) {
+    itemByName.set(String(it.name).trim().toLowerCase(), { id: it.id, current_stock: Number(it.current_stock ?? 0) });
+    if (it.sku) {
+      itemBySku.set(String(it.sku).trim().toLowerCase(), { id: it.id, current_stock: Number(it.current_stock ?? 0) });
+    }
+  }
 
   async function resolveCategoryId(name: string | null): Promise<string | null> {
     if (!name) return null;
@@ -254,8 +295,24 @@ export async function postShipment(raw: unknown): Promise<{ shipmentId: string; 
         priorStock = Number(current.current_stock ?? 0);
       }
       // Else: the id does not belong to this org, or does not exist at all.
-      // Falling through to create a fresh item is safer than trusting it
-      // further, and the line still posts — no special-case error needed.
+      // Falling through is fine — the name/SKU resolution just below is the
+      // real safety net, and if that also comes up empty the line still
+      // posts as a new item.
+    }
+
+    const nameKey = line.name.trim().toLowerCase();
+    const skuKey = line.sku ? line.sku.trim().toLowerCase() : null;
+
+    if (!itemId) {
+      // The client-supplied existingId missed. Before treating this as a
+      // brand-new product, check whether this org already has one by name
+      // (SKU as a fallback) — see the comment above itemByName/itemBySku for
+      // why skipping this is what caused the unique-constraint abort.
+      const nameMatch = itemByName.get(nameKey) ?? (skuKey ? itemBySku.get(skuKey) : undefined);
+      if (nameMatch) {
+        itemId = nameMatch.id;
+        priorStock = nameMatch.current_stock;
+      }
     }
 
     if (!itemId) {
@@ -279,15 +336,27 @@ export async function postShipment(raw: unknown): Promise<{ shipmentId: string; 
       if (createError || !created) {
         throw new Error(`Could not create item "${line.name}": ${createError?.message ?? 'unknown error'}`);
       }
-      itemId = created.id;
+      const newItemId: string = created.id;
+      itemId = newItemId;
+
+      // Register it in the same-name/SKU maps immediately: an invoice can
+      // list one product across two lines (a split delivery), and without
+      // this a second line for the item this loop JUST created would not
+      // see it either, and would try to insert the same name again —
+      // exactly the unique-constraint abort this whole block exists to
+      // prevent.
+      itemByName.set(nameKey, { id: newItemId, current_stock: line.quantity });
+      if (skuKey) itemBySku.set(skuKey, { id: newItemId, current_stock: line.quantity });
     } else {
       const update: Record<string, unknown> = { current_stock: priorStock + line.quantity };
       // Cost price only moves when the human ticked applyCost in review — a
       // line nobody confirmed must never silently reprice the item.
       if (line.applyCost && line.unitCost !== null) update.cost_price = line.unitCost;
 
-      // admin-scope-ok: `itemId` was resolved just above from a query filtered
-      // by .eq('organization_id', org.id), so it is always in-org.
+      // admin-scope-ok: `itemId` was resolved just above — either a scoped
+      // per-id lookup a few lines up, or a match against existingItems
+      // (fetched further up filtered by .eq('organization_id', org.id)) —
+      // so it is always in-org either way.
       const { error: updateError } = await supabase
         .from('inventory_items')
         .update(update)
@@ -298,10 +367,10 @@ export async function postShipment(raw: unknown): Promise<{ shipmentId: string; 
       }
     }
 
-    // admin-scope-ok: `itemId` above is either freshly created in this org
-    // (organization_id: org.id, right above) or a match confirmed in-org by
-    // the scoped lookup above that — either way it cannot name another bar's
-    // item.
+    // admin-scope-ok: `itemId` above is one of three things, all in-org: a
+    // scoped per-id lookup a few lines up, a match against existingItems
+    // (fetched further up filtered by .eq('organization_id', org.id)), or an
+    // id this function just created with organization_id: org.id itself.
     const { error: usageError } = await supabase.from('usage_logs').insert({
       organization_id: org.id,
       item_id: itemId,
@@ -354,8 +423,116 @@ export async function voidShipment(shipmentId: string): Promise<void> {
     .maybeSingle();
 
   if (!shipment) throw new Error('Shipment not found');
+  // This guard only fires once EVERY line has been reversed — voided_at is
+  // set at the very end of this function, after the loop below completes
+  // without throwing. That ordering is what makes it safe to keep: a retry
+  // after a partial failure (row 3 of 5 hits a transient error, say) finds
+  // voided_at still null and is allowed back in to finish the rest, rather
+  // than being permanently refused with two lines reversed and three not.
   if (shipment.voided_at) throw new Error('Shipment is already voided');
 
+  // Only 'delivery' rows are this shipment's original lines. The reversal
+  // rows this function writes below share the same shipment_id but carry
+  // reason: 'other' (see below), so this filter can never pick up and
+  // re-reverse its own reversal rows.
+  const { data: deliveryRows, error: rowsError } = await supabase
+    .from('usage_logs')
+    .select('item_id, quantity')
+    .eq('shipment_id', shipmentId)
+    .eq('organization_id', org.id)
+    .eq('reason', 'delivery');
+
+  if (rowsError) {
+    throw new Error(`Could not read that shipment's stock movements: ${rowsError.message}`);
+  }
+
+  // Grouped by item, not left as one row per original delivery line. An
+  // invoice can list the same product on two lines (a split delivery), and
+  // reversing per item rather than per row is what makes the idempotency
+  // check just below well-defined: for a given item there is either one
+  // reversal row (fully done) or none (not started) — never a partial state
+  // to reconcile if this function is retried after a failure.
+  const qtyByItem = new Map<string, number>();
+  for (const row of deliveryRows ?? []) {
+    if (!row.item_id) continue;
+    qtyByItem.set(row.item_id, (qtyByItem.get(row.item_id) ?? 0) + Number(row.quantity ?? 0));
+  }
+
+  // Which items a PRIOR, partially-failed void already reversed — so a retry
+  // resumes instead of double-decrementing stock that is already reversed.
+  const { data: alreadyReversedRows, error: reversedError } = await supabase
+    .from('usage_logs')
+    .select('item_id')
+    .eq('shipment_id', shipmentId)
+    .eq('organization_id', org.id)
+    .eq('reason', 'other');
+
+  if (reversedError) {
+    throw new Error(`Could not check this shipment's void progress: ${reversedError.message}`);
+  }
+
+  const alreadyReversedItemIds = new Set((alreadyReversedRows ?? []).map((r) => r.item_id));
+
+  for (const [itemId, quantity] of qtyByItem) {
+    if (alreadyReversedItemIds.has(itemId)) continue;
+
+    // admin-scope-ok: `itemId` is a key of qtyByItem, built from usage_logs
+    // rows filtered by .eq('organization_id', org.id) above, so it is always
+    // in-org.
+    const { data: item } = await supabase
+      .from('inventory_items')
+      .select('id, current_stock')
+      .eq('id', itemId)
+      .maybeSingle();
+
+    // The item itself may since have been deleted. There is no stock left to
+    // reverse it on and no item to log against — skip rather than fail the
+    // whole void over one missing item. Skipping writes no reversal row, so
+    // a retry (or this same run, if a later item throws) finds it still
+    // unreversed and tries again — harmlessly, since it will still be gone.
+    if (!item) continue;
+
+    // Not clamped to zero: if this item has since been sold through, a
+    // negative count is real information — an over-sold position caused by
+    // voiding a delivery whose stock already left the building — not a bug
+    // to paper over.
+    const newStock = Number(item.current_stock ?? 0) - quantity;
+
+    // admin-scope-ok: `item` was fetched immediately above by `itemId`,
+    // itself in-org per the comment on that lookup.
+    const { error: stockError } = await supabase
+      .from('inventory_items')
+      .update({ current_stock: newStock })
+      .eq('id', itemId);
+
+    if (stockError) throw new Error(`Could not reverse stock: ${stockError.message}`);
+
+    // reason: 'other', deliberately NOT 'recount' as the original brief for
+    // this file specified — overruled on review. SHRINKAGE_REASONS in both
+    // app/(app)/app/inventory/analytics/actions.ts and
+    // app/(app)/app/analytics/actions.ts treats 'recount' as shrinkage/loss,
+    // so a voided delivery would show up as the bar having LOST the cases it
+    // sent back, which is wrong and materially misleads those reports.
+    // 'other' is a valid usage_reason (see stock-adjust-dialog.tsx's option
+    // list) and sits in neither shrinkage set. Do not change this back to
+    // 'recount'.
+    const { error: reversalError } = await supabase.from('usage_logs').insert({
+      organization_id: org.id,
+      item_id: itemId,
+      quantity,
+      reason: 'other',
+      unit_cost: null,
+      shipment_id: shipmentId,
+      note: `Void of shipment ${shipment.invoice_number ?? shipment.vendor_name}`,
+    });
+
+    if (reversalError) throw new Error(`Could not log the void: ${reversalError.message}`);
+  }
+
+  // Only reached once every item above has either been reversed just now,
+  // was already reversed by a prior attempt, or was permanently skipped
+  // (deleted item) — never partway through a fresh failure.
+  //
   // admin-scope-ok: `shipmentId` was confirmed above with
   // .eq('organization_id', org.id), and the function throws when it is
   // missing, so this id is always in-org.
@@ -365,64 +542,6 @@ export async function voidShipment(shipmentId: string): Promise<void> {
     .eq('id', shipmentId);
 
   if (voidError) throw new Error(`Could not void that shipment: ${voidError.message}`);
-
-  // Only 'delivery' rows are this shipment's original lines. The reversal
-  // rows this function is about to write below share the same shipment_id but
-  // carry 'recount', so filtering on reason here means they could never be
-  // picked up and re-reversed even if this ran twice.
-  const { data: deliveryRows, error: rowsError } = await supabase
-    .from('usage_logs')
-    .select('id, item_id, quantity')
-    .eq('shipment_id', shipmentId)
-    .eq('organization_id', org.id)
-    .eq('reason', 'delivery');
-
-  if (rowsError) {
-    throw new Error(`Could not read that shipment's stock movements: ${rowsError.message}`);
-  }
-
-  for (const row of deliveryRows ?? []) {
-    // admin-scope-ok: `row.item_id` comes from a usage_logs row filtered by
-    // .eq('organization_id', org.id) immediately above, so it is always
-    // in-org.
-    const { data: item } = await supabase
-      .from('inventory_items')
-      .select('id, current_stock')
-      .eq('id', row.item_id)
-      .maybeSingle();
-
-    // The item itself may since have been deleted. There is no stock left to
-    // reverse it on and no item to log against — skip rather than fail the
-    // whole void over one missing item.
-    if (!item) continue;
-
-    // Not clamped to zero: if this item has since been sold through, a
-    // negative count is real information — an over-sold position caused by
-    // voiding a delivery whose stock already left the building — not a bug
-    // to paper over.
-    const newStock = Number(item.current_stock ?? 0) - Number(row.quantity ?? 0);
-
-    // admin-scope-ok: `item` was fetched immediately above by an id that came
-    // from a usage_logs row filtered by .eq('organization_id', org.id).
-    const { error: stockError } = await supabase
-      .from('inventory_items')
-      .update({ current_stock: newStock })
-      .eq('id', row.item_id);
-
-    if (stockError) throw new Error(`Could not reverse stock: ${stockError.message}`);
-
-    const { error: reversalError } = await supabase.from('usage_logs').insert({
-      organization_id: org.id,
-      item_id: row.item_id,
-      quantity: row.quantity,
-      reason: 'recount',
-      unit_cost: null,
-      shipment_id: shipmentId,
-      note: `Void of shipment ${shipment.invoice_number ?? shipment.vendor_name}`,
-    });
-
-    if (reversalError) throw new Error(`Could not log the void: ${reversalError.message}`);
-  }
 
   revalidatePath('/app/inventory');
   revalidatePath('/app/inventory/shipments');
@@ -445,52 +564,72 @@ export type ShipmentSummary = {
   voided: boolean;
 };
 
+/** A generous but bounded page size — see the comment on `safeLimit` below. */
+const MAX_SHIPMENTS_LIMIT = 200;
+
 /**
  * Recent shipments for the list screen, newest invoice first.
  *
- * Two plain queries rather than one nested select: usage_logs carries both a
- * shipment's original 'delivery' lines and, once voided, its 'recount'
- * reversal rows under the same shipment_id, and a PostgREST embed filter is
- * easy to get subtly wrong. A separate .in() with an explicit reason filter
- * leaves no ambiguity about which rows count toward the total.
+ * One query per shipment for its lines, not a single .in(shipment_id, ids)
+ * across all of them. supabase/config.toml sets max_rows = 1000 — a hard cap
+ * PostgREST applies to every response with no error when it truncates. A
+ * distributor invoice commonly runs 30-40 lines, so a handful of pages'
+ * worth of shipments can together exceed 1000 lines with room to spare; a
+ * shipment whose lines fall off the end of that cap would silently report
+ * lineCount: 0 and a computedTotal of just its header charges. Querying per
+ * shipment, scoped to that one shipment_id, makes hitting the cap on a
+ * single invoice's own lines essentially impossible, and also removes any
+ * need for a `.in()` list sized by however many shipments were asked for.
  */
 export async function listShipments(limit = 50): Promise<ShipmentSummary[]> {
   const { org } = await getCurrentOrg();
   const supabase = createAdminClient();
+
+  // `limit` is client-supplied and was previously passed straight to
+  // .limit() unvalidated. Clamped here so an absurd value can neither
+  // silently get capped by max_rows on the query below (returning fewer
+  // shipments than asked for, with no error) nor drive an unreasonable
+  // number of per-shipment queries just below.
+  const safeLimit = Number.isFinite(limit)
+    ? Math.min(Math.max(Math.trunc(limit), 1), MAX_SHIPMENTS_LIMIT)
+    : 50;
 
   const { data: shipments, error } = await supabase
     .from('inventory_shipments')
     .select('id, vendor_name, invoice_number, invoice_date, freight, tax, deposits, other_charges, invoice_total, voided_at')
     .eq('organization_id', org.id)
     .order('invoice_date', { ascending: false })
-    .limit(limit);
+    .limit(safeLimit);
 
   if (error) throw new Error(`Could not load shipments: ${error.message}`);
   if (!shipments || shipments.length === 0) return [];
 
-  const ids = shipments.map((s) => s.id);
+  const lineAggregates = await Promise.all(
+    shipments.map(async (s) => {
+      const { data: lines, error: linesError } = await supabase
+        .from('usage_logs')
+        .select('quantity, unit_cost')
+        .eq('shipment_id', s.id)
+        .eq('organization_id', org.id)
+        .eq('reason', 'delivery');
 
-  // admin-scope-ok: `ids` come from the shipments query above, filtered by
-  // .eq('organization_id', org.id), so this .in() cannot reach another bar's
-  // rows.
-  const { data: lines, error: linesError } = await supabase
-    .from('usage_logs')
-    .select('shipment_id, quantity, unit_cost')
-    .in('shipment_id', ids)
-    .eq('reason', 'delivery');
+      if (linesError) {
+        throw new Error(`Could not load lines for shipment ${s.id}: ${linesError.message}`);
+      }
 
-  if (linesError) throw new Error(`Could not load shipment lines: ${linesError.message}`);
+      let count = 0;
+      let lineTotal = 0;
+      for (const line of lines ?? []) {
+        count += 1;
+        // A null unit_cost means no price was recorded on this line — it
+        // still counts toward lineCount, just not toward the dollar total.
+        if (line.unit_cost !== null) lineTotal += Number(line.quantity) * Number(line.unit_cost);
+      }
+      return { id: s.id as string, count, lineTotal };
+    }),
+  );
 
-  const byShipment = new Map<string, { count: number; lineTotal: number }>();
-  for (const line of lines ?? []) {
-    if (!line.shipment_id) continue;
-    const acc = byShipment.get(line.shipment_id) ?? { count: 0, lineTotal: 0 };
-    acc.count += 1;
-    // A null unit_cost means no price was recorded on this line — it still
-    // counts toward lineCount, just not toward the dollar total.
-    if (line.unit_cost !== null) acc.lineTotal += Number(line.quantity) * Number(line.unit_cost);
-    byShipment.set(line.shipment_id, acc);
-  }
+  const byShipment = new Map(lineAggregates.map((a) => [a.id, a]));
 
   return shipments.map((s) => {
     const agg = byShipment.get(s.id) ?? { count: 0, lineTotal: 0 };
