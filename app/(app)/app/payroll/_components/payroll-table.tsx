@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { SlidersHorizontal } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { SlidersHorizontal, ChevronRight } from 'lucide-react';
 import { AdjustDialog } from './adjust-dialog';
+import { EmployeeDaysPanel } from './employee-days-panel';
 import {
   Table,
   TableBody,
@@ -120,6 +122,11 @@ export default function PayrollTable({
   canAdjust = false,
 }: PayrollTableProps) {
   const [adjusting, setAdjusting] = useState<PayrollEntry | null>(null);
+  // Which employee's nights are open. One at a time: the panel is a detail
+  // view of the row above it, and several open at once turns the pay run into
+  // a wall nobody can scan.
+  const [openDays, setOpenDays] = useState<string | null>(null);
+  const router = useRouter();
   if (entries.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-14 text-center">
@@ -183,9 +190,21 @@ export default function PayrollTable({
                       </span>
                     )}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <button
+                      type="button"
+                      onClick={() => setOpenDays((cur) => (cur === entry.employeeId ? null : entry.employeeId))}
+                      aria-expanded={openDays === entry.employeeId}
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
+                    >
+                      {/* The total itself opens the nights behind it — on a phone
+                          that is the figure being questioned, so it is the thing
+                          worth making tappable. */}
                       {entry.totalHours.toFixed(2)} hrs @ ${entry.hourlyRate.toFixed(2)}
-                    </p>
+                      <ChevronRight
+                        className={`h-3 w-3 transition-transform ${openDays === entry.employeeId ? 'rotate-90' : ''}`}
+                        aria-hidden
+                      />
+                    </button>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <span className="tabular-nums text-lg font-semibold text-primary">
@@ -239,6 +258,19 @@ export default function PayrollTable({
                     </dd>
                   </div>
                 </dl>
+
+                {openDays === entry.employeeId && startDate && endDate && (
+                  <div className="mt-3 border-t pt-3">
+                    <EmployeeDaysPanel
+                      employeeId={entry.employeeId}
+                      employeeName={entry.employeeName}
+                      startDate={startDate}
+                      endDate={endDate}
+                      canAdjust={canAdjust}
+                      onSaved={() => router.refresh()}
+                    />
+                  </div>
+                )}
               </div>
             ))}
 
@@ -313,12 +345,26 @@ export default function PayrollTable({
                 </TableCell>
               </TableRow>
 
-              {group.rows.map((entry, i) => (
+              {group.rows.map((entry, i) => [
                 <TableRow
                   key={entry.employeeId}
                   className={i % 2 === 1 ? 'bg-muted/20' : ''}
                 >
                   <TableCell className="pl-4 font-medium whitespace-normal">
+                    {/* The period total on this row is the sum of nights that
+                        were never shown anywhere. This opens them. */}
+                    <button
+                      type="button"
+                      onClick={() => setOpenDays((cur) => (cur === entry.employeeId ? null : entry.employeeId))}
+                      aria-expanded={openDays === entry.employeeId}
+                      aria-label={`Show each night for ${entry.employeeName}`}
+                      className="mr-1 inline-flex h-5 w-5 items-center justify-center rounded align-middle text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      <ChevronRight
+                        className={`h-3.5 w-3.5 transition-transform ${openDays === entry.employeeId ? 'rotate-90' : ''}`}
+                        aria-hidden
+                      />
+                    </button>
                     <span className="align-middle">{entry.employeeName}</span>
                     {entry.payType === 'hourly' && (
                       /* Without this an hourly barback's $0 tips reads as a
@@ -386,8 +432,22 @@ export default function PayrollTable({
                       </button>
                     </TableCell>
                   )}
-                </TableRow>
-              ))}
+                </TableRow>,
+                openDays === entry.employeeId && startDate && endDate ? (
+                  <TableRow key={`${entry.employeeId}-days`} className="hover:bg-transparent">
+                    <TableCell colSpan={COLUMNS} className="p-3">
+                      <EmployeeDaysPanel
+                        employeeId={entry.employeeId}
+                        employeeName={entry.employeeName}
+                        startDate={startDate}
+                        endDate={endDate}
+                        canAdjust={canAdjust}
+                        onSaved={() => router.refresh()}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ) : null,
+              ]).flat()}
 
               {/* Shown even for a single person, so every block reads the same
                   way down the page. */}

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthUser, getCurrentOrg } from '@/lib/org';
 import { canManagePayroll } from '@/lib/permissions';
+import { buildDailyHours, type DailyHoursRow } from '@/lib/payroll/daily-hours';
 
 /**
  * Manual corrections to a pay run.
@@ -544,4 +545,52 @@ export async function revertShiftToPos(raw: unknown): Promise<{ wasLocked: boole
 
   revalidatePath('/app/payroll');
   return { wasLocked: true };
+}
+
+// ── Reading the nights behind a week's total ──────────────────────────────────
+
+/**
+ * Every night in the period for one employee, whether or not a shift exists.
+ *
+ * The pay run reports a period TOTAL, and the Adjust dialog writes a single
+ * night. Between the two there was nothing showing which nights made up the
+ * total, so an operator correcting a week had no way to see which night was
+ * wrong — and the dialog's date, defaulting to the first day of the period,
+ * quietly received figures meant for the whole week.
+ *
+ * Read-only, and gated the same as the writes: hours are pay, and who worked
+ * what is not something every member of a bar should be able to page through.
+ */
+export async function getEmployeeDailyHours(
+  employeeId: string,
+  startDate: string,
+  endDate: string,
+): Promise<DailyHoursRow[]> {
+  const { org, role } = await getCurrentOrg();
+  if (!canManagePayroll(role)) throw new Error('Not authorized');
+
+  const bounds = z.object({
+    employeeId: z.string().uuid(),
+    startDate: isoDate,
+    endDate: isoDate,
+  }).parse({ employeeId, startDate, endDate });
+
+  const supabase = createAdminClient();
+  await assertEmployeesInOrg(supabase, org.id, [bounds.employeeId]);
+
+  const { data, error } = await supabase
+    .from('employee_shifts')
+    .select('shift_date, regular_hours, overtime_hours, hours_source, is_opener')
+    .eq('organization_id', org.id)
+    .eq('employee_id', bounds.employeeId)
+    .gte('shift_date', bounds.startDate)
+    .lte('shift_date', bounds.endDate)
+    .order('shift_date');
+
+  // Thrown rather than swallowed: an empty list and a failed query look
+  // identical on screen, and one of them means "nobody worked" while the other
+  // means "we do not know". Correcting pay from the wrong one is the hazard.
+  if (error) throw new Error(`Could not load those nights: ${error.message}`);
+
+  return buildDailyHours(data ?? [], bounds.startDate, bounds.endDate);
 }
