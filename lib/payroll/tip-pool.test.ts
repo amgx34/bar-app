@@ -7,6 +7,7 @@ import {
   splitBarbackTips,
   barbackSplitFromSettings,
   barbackTiersFromSettings,
+  paysHourlyWage,
 } from './tip-pool';
 
 /**
@@ -479,5 +480,75 @@ describe('splitBarbackTips with headcount tiers', () => {
     expect(r.barbackCount).toBe(0);
     expect(r.appliedFraction).toBe(0);
     expect(r.poolTips).toBeCloseTo(1000);
+  });
+});
+
+/**
+ * Tips with no wage behind them.
+ *
+ * `pay_type` describes what somebody actually receives, and it now has three
+ * corners rather than two: wage plus tips (the default), wage only, and tips
+ * only. The last is for people who are not on the bar's payroll at all — a
+ * contractor behind the stick for a night, a DJ taking a cut — and it is the
+ * mirror of 'hourly' rather than a new idea.
+ */
+describe('normalizePayType and tips-only', () => {
+  it('reads tips_only', () => {
+    expect(normalizePayType('tips_only')).toBe('tips_only');
+  });
+
+  it('is not case or whitespace sensitive about it', () => {
+    expect(normalizePayType('  Tips_Only ')).toBe('tips_only');
+  });
+
+  it('still treats anything unrecognised as percentage', () => {
+    // The safe direction: a typo must never silently stop paying somebody
+    // their wage, which is what falling through to tips_only would do.
+    expect(normalizePayType('tipsonly')).toBe('percentage');
+    expect(normalizePayType('tips only')).toBe('percentage');
+  });
+});
+
+describe('paysHourlyWage', () => {
+  it('pays a wage on the default arrangement', () => {
+    expect(paysHourlyWage('percentage')).toBe(true);
+  });
+
+  it('pays a wage to somebody on hourly only', () => {
+    expect(paysHourlyWage('hourly')).toBe(true);
+  });
+
+  it('pays no wage to somebody on tips only', () => {
+    expect(paysHourlyWage('tips_only')).toBe(false);
+  });
+});
+
+describe('splitBarbackTips and tips-only staff', () => {
+  it('pays a tips-only barback their full share', () => {
+    // The mirror of the hourly case: 'hourly' holds a slot without claiming it,
+    // 'tips_only' claims it in full. Only the wage differs.
+    const r = splitBarbackTips({
+      dailyTips: 1000,
+      barbackFraction: 0.15,
+      method: 'equal',
+      barbackShifts: [
+        { employeeId: 'tips', payType: 'tips_only', hours: 5 },
+        { employeeId: 'both', payType: 'percentage', hours: 5 },
+      ],
+    });
+    expect(r.tipsByEmployee.get('tips')).toBeCloseTo(75);
+    expect(r.tipsByEmployee.get('both')).toBeCloseTo(75);
+    expect(r.returnedToPool).toBeCloseTo(0);
+  });
+
+  it('does not return a tips-only barback’s share to the bartenders', () => {
+    const r = splitBarbackTips({
+      dailyTips: 1000,
+      barbackFraction: 0.15,
+      method: 'equal',
+      barbackShifts: [{ employeeId: 'tips', payType: 'tips_only', hours: 5 }],
+    });
+    expect(r.tipsByEmployee.get('tips')).toBeCloseTo(150);
+    expect(r.poolTips).toBeCloseTo(850);
   });
 });

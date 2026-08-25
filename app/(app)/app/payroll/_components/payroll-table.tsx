@@ -189,6 +189,14 @@ export default function PayrollTable({
                         No pool share
                       </span>
                     )}
+                      {entry.payType === 'tips_only' && (
+                        <span
+                          title="Paid out of the tip pool only. No wage is owed for the hours worked."
+                          className="ml-2 inline-flex items-center rounded-full bg-muted px-2 py-0.5 align-middle text-[11px] font-medium text-muted-foreground"
+                        >
+                          Tips only
+                        </span>
+                      )}
                     </p>
                     <button
                       type="button"
@@ -371,6 +379,16 @@ export default function PayrollTable({
                          broken split rather than the arrangement they are on. */
                       <span className="ml-2 inline-flex items-center rounded-full bg-muted px-2 py-0.5 align-middle text-[11px] font-medium text-muted-foreground">
                         Hourly only
+                      </span>
+                    )}
+                    {entry.payType === 'tips_only' && (
+                      /* The mirror: without it a $0 wage on a full week of
+                         hours reads as a missing rate rather than the deal. */
+                      <span
+                        title="Paid out of the tip pool only. No wage is owed for the hours worked."
+                        className="ml-2 inline-flex items-center rounded-full bg-muted px-2 py-0.5 align-middle text-[11px] font-medium text-muted-foreground"
+                      >
+                        Tips only
                       </span>
                     )}
                   </TableCell>

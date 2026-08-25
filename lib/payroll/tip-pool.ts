@@ -107,18 +107,41 @@ export function barbackFractionFromSettings(settings: {
  * share of the barback cut on top of their hourly wage. `hourly` means the wage
  * is the whole deal — they take no part of the tip pool.
  */
-export type BarbackPayType = 'percentage' | 'hourly';
+export type PayType = 'percentage' | 'hourly' | 'tips_only';
+
+/**
+ * Named PayType, not BarbackPayType: the payroll engine reads it for EVERY
+ * employee, and 'tips_only' is an arrangement a guest bartender or a DJ is on
+ * far more often than a barback. The old name described where the column
+ * started, not what it governs.
+ */
+export type BarbackPayType = PayType;
 
 /**
  * Reads `employees.pay_type` defensively.
  *
- * Anything that is not literally 'hourly' means percentage. That direction is
+ * Anything unrecognised means percentage — wage AND tips. That direction is
  * deliberate: the column was added after these rows existed, so NULL is the
- * common case and must mean "unchanged". A typo must not silently stop paying
- * somebody their tips.
+ * common case and must mean "unchanged", and a typo must not silently stop
+ * paying somebody either half of what they are owed. Falling through to
+ * 'tips_only' on a bad value would quietly zero a wage.
  */
-export function normalizePayType(raw: string | null | undefined): BarbackPayType {
-  return raw?.trim().toLowerCase() === 'hourly' ? 'hourly' : 'percentage';
+export function normalizePayType(raw: string | null | undefined): PayType {
+  const value = raw?.trim().toLowerCase();
+  if (value === 'hourly') return 'hourly';
+  if (value === 'tips_only') return 'tips_only';
+  return 'percentage';
+}
+
+/**
+ * Whether the bar owes this person an hourly wage at all.
+ *
+ * 'tips_only' is the one arrangement that earns nothing per hour. Their hours
+ * are still recorded and still matter, because the pool is split by hours
+ * worked — they are simply not paid for them.
+ */
+export function paysHourlyWage(payType: PayType): boolean {
+  return payType !== 'tips_only';
 }
 
 /**

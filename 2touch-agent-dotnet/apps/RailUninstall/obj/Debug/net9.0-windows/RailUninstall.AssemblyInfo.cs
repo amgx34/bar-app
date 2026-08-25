@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Rail")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.1.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.1.0+417b29579639671ad3a5686969b19d8aed40800d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.1.0+2b8f113edaac33515ad39f03b9297e0640b95dea")]
 [assembly: System.Reflection.AssemblyProductAttribute("Rail 2Touch Agent Uninstaller")]
 [assembly: System.Reflection.AssemblyTitleAttribute("rail-uninstall")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.1.0.0")]

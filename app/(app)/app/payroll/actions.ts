@@ -11,6 +11,7 @@ import {
   barbackTiersFromSettings,
   splitBarbackTips,
   normalizePayType,
+  paysHourlyWage,
   type BarbackPayType,
   type BarbackTier,
   type BarbackSplitMethod,
@@ -840,8 +841,16 @@ export async function computePayroll(
 
       const totalHours = regularHours + overtimeHours;
 
-      const hourlyRate =
-        employeeShifts[0]?.hourly_rate || employee.hourly_rate || 0;
+      // 'tips_only' earns nothing per hour — a guest bartender or a DJ who
+      // takes a share of the night and is not on the bar's payroll. Their hours
+      // are still counted and still matter, because the pool is split by hours
+      // worked; the bar simply owes no wage for them. Zeroing the RATE rather
+      // than the pay keeps every derived figure honest: the rate column, the
+      // overtime premium and the effective-rate breakdown all follow from it.
+      const payType = normalizePayType(employee.pay_type);
+      const hourlyRate = paysHourlyWage(payType)
+        ? (employeeShifts[0]?.hourly_rate || employee.hourly_rate || 0)
+        : 0;
 
       const regularPay = regularHours * hourlyRate;
       const otPay = overtimePay(overtimeHours, hourlyRate, overtimeCfg);
@@ -879,7 +888,7 @@ export async function computePayroll(
         tipsPerHour,
         effectiveHourlyRate,
         totalCompensation,
-        payType: normalizePayType(employee.pay_type),
+        payType,
       });
     }
 

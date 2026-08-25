@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Employee, TipMode, saveEmployee } from '../actions';
+import type { PayType } from '@/lib/payroll/tip-pool';
 import {
   Dialog,
   DialogContent,
@@ -55,7 +56,7 @@ export default function EmployeeSetupDialog({
   const [formData, setFormData] = useState<{
     name: string;
     role: string;
-    payType: 'percentage' | 'hourly';
+    payType: PayType;
     hourlyRate: string;
     tipMode: TipMode;
   }>({
@@ -78,8 +79,18 @@ export default function EmployeeSetupDialog({
       toast.error('Please select a role');
       return;
     }
-    if (!formData.hourlyRate || parseFloat(formData.hourlyRate) <= 0) {
-      toast.error('Please enter a valid hourly rate');
+    // Not asked of a tips-only person: they earn nothing per hour, so there is
+    // no rate to enter and demanding one is a contradiction.
+    if (formData.payType !== 'tips_only') {
+      if (!formData.hourlyRate || parseFloat(formData.hourlyRate) <= 0) {
+        toast.error('Please enter a valid hourly rate');
+        return;
+      }
+    }
+
+    // Tips only AND not tipped is nobody being paid anything. Always a slip.
+    if (formData.payType === 'tips_only' && formData.tipMode === 'no_tip') {
+      toast.error('Tips only and Not Tipped together would pay them nothing at all');
       return;
     }
 
@@ -89,7 +100,11 @@ export default function EmployeeSetupDialog({
         id: employee?.id,
         name: isNew ? formData.name.trim() : employee!.name,
         role: formData.role,
-        hourly_rate: parseFloat(formData.hourlyRate),
+        // Zero rather than NaN when the field was left empty for a
+        // tips-only person, so the column keeps a number the engine can read.
+        hourly_rate: formData.payType === 'tips_only'
+          ? (parseFloat(formData.hourlyRate) || 0)
+          : parseFloat(formData.hourlyRate),
         tip_mode: formData.tipMode,
         pay_type: formData.payType,
       });
@@ -179,7 +194,16 @@ export default function EmployeeSetupDialog({
               <Select
                 value={formData.tipMode}
                 onValueChange={(value) =>
-                  setFormData({ ...formData, tipMode: value as TipMode })
+                  setFormData({
+                    ...formData,
+                    tipMode: value as TipMode,
+                    // Not Tipped hides the control below, so a stranded
+                    // 'tips_only' would leave somebody earning nothing at all
+                    // with no visible reason why.
+                    payType: value === 'no_tip' && formData.payType === 'tips_only'
+                      ? 'percentage'
+                      : formData.payType,
+                  })
                 }
               >
                 <SelectTrigger>
@@ -200,16 +224,17 @@ export default function EmployeeSetupDialog({
                 <p className="text-muted-foreground">{TIP_MODE_INFO[formData.tipMode]}</p>
               </div>
 
-              {/* Only a barback can be on this arrangement, so asking everyone
-                  would be a question with one right answer. Bartender pay is
-                  governed by Tip Distribution above. */}
-              {(formData.role === 'barback' || formData.tipMode === 'barback') && (
+              {/* Shown to anyone who takes tips, not just barbacks: "tips only"
+                  is an arrangement a guest bartender or a contractor is on far
+                  more often than a barback. Hidden for Not Tipped staff, where
+                  the question has one right answer. */}
+              {formData.tipMode !== 'no_tip' && (
                 <div className="space-y-2 pt-1">
-                  <Label htmlFor="payType">Barback Pay</Label>
+                  <Label htmlFor="payType">What they receive</Label>
                   <Select
                     value={formData.payType}
                     onValueChange={(value) =>
-                      setFormData({ ...formData, payType: value as 'percentage' | 'hourly' })
+                      setFormData({ ...formData, payType: value as PayType })
                     }
                   >
                     <SelectTrigger>
@@ -218,14 +243,17 @@ export default function EmployeeSetupDialog({
                     <SelectContent>
                       <SelectItem value="percentage">Hourly wage + share of tips</SelectItem>
                       <SelectItem value="hourly">Hourly wage only</SelectItem>
+                      <SelectItem value="tips_only">Tips only — no hourly wage</SelectItem>
                     </SelectContent>
                   </Select>
                   <div className="flex gap-2 rounded-lg bg-muted p-3 text-sm">
                     <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
                     <p className="text-muted-foreground">
                       {formData.payType === 'hourly'
-                        ? 'Paid their hourly rate and nothing from the tip pool. Their share goes back to the bartenders rather than to the other barbacks, and they still count toward the barback headcount.'
-                        : 'Paid their hourly rate plus a share of the barback cut. This is the default.'}
+                        ? 'Paid their hourly rate and nothing from the tip pool. A barback on this arrangement still holds their slot — their share goes back to the bartenders rather than to the other barbacks.'
+                        : formData.payType === 'tips_only'
+                        ? 'Paid out of the tip pool only, with no wage for the hours they work. Their hours are still recorded, because both pools are split by hours worked.'
+                        : 'Paid their hourly rate plus their share of the tips. This is the default.'}
                     </p>
                   </div>
                 </div>
