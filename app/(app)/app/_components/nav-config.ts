@@ -1,7 +1,7 @@
 import {
   Home, Package, CircleDollarSign, Receipt, Settings, BookOpen, Users,
   Scale, ClipboardCheck, TrendingUp, CalendarRange, UserCog, Landmark, Layers,
-  Banknote, FileCheck2,
+  Banknote, FileCheck2, Truck,
 } from 'lucide-react';
 
 /**
@@ -59,6 +59,7 @@ export const SECTIONS: NavSection[] = [
     tabs: [
       { label: 'Items',     href: '/app/inventory',           icon: Package },
       { label: 'Weigh',     href: '/app/inventory/weigh',     icon: Scale },
+      { label: 'Shipments', href: '/app/inventory/shipments', icon: Truck },
       // Before Analytics deliberately: it decides whether the numbers there can
       // be trusted, and reading them the other way round means studying a
       // report built on stock that never moved.
