@@ -1,7 +1,9 @@
 'use client';
 
-import { Truck } from 'lucide-react';
+import { useState } from 'react';
+import { Truck, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -11,6 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { ShipmentSummary } from '../../shipment-actions';
+import { LogShipmentDialog } from './log-shipment-dialog';
 
 const money = (n: number) =>
   `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -48,6 +51,11 @@ export function ShipmentList({
   shipments: ShipmentSummary[];
   canEdit: boolean;
 }) {
+  // Owned here, not in the page: the page is a server component and this is
+  // the one client boundary on the screen already gated on `canEdit`, so the
+  // dialog's open state and its trigger both live beside each other.
+  const [dialogOpen, setDialogOpen] = useState(false);
+
   if (shipments.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-14 text-center">
@@ -61,29 +69,42 @@ export function ShipmentList({
           </p>
         </div>
         {/*
-          Task 8 wires the "Log a shipment" dialog here and renders its
-          trigger button in this spot, gated on the same `canEdit` the text
-          above already branches on. Left as a labelled gap rather than a
-          button with no handler: a dead button reads as broken, an absent
-          one reads as "not built yet", which is the true state of the world
-          right now — nothing is rendered here until Task 8 lands.
+          The reserved slot from Task 7: the trigger is gated on the same
+          `canEdit` the text above already branches on, so a staff-role user
+          sees the explanatory copy with no dead button beneath it.
         */}
+        {canEdit && (
+          <Button onClick={() => setDialogOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Log a shipment
+          </Button>
+        )}
+        <LogShipmentDialog open={dialogOpen} onOpenChange={setDialogOpen} />
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border">
-      {/*
-        Table itself (components/ui/table) already wraps in
-        `overflow-x-auto` on its own container, so wide rows scroll inside
-        that box instead of widening the page — see the min-w-0 comment in
-        ../../layout.tsx and payroll-table.tsx for the failure mode this
-        avoids: a table sized to its min-content pushes the whole document
-        wider than the viewport on a phone, and no wrapper div fixes that
-        after the fact.
-      */}
-      <Table>
+    <div className="space-y-4">
+      {canEdit && (
+        <div className="flex items-center justify-end">
+          <Button onClick={() => setDialogOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Log a shipment
+          </Button>
+        </div>
+      )}
+      <div className="rounded-xl border">
+        {/*
+          Table itself (components/ui/table) already wraps in
+          `overflow-x-auto` on its own container, so wide rows scroll inside
+          that box instead of widening the page — see the min-w-0 comment in
+          ../../layout.tsx and payroll-table.tsx for the failure mode this
+          avoids: a table sized to its min-content pushes the whole document
+          wider than the viewport on a phone, and no wrapper div fixes that
+          after the fact.
+        */}
+        <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Date</TableHead>
@@ -144,6 +165,8 @@ export function ShipmentList({
           })}
         </TableBody>
       </Table>
+      </div>
+      <LogShipmentDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   );
 }
