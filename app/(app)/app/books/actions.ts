@@ -192,17 +192,37 @@ export async function getBooksData(startDate: string, endDate: string): Promise<
   // case of napkins on a liquor invoice must not carry the same freight as ten
   // cases of spirits. Deposits are excluded — they come back.
   //
+  // Charge-bearing shipments are found from the shipment_id values already
+  // present on `logs`, NOT by filtering inventory_shipments on invoice_date.
+  // usage_logs.logged_at (the window `logs` was already fetched by) and
+  // inventory_shipments.invoice_date are different clocks — logged_at is
+  // effectively insert time, invoice_date is user/AI-entered and can fall in
+  // an earlier or later month. An invoice dated Jul 31 but keyed in Aug 2 would
+  // have its lines in the August window and, if charges were queried by
+  // invoice_date, its charges in July — a month with none of its lines, so
+  // allocateShipmentCharges would return the whole charge as `unallocated` and
+  // it would land in neither month. Deriving the shipment set from `logs`
+  // instead means charges always travel with their own lines, so this straddle
+  // cannot happen in either direction. Do NOT change this back to an
+  // invoice_date range — it looks like the more obvious filter but it reintroduces
+  // the bug.
+  //
   // .is('voided_at', null) here means a voided shipment's charges are simply
   // never fetched, which is enough for the charges themselves — but it does
   // NOT touch the underlying usage_logs lines, which is why costedUsage above
   // needs its own voidedShipmentIds filter.
-  const { data: shipmentCharges } = await supabase
-    .from('inventory_shipments')
-    .select('id, freight, tax, other_charges')
-    .eq('organization_id', orgId)
-    .is('voided_at', null)
-    .gte('invoice_date', startDate)
-    .lte('invoice_date', endDate);
+  const shipmentIdsInWindow = [...new Set(
+    logs.map((l) => l.shipment_id).filter((id): id is string => !!id),
+  )];
+
+  const { data: shipmentCharges } = shipmentIdsInWindow.length > 0
+    ? await supabase
+        .from('inventory_shipments')
+        .select('id, freight, tax, other_charges')
+        .eq('organization_id', orgId)
+        .is('voided_at', null)
+        .in('id', shipmentIdsInWindow)
+    : { data: [] as { id: string; freight: number | null; tax: number | null; other_charges: number | null }[] };
 
   const chargedUsage: CostedUsage[] = [];
   for (const shipment of shipmentCharges ?? []) {
