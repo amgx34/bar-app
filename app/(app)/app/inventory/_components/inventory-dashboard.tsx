@@ -14,6 +14,13 @@ export type DashboardUsageLog = {
   note: string | null;
   /** usage_logs stores this as `logged_at`, not `created_at`. */
   logged_at: string;
+  /**
+   * Non-null only for rows postShipment wrote — names the shipment this
+   * delivery line belongs to. This is the ONLY reliable link back to a real
+   * shipment document: `logged_at` is insertion time, not the invoice date,
+   * so it must never be compared against `ShipmentSummary.invoiceDate`.
+   */
+  shipment_id: string | null;
   inventory_items: { name: string } | null;
 };
 
@@ -132,9 +139,15 @@ export function InventoryDashboard({
     stockedItemCount: items.filter(i => (i.current_stock ?? 0) > 0).length,
   }), [items]);
 
-  const { latestShipmentDate, latestShipmentItems } = useMemo(() => {
+  const { latestShipmentDate, latestShipmentItems, latestDayShipmentIds } = useMemo(() => {
     const deliveries = usageLogs.filter(l => l.reason === 'delivery');
-    if (deliveries.length === 0) return { latestShipmentDate: null, latestShipmentItems: [] };
+    if (deliveries.length === 0) {
+      return {
+        latestShipmentDate: null,
+        latestShipmentItems: [] as { name: string; quantity: number }[],
+        latestDayShipmentIds: [] as string[],
+      };
+    }
     // Sort deliveries newest first to find the latest delivery day
     const sortedDeliveries = [...deliveries].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
     const latestDay = sortedDeliveries[0].logged_at.slice(0, 10);
@@ -145,6 +158,14 @@ export function InventoryDashboard({
         name: l.inventory_items?.name ?? 'Unknown',
         quantity: l.quantity,
       })),
+      // Distinct shipment_id values named by this same day's delivery rows.
+      // Not used by the inference render path itself (that still only reads
+      // latestShipmentDate/latestShipmentItems, untouched above) — it exists
+      // purely to hand latestRealShipment below something to match on that
+      // isn't a date.
+      latestDayShipmentIds: Array.from(
+        new Set(sameDay.map(l => l.shipment_id).filter((id): id is string => id !== null)),
+      ),
     };
   }, [usageLogs]);
 
@@ -156,26 +177,33 @@ export function InventoryDashboard({
   // predating this feature, and any manual stock adjustment — keeps seeing
   // exactly what it always has.
   //
-  // When the org DOES log shipments, prefer the real document for the same
-  // calendar day: a shipment's own vendor and total, not a reconstruction.
-  // Matched by day rather than by shipment_id because usage_logs rows don't
-  // carry that id down to this component (only shipment-actions.ts does),
-  // and the invoice date is what a manager actually recognizes a delivery
-  // by. `shipments` only ever contains this org's rows (listShipments scopes
-  // it internally), so no further filtering is needed here beyond voided.
+  // When the org DOES log shipments, prefer the real document instead of a
+  // reconstruction — but matched by shipment_id, NOT by comparing dates.
+  // logged_at (when the delivery row was inserted) and invoice_date (the
+  // date printed on the vendor's invoice) are two different clocks: nothing
+  // copies one into the other, and a bar keying in yesterday's — or last
+  // week's — invoice is the normal case, not an edge case. Comparing dates
+  // here silently misses every one of those and quietly falls back to the
+  // inference with no indication why. usage_logs rows written by
+  // postShipment already carry shipment_id, which names the real document
+  // directly regardless of when it was typed in, so that is the only thing
+  // compared below.
   //
-  // Voided shipments are excluded up front: their stock was reversed and
-  // their money excluded from the books (see voidShipment in
-  // shipment-actions.ts), so presenting one as "the latest shipment" — with
-  // a vendor and a total that no longer count — would contradict both. A
-  // voided shipment simply never matches here; the day it covers falls back
-  // to the plain inference above, the same as any other day with no logged
-  // shipment.
+  // Voided shipments are excluded: their stock was reversed and their money
+  // excluded from the books (see voidShipment in shipment-actions.ts), so
+  // presenting one as "the latest shipment" — with a vendor and a total that
+  // no longer count — would contradict both. `shipments` is iterated in its
+  // given order (listShipments returns newest invoice_date first) and the
+  // first non-voided match wins — deterministic even on the rare day two
+  // shipments were both logged: it prefers whichever has the later invoice
+  // date, not whichever happened to sort first among usage_logs rows.
   const latestRealShipment = useMemo(() => {
-    if (!latestShipmentDate) return null;
-    const latestDeliveryDay = latestShipmentDate.slice(0, 10);
-    return shipments.find(s => !s.voided && s.invoiceDate === latestDeliveryDay) ?? null;
-  }, [shipments, latestShipmentDate]);
+    if (latestDayShipmentIds.length === 0) return null;
+    for (const shipment of shipments) {
+      if (!shipment.voided && latestDayShipmentIds.includes(shipment.id)) return shipment;
+    }
+    return null;
+  }, [shipments, latestDayShipmentIds]);
 
   /**
    * `invoiceDate` is YYYY-MM-DD with no time component. `new Date(iso)` reads

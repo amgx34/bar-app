@@ -61,7 +61,7 @@ export default async function InventoryPage({
     supabase.from('reps').select('id, name').eq('organization_id', org.id).eq('is_active', true).order('name'),
     supabase
       .from('usage_logs')
-      .select('item_id, quantity, reason, note, logged_at, inventory_items(name)')
+      .select('item_id, quantity, reason, note, logged_at, shipment_id, inventory_items(name)')
       .eq('organization_id', org.id)
       .order('logged_at', { ascending: false })
       .limit(500),
