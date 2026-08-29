@@ -3282,11 +3282,11 @@
   "project": {
     "version": "1.1.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\apps\\RailUninstall\\RailUninstall.csproj",
+      "projectUniqueName": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\apps\\RailUninstall\\RailUninstall.csproj",
       "projectName": "rail-uninstall",
-      "projectPath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\apps\\RailUninstall\\RailUninstall.csproj",
+      "projectPath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\apps\\RailUninstall\\RailUninstall.csproj",
       "packagesPath": "C:\\Users\\notug\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\apps\\RailUninstall\\obj\\",
+      "outputPath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\apps\\RailUninstall\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\notug\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -3303,8 +3303,8 @@
         "net9.0-windows7.0": {
           "targetAlias": "net9.0-windows",
           "projectReferences": {
-            "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\RailAgent.csproj": {
-              "projectPath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\RailAgent.csproj"
+            "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\RailAgent.csproj": {
+              "projectPath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\RailAgent.csproj"
             }
           }
         }

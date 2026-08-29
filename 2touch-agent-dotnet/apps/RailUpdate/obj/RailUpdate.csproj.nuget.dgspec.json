@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\apps\\RailUpdate\\RailUpdate.csproj": {}
+    "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\apps\\RailUpdate\\RailUpdate.csproj": {}
   },
   "projects": {
-    "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\apps\\RailUpdate\\RailUpdate.csproj": {
+    "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\apps\\RailUpdate\\RailUpdate.csproj": {
       "version": "1.1.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\apps\\RailUpdate\\RailUpdate.csproj",
+        "projectUniqueName": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\apps\\RailUpdate\\RailUpdate.csproj",
         "projectName": "rail-update",
-        "projectPath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\apps\\RailUpdate\\RailUpdate.csproj",
+        "projectPath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\apps\\RailUpdate\\RailUpdate.csproj",
         "packagesPath": "C:\\Users\\notug\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\apps\\RailUpdate\\obj\\",
+        "outputPath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\apps\\RailUpdate\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\notug\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -28,8 +28,8 @@
           "net9.0-windows7.0": {
             "targetAlias": "net9.0-windows",
             "projectReferences": {
-              "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\RailAgent.csproj": {
-                "projectPath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\RailAgent.csproj"
+              "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\RailAgent.csproj": {
+                "projectPath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\RailAgent.csproj"
               }
             }
           }
@@ -69,14 +69,14 @@
         }
       }
     },
-    "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\RailAgent.csproj": {
+    "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\RailAgent.csproj": {
       "version": "1.1.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\RailAgent.csproj",
+        "projectUniqueName": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\RailAgent.csproj",
         "projectName": "rail-2touch-agent",
-        "projectPath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\RailAgent.csproj",
+        "projectPath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\RailAgent.csproj",
         "packagesPath": "C:\\Users\\notug\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\obj\\",
+        "outputPath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\notug\\AppData\\Roaming\\NuGet\\NuGet.Config",
