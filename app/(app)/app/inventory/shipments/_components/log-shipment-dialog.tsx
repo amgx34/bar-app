@@ -40,9 +40,19 @@ type HeaderState = {
   invoiceTotal: number | null;
 };
 
-/** A review line plus the one thing the review screen adds: has a human confirmed this price? */
+/**
+ * A review line plus the one thing the review screen adds: which unit cost,
+ * if any, a human has actually signed off on.
+ *
+ * Deliberately NOT a boolean. A boolean records "yes, apply the cost" with no
+ * memory of WHICH cost it was approving — so editing the price after ticking
+ * the box leaves the tick standing over a number nobody looked at. Storing
+ * the approved figure itself makes that impossible: the approval is for a
+ * specific price, and it stops matching the moment the price changes out
+ * from under it. `null` means nothing has been approved yet.
+ */
 interface EditableLine extends ShipmentReviewLine {
-  applyCost: boolean;
+  approvedCost: number | null;
 }
 
 interface Props {
@@ -93,28 +103,36 @@ function computePriceChanges(lines: Array<{ existingId: string | null; quantity:
 /**
  * Whether this line's cost price should actually move if the shipment posts.
  *
- * NOT the same thing as the raw `applyCost` checkbox state: a line that
- * started flagged (needsConfirm) and was then hand-corrected back under the
- * threshold has stopped needing confirmation, and should apply automatically
- * — the checkbox the operator never got to tick (because the warning
- * disappeared) must not silently veto a price that is now fine. Only a line
- * that IS still flagged defers to whatever the operator ticked.
+ * A line that is not currently flagged applies automatically — either it was
+ * never risky, or it started flagged and was hand-corrected back under the
+ * threshold, in which case the (now stale) approval is irrelevant because
+ * nothing needs confirming any more. A line that IS still flagged applies
+ * only when `approvedCost` equals its CURRENT `unitCost` — i.e. a human
+ * ticked the box for this exact number, not some earlier one that has since
+ * been edited again.
  */
 function effectiveApplyCost(line: EditableLine, changes: Map<string, PriceChange>): boolean {
-  if (!line.existingId) return true;
+  return !isLineUnresolved(line, changes);
+}
+
+/**
+ * The single source of truth for "this line is still blocking the post."
+ * Used both to compute `canPost` and to word the footer's warning message —
+ * kept as one function specifically so those two things cannot drift apart
+ * and disagree about which lines are actually unresolved.
+ */
+function isLineUnresolved(line: EditableLine, changes: Map<string, PriceChange>): boolean {
+  if (!line.existingId) return false;
   const change = changes.get(line.existingId);
-  if (!change?.needsConfirm) return true;
-  return line.applyCost;
+  if (!change?.needsConfirm) return false;
+  return line.approvedCost !== line.unitCost;
 }
 
 function linesFromReview(lines: ShipmentReviewLine[]): EditableLine[] {
-  const changes = computePriceChanges(lines);
-  return lines.map((l) => {
-    const change = l.existingId ? changes.get(l.existingId) : undefined;
-    // Flagged lines start unticked — the whole point is that a human has to
-    // look before the price moves. Everything else starts ready to apply.
-    return { ...l, applyCost: !change?.needsConfirm };
-  });
+  // No line starts approved — a fresh parse has had no human look at it yet,
+  // flagged or not. Unflagged lines apply anyway (see effectiveApplyCost);
+  // flagged lines wait for a tick.
+  return lines.map((l) => ({ ...l, approvedCost: null }));
 }
 
 /**
@@ -145,6 +163,15 @@ export function LogShipmentDialog({ open, onOpenChange }: Props) {
   }
 
   function handleClose(v: boolean) {
+    // Base UI dismisses this dialog on Escape and on an overlay click by
+    // default, same as every close affordance (the X button, "Start over"
+    // does not go through here). None of those must be allowed to interrupt
+    // an in-flight post: the request is still running, and letting the
+    // dialog close and reopen for a second invoice means the FIRST call's
+    // setResult/setState('done') can land on the second one's screen —
+    // a "done" summary for the wrong shipment. Refusing to close is more
+    // honest than closing and discarding a result that is still coming.
+    if (!v && state === 'importing') return;
     if (!v) reset();
     onOpenChange(v);
   }
@@ -176,6 +203,16 @@ export function LogShipmentDialog({ open, onOpenChange }: Props) {
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, [field]: value } : l)));
   }
 
+  /**
+   * Ticking the box approves the CURRENT unit cost, not "yes forever" — see
+   * the comment on `EditableLine.approvedCost`. Unticking clears it back to
+   * null rather than to some other sentinel, so `effectiveApplyCost`'s
+   * `approvedCost === unitCost` check has exactly one way to read "approved".
+   */
+  function toggleApproval(index: number, checked: boolean) {
+    setLines((prev) => prev.map((l, i) => (i === index ? { ...l, approvedCost: checked ? l.unitCost : null } : l)));
+  }
+
   // Recomputed from current line state on every render rather than stored —
   // it must never go stale relative to an edit the operator just made to
   // quantity or unit cost. Cheap: this dialog handles one invoice at a time.
@@ -192,17 +229,35 @@ export function LogShipmentDialog({ open, onOpenChange }: Props) {
   );
 
   // The guard against a misread digit silently repricing the bar: any line
-  // still flagged AND not yet confirmed blocks the Post button outright.
-  const unresolvedPriceChanges = lines.some((l) => {
-    if (!l.existingId) return false;
-    return Boolean(priceChanges.get(l.existingId)?.needsConfirm) && !l.applyCost;
-  });
+  // still flagged AND not approved for its CURRENT unit cost blocks the Post
+  // button outright — see isLineUnresolved for why "approved" means
+  // approvedCost === unitCost rather than a plain sticky boolean.
+  const unresolvedPriceChanges = lines.some((l) => isLineUnresolved(l, priceChanges));
+
+  /**
+   * A line that would post with $0.00 of value nobody can see coming: a
+   * cleared/zeroed quantity, a negative quantity, or an unreadable/negative
+   * unit cost. `null` unit cost stays legal on purpose — a genuinely free
+   * case is real (Task 6 values it at $0 rather than falling back to the
+   * stored cost), so only a NUMBER that is negative or non-finite is wrong.
+   * Checked client-side so a bad field blocks the Post button with a named
+   * cause, instead of round-tripping to postShipment's zod and bouncing back
+   * as a raw server error.
+   */
+  function lineError(l: EditableLine): string | null {
+    if (!Number.isFinite(l.quantity) || l.quantity <= 0) return 'needs a quantity greater than 0';
+    if (l.unitCost !== null && (!Number.isFinite(l.unitCost) || l.unitCost < 0)) return 'needs a valid unit cost';
+    return null;
+  }
+
+  const firstInvalidLine = lines.find((l) => lineError(l) !== null) ?? null;
 
   const canPost =
     header.vendorName.trim() !== '' &&
     header.invoiceDate.trim() !== '' &&
     lines.length > 0 &&
-    !unresolvedPriceChanges;
+    !unresolvedPriceChanges &&
+    firstInvalidLine === null;
 
   async function handlePost() {
     // Caught here, in the form, rather than left to surface as postShipment's
@@ -211,8 +266,9 @@ export function LogShipmentDialog({ open, onOpenChange }: Props) {
     // validation message.
     if (header.vendorName.trim() === '') { toast.error('Vendor is required'); return; }
     if (header.invoiceDate.trim() === '') { toast.error('Invoice date is required'); return; }
-    if (unresolvedPriceChanges) { toast.error('Confirm or correct the flagged price changes before posting'); return; }
     if (lines.length === 0) { toast.error('This shipment has no lines'); return; }
+    if (firstInvalidLine) { toast.error(`"${firstInvalidLine.name}" ${lineError(firstInvalidLine)}`); return; }
+    if (unresolvedPriceChanges) { toast.error('Confirm or correct the flagged price changes before posting'); return; }
 
     setState('importing');
     try {
@@ -251,7 +307,12 @@ export function LogShipmentDialog({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col gap-0 p-0">
+      <DialogContent
+        className="max-w-4xl max-h-[90vh] flex flex-col gap-0 p-0"
+        // handleClose already refuses to close mid-post; hiding the X here
+        // too means there is no dead click to be confused by while it does.
+        showCloseButton={state !== 'importing'}
+      >
         <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -394,10 +455,12 @@ export function LogShipmentDialog({ open, onOpenChange }: Props) {
                     {lines.map((line, index) => {
                       const change = line.existingId ? priceChanges.get(line.existingId) : undefined;
                       const flagged = Boolean(change?.needsConfirm);
+                      const unresolved = isLineUnresolved(line, priceChanges);
+                      const error = lineError(line);
                       const lineTotal = line.quantity * (line.unitCost ?? 0);
 
                       return (
-                        <tr key={index} className={flagged && !line.applyCost ? 'bg-amber-500/5' : undefined}>
+                        <tr key={index} className={unresolved || error ? 'bg-amber-500/5' : undefined}>
                           <td className="px-3 py-2">
                             {line.existingId ? (
                               <Badge variant="secondary" className="text-[10px] font-medium whitespace-nowrap">MATCH</Badge>
@@ -417,7 +480,11 @@ export function LogShipmentDialog({ open, onOpenChange }: Props) {
                           <td className="px-3 py-2">
                             <input
                               type="number" min={0} step="any"
-                              className="w-16 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-primary/40 rounded px-1 py-0.5 text-sm tabular-nums"
+                              className={`w-16 bg-transparent border-0 focus:outline-none focus:ring-1 rounded px-1 py-0.5 text-sm tabular-nums ${
+                                !Number.isFinite(line.quantity) || line.quantity <= 0
+                                  ? 'ring-1 ring-destructive/50 focus:ring-destructive'
+                                  : 'focus:ring-primary/40'
+                              }`}
                               value={line.quantity}
                               onChange={(e) => updateLine(index, 'quantity', parseFloat(e.target.value) || 0)}
                             />
@@ -440,7 +507,11 @@ export function LogShipmentDialog({ open, onOpenChange }: Props) {
                               <input
                                 type="number" min={0} step="0.01"
                                 placeholder="—"
-                                className="w-16 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-primary/40 rounded px-1 py-0.5 text-sm tabular-nums"
+                                className={`w-16 bg-transparent border-0 focus:outline-none focus:ring-1 rounded px-1 py-0.5 text-sm tabular-nums ${
+                                  line.unitCost !== null && (!Number.isFinite(line.unitCost) || line.unitCost < 0)
+                                    ? 'ring-1 ring-destructive/50 focus:ring-destructive'
+                                    : 'focus:ring-primary/40'
+                                }`}
                                 value={line.unitCost ?? ''}
                                 onChange={(e) => updateLine(index, 'unitCost', e.target.value ? parseFloat(e.target.value) : null)}
                               />
@@ -448,7 +519,12 @@ export function LogShipmentDialog({ open, onOpenChange }: Props) {
                           </td>
                           <td className="px-3 py-2 tabular-nums">{money(lineTotal)}</td>
                           <td className="px-3 py-2">
-                            {flagged && change ? (
+                            {error ? (
+                              <span className="flex items-center gap-1 text-xs font-medium text-destructive">
+                                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                                {error}
+                              </span>
+                            ) : flagged && change ? (
                               <div className="flex flex-col gap-1">
                                 <span className="flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400">
                                   <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
@@ -459,8 +535,8 @@ export function LogShipmentDialog({ open, onOpenChange }: Props) {
                                   <input
                                     type="checkbox"
                                     className="rounded"
-                                    checked={line.applyCost}
-                                    onChange={(e) => updateLine(index, 'applyCost', e.target.checked)}
+                                    checked={line.approvedCost !== null && line.approvedCost === line.unitCost}
+                                    onChange={(e) => toggleApproval(index, e.target.checked)}
                                   />
                                   Apply this price
                                 </label>
@@ -512,10 +588,15 @@ export function LogShipmentDialog({ open, onOpenChange }: Props) {
                 <RotateCcw className="h-3.5 w-3.5" />
                 Start over
               </button>
-              {unresolvedPriceChanges && (
+              {firstInvalidLine ? (
+                <span className="flex items-center gap-1 text-xs font-medium text-destructive ml-2">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  &quot;{firstInvalidLine.name}&quot; {lineError(firstInvalidLine)}
+                </span>
+              ) : unresolvedPriceChanges && (
                 <span className="flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 ml-2">
                   <AlertTriangle className="h-3.5 w-3.5" />
-                  Confirm the flagged price{lines.filter((l) => l.existingId && priceChanges.get(l.existingId!)?.needsConfirm && !l.applyCost).length !== 1 ? 's' : ''} above to post
+                  Confirm the flagged price{lines.filter((l) => isLineUnresolved(l, priceChanges)).length !== 1 ? 's' : ''} above to post
                 </span>
               )}
               <Button onClick={handlePost} disabled={!canPost} className="ml-auto gap-2">
