@@ -172,12 +172,19 @@ export async function getBooksData(startDate: string, endDate: string): Promise<
   // stock it bought is gone. Rows with no shipment_id (all history predating
   // shipments, plus manual adjustments) never match a voided id and pass
   // through untouched.
-  const costedUsage: CostedUsage[] = logs
-    .filter((l) => !l.shipment_id || !voidedShipmentIds.has(l.shipment_id))
-    .map((l) => ({
-      costType: getCostType(l.inventory_items),
-      value: (l.quantity ?? 0) * (l.unit_cost ?? getCostPrice(l.inventory_items)),
-    }));
+  // Kept as its own array, not folded straight into costedUsage's .map, so the
+  // monthly bucket loop further down can reuse the EXACT same filtered rows
+  // instead of re-deriving them with a second copy of this predicate. Two
+  // independent copies of "drop rows whose shipment was voided" is how the
+  // headline and the monthly chart drifted apart before: the headline picked
+  // this filter up and the month loop did not, so voiding an invoice zeroed
+  // the headline but left its stock reading as consumed forever in the trend.
+  const nonVoidedLogs = logs.filter((l) => !l.shipment_id || !voidedShipmentIds.has(l.shipment_id));
+
+  const costedUsage: CostedUsage[] = nonVoidedLogs.map((l) => ({
+    costType: getCostType(l.inventory_items),
+    value: (l.quantity ?? 0) * (l.unit_cost ?? getCostPrice(l.inventory_items)),
+  }));
 
   const rawExpenses: OperatingExpense[] = (operatingExpenses ?? []).map((e) => ({
     category: e.category as ExpenseCategory,
@@ -288,11 +295,18 @@ export async function getBooksData(startDate: string, endDate: string): Promise<
     monthMap.get(key)!.revenue += splitRevenue(d.total_sales ?? 0, taxConfig).net;
   }
 
-  for (const l of logs) {
+  // Same source array and the same unit_cost ?? cost_price valuation the
+  // headline (costedUsage, above) uses — see the comment on nonVoidedLogs.
+  // Freight/tax allocation (chargedUsage, above) is deliberately NOT added
+  // per month here: it would need each shipment's charges re-split across
+  // whichever month(s) its own lines land in, which this loop does not do.
+  // That is a pre-existing gap between this chart and the headline total,
+  // not something this fix introduces or was asked to close.
+  for (const l of nonVoidedLogs) {
     const dt  = new Date(l.logged_at as string);
     const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
     if (!monthMap.has(key)) monthMap.set(key, { revenue: 0, cogs: 0, labor: 0 });
-    monthMap.get(key)!.cogs += (l.quantity ?? 0) * getCostPrice(l.inventory_items);
+    monthMap.get(key)!.cogs += (l.quantity ?? 0) * (l.unit_cost ?? getCostPrice(l.inventory_items));
   }
 
   // Distribute labor evenly across months

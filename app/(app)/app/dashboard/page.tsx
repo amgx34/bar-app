@@ -126,7 +126,11 @@ export default async function DashboardPage() {
     supabase.from('usage_logs')
       // `reason` is selected because computeVelocity needs it to drop `pos_sale`
       // rows, which describe the same units as the POS sales feed below.
-      .select('item_id, quantity, reason')
+      // `shipment_id` is selected so computeVelocity can also drop a void's
+      // reversal row — reason: 'other', so the NON_CONSUMPTION_FILTER below
+      // (reason-based) does not catch it — from counting as consumption. See
+      // isShipmentBookkeeping in lib/pos/velocity.ts.
+      .select('item_id, quantity, reason, shipment_id')
       .eq('organization_id', orgId).not('reason', 'in', NON_CONSUMPTION_FILTER)
       .gte('logged_at', d30ago).limit(200),
     supabase.from('rep_orders')
@@ -249,6 +253,7 @@ export default async function DashboardPage() {
       itemId: l.item_id,
       quantity: Number(l.quantity) || 0,
       reason: l.reason,
+      shipmentId: l.shipment_id,
     })),
     30,
   );

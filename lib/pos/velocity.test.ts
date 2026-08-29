@@ -36,6 +36,9 @@ const sale = (matchKey: string, qtySold: number, netSales = 0): SalesFact =>
 const usage = (itemId: string, quantity: number, reason: string): UsageLogFact =>
   ({ itemId, quantity, reason });
 
+const shipmentUsage = (itemId: string, quantity: number, reason: string, shipmentId: string): UsageLogFact =>
+  ({ itemId, quantity, reason, shipmentId });
+
 describe('computeVelocity', () => {
   it('reports sales in STOCK units, not drinks', () => {
     const [v] = computeVelocity([vodka], [sale('well vodka', 185)], [], 30);
@@ -109,6 +112,35 @@ describe('computeVelocity', () => {
       30,
     );
     expect(v.unitsMoved).toBe(10);
+  });
+
+  it('excludes a void reversal from consumption even though its reason is not delivery/pos_reversal', () => {
+    // voidShipment() logs the reversal with reason: 'other' (deliberately not
+    // 'recount' or anything else NON_CONSUMPTION recognises by reason alone),
+    // linked back to the shipment it undid via shipment_id. Reason-only
+    // filtering would read a voided 40-case delivery as 40 cases of usage;
+    // the shipment_id link is what lets this be told apart from a genuine
+    // floor loss also logged as 'other'.
+    const [v] = computeVelocity(
+      [beer],
+      [sale('domestic bottle', 10)],
+      [shipmentUsage('i-beer', 40, 'other', 'ship-1')],
+      30,
+    );
+    expect(v.unitsMoved).toBe(10);
+  });
+
+  it('still counts a manual "other" adjustment with no shipment link as a loss', () => {
+    // Confirms the shipment_id check is additive, not a blanket exemption for
+    // reason: 'other' — stock-adjust-dialog.tsx uses 'other' for hand-logged
+    // adjustments unrelated to any shipment, and those must still count.
+    const [v] = computeVelocity(
+      [beer],
+      [sale('domestic bottle', 10)],
+      [usage('i-beer', 3, 'other')],
+      30,
+    );
+    expect(v.unitsMoved).toBe(13);
   });
 
   it('divides by the window length, not by days that had activity', () => {

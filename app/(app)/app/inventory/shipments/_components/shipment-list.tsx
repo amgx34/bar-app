@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Truck, Plus } from 'lucide-react';
+import { Truck, Plus, Ban } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/table';
 import type { ShipmentSummary } from '../../shipment-actions';
 import { LogShipmentDialog } from './log-shipment-dialog';
+import { VoidShipmentDialog } from './void-shipment-dialog';
 
 const money = (n: number) =>
   `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -55,6 +56,11 @@ export function ShipmentList({
   // the one client boundary on the screen already gated on `canEdit`, so the
   // dialog's open state and its trigger both live beside each other.
   const [dialogOpen, setDialogOpen] = useState(false);
+  // The shipment currently offered for voiding, or null when that dialog is
+  // closed. Held here (not per-row local state) because only one confirm can
+  // be open at a time and VoidShipmentDialog needs the full summary — vendor
+  // name and computedTotal — to name what it is about to reverse.
+  const [voidingShipment, setVoidingShipment] = useState<ShipmentSummary | null>(null);
 
   if (shipments.length === 0) {
     return (
@@ -155,9 +161,26 @@ export function ShipmentList({
                     </div>
                   )}
                 </TableCell>
-                <TableCell>
-                  {s.voided && (
+                <TableCell className="text-right">
+                  {s.voided ? (
                     <Badge variant="destructive">Voided</Badge>
+                  ) : (
+                    // Void is the ONLY way to correct a posted shipment (see
+                    // the header comment on ../../shipment-actions.ts) — gated
+                    // on canEdit like every other mutating control on this
+                    // screen, and hidden once a row is already voided since
+                    // voidShipment() itself refuses a second void.
+                    canEdit && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5 text-muted-foreground hover:text-destructive"
+                        onClick={() => setVoidingShipment(s)}
+                      >
+                        <Ban className="h-3.5 w-3.5" />
+                        Void
+                      </Button>
+                    )
                   )}
                 </TableCell>
               </TableRow>
@@ -167,6 +190,7 @@ export function ShipmentList({
       </Table>
       </div>
       <LogShipmentDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <VoidShipmentDialog shipment={voidingShipment} onClose={() => setVoidingShipment(null)} />
     </div>
   );
 }
