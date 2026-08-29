@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, TrendingDown, DollarSign, Truck, ShoppingCart }
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
+import type { ShipmentSummary } from '../shipment-actions';
 
 export type DashboardUsageLog = {
   item_id: string;
@@ -82,13 +83,19 @@ function RankedList({ entries, tone }: { entries: ChartEntry[]; tone: string }) 
  *
  * @param usageLogs - Array of usage log entries for inventory items.
  * @param items - Array of inventory items with current stock and cost price.
+ * @param shipments - Logged shipment documents (Task 5+), newest invoice
+ *   date first. Used only to upgrade the "Latest Shipment" panel from an
+ *   inference to the real vendor/total when one is available for that day —
+ *   see the comment on `latestRealShipment` below.
  */
 export function InventoryDashboard({
   usageLogs,
   items,
+  shipments,
 }: {
   usageLogs: DashboardUsageLog[];
   items: DashboardItem[];
+  shipments: ShipmentSummary[];
 }) {
   const [open, setOpen] = useState(true);
 
@@ -140,6 +147,47 @@ export function InventoryDashboard({
       })),
     };
   }, [usageLogs]);
+
+  // The grouped-by-day block above is an INFERENCE: before shipments were
+  // logged as their own documents, "the latest shipment" was just a guess
+  // built from usage_logs rows that happen to carry reason: 'delivery'. It
+  // has no vendor and no real invoice total, and it stays completely
+  // unchanged above so a bar that never logs a shipment — every delivery
+  // predating this feature, and any manual stock adjustment — keeps seeing
+  // exactly what it always has.
+  //
+  // When the org DOES log shipments, prefer the real document for the same
+  // calendar day: a shipment's own vendor and total, not a reconstruction.
+  // Matched by day rather than by shipment_id because usage_logs rows don't
+  // carry that id down to this component (only shipment-actions.ts does),
+  // and the invoice date is what a manager actually recognizes a delivery
+  // by. `shipments` only ever contains this org's rows (listShipments scopes
+  // it internally), so no further filtering is needed here beyond voided.
+  //
+  // Voided shipments are excluded up front: their stock was reversed and
+  // their money excluded from the books (see voidShipment in
+  // shipment-actions.ts), so presenting one as "the latest shipment" — with
+  // a vendor and a total that no longer count — would contradict both. A
+  // voided shipment simply never matches here; the day it covers falls back
+  // to the plain inference above, the same as any other day with no logged
+  // shipment.
+  const latestRealShipment = useMemo(() => {
+    if (!latestShipmentDate) return null;
+    const latestDeliveryDay = latestShipmentDate.slice(0, 10);
+    return shipments.find(s => !s.voided && s.invoiceDate === latestDeliveryDay) ?? null;
+  }, [shipments, latestShipmentDate]);
+
+  /**
+   * `invoiceDate` is YYYY-MM-DD with no time component. `new Date(iso)` reads
+   * that as UTC midnight, which prints as the day *before* in any timezone
+   * west of UTC — the same pitfall documented on the identical helper in
+   * shipments/_components/shipment-list.tsx. Splitting it out and building a
+   * local date sidesteps that entirely.
+   */
+  function formatInvoiceDate(iso: string): string {
+    const [y, m, d] = iso.split('-').map(Number);
+    return format(new Date(y, m - 1, d), 'MMM d, yyyy');
+  }
 
   // 12 characters in an 84px gutter cut almost every real bottle name down to
   // something unreadable — "Tito's Handmade Vodka" arrived as "Tito's Handm…",
@@ -283,6 +331,30 @@ export function InventoryDashboard({
             <CardContent className="pt-1">
               {!latestShipmentDate ? (
                 <p className="text-xs text-muted-foreground py-2">No deliveries recorded</p>
+              ) : latestRealShipment ? (
+                // A real shipment document exists for this day — show what it
+                // actually says (vendor, invoice total) instead of the
+                // reconstruction below. invoiceTotal is the number on the
+                // paper invoice when one was entered; computedTotal (line
+                // sum + freight/tax/other/deposits) is the fallback when it
+                // wasn't, so the card never has nothing to show.
+                <>
+                  <p className="text-xs text-muted-foreground mb-2.5">
+                    {formatInvoiceDate(latestRealShipment.invoiceDate)}
+                  </p>
+                  <p className="text-sm font-medium truncate">{latestRealShipment.vendorName}</p>
+                  {latestRealShipment.invoiceNumber && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Invoice #{latestRealShipment.invoiceNumber}
+                    </p>
+                  )}
+                  <p className="text-2xl font-bold tracking-tight tabular-nums mt-2">
+                    ${(latestRealShipment.invoiceTotal ?? latestRealShipment.computedTotal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {latestRealShipment.lineCount} item{latestRealShipment.lineCount !== 1 ? 's' : ''}
+                  </p>
+                </>
               ) : (
                 <>
                   <p className="text-xs text-muted-foreground mb-2.5">
