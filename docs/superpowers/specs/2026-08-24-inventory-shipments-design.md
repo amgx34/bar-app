@@ -1,6 +1,6 @@
 # Inventory shipments: logging what a delivery actually cost
 
-**Status:** DESIGNED (2026-08-24). Not built.
+**Status:** BUILT (2026-08-25).
 **Date:** 2026-08-24
 
 Log a liquor delivery as the invoice it is — vendor, invoice number, real line
