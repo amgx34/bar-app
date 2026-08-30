@@ -909,6 +909,14 @@ export interface DaySplitEmployee {
   role: string | null;
   hours: number;
   /**
+   * The two halves of `hours`, kept separate so a correction on this screen can
+   * prefill both. Collapsing them and offering only a total would let an
+   * operator save someone's overtime away without ever seeing it: the editor
+   * would show all their hours as regular and write that back.
+   */
+  regularHours: number;
+  overtimeHours: number;
+  /**
    * Which pool this person draws from, decided by the same function the pay run
    * uses. Never re-derived on the client from `role` alone — that is exactly
    * how this screen came to include managers and Not Tipped staff.
@@ -990,9 +998,14 @@ export async function getDaySplitData(date: string): Promise<DaySplitData | null
     if (!emp) continue;
     if (DAY_SPLIT_EXCLUDED.has(emp.name.toLowerCase().trim())) continue;
 
-    const hours = (shift.regular_hours as number || 0) + (shift.overtime_hours as number || 0);
+    const regularHours  = (shift.regular_hours as number) || 0;
+    const overtimeHours = (shift.overtime_hours as number) || 0;
+    const hours = regularHours + overtimeHours;
     if (empMap.has(emp.id)) {
-      empMap.get(emp.id)!.hours += hours;
+      const existing = empMap.get(emp.id)!;
+      existing.hours += hours;
+      existing.regularHours += regularHours;
+      existing.overtimeHours += overtimeHours;
     } else {
       const participant = { role: emp.role, tipMode: emp.tip_mode };
       empMap.set(emp.id, {
@@ -1000,6 +1013,8 @@ export async function getDaySplitData(date: string): Promise<DaySplitData | null
         name: emp.name,
         role: emp.role,
         hours,
+        regularHours,
+        overtimeHours,
         tipRole: classifyTipRole(participant),
         excludedReason: tipExclusionReason(participant),
         payType: normalizePayType(emp.pay_type),
