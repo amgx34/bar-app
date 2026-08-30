@@ -183,6 +183,13 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
     { label: 'Pure Profit',   value: data.pureProfit,      indent: false, border: true  },
   ];
 
+  // What the bottom line used to skip. Books printed a total that never
+  // subtracted these two, so an owner who knows the old figure will read the
+  // corrected one as a bad month rather than as a fix. Worth saying out loud
+  // for as long as anyone remembers the old number — see the note below the
+  // statement, which is safe to delete once nobody does.
+  const previouslyOmitted = data.supplies + data.operatingExpenses;
+
   return (
     <main className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -344,6 +351,17 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
                 </div>
               ))}
             </div>
+
+            {previouslyOmitted > 0 && (
+              <p className="mt-4 border-t pt-3 text-xs text-muted-foreground">
+                Pure Profit is after <strong>every</strong> cost on this page.
+                That now includes operating supplies ({fmtMoney(data.supplies)})
+                and operating expenses ({fmtMoney(data.operatingExpenses)}), which
+                this total used to list above but never subtract — so it reads{' '}
+                <strong>{fmtMoney(previouslyOmitted)} lower</strong> than it did
+                before. Your trade has not changed; the arithmetic has.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
