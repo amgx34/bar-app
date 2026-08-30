@@ -1,6 +1,6 @@
 import {
   Home, Package, CircleDollarSign, Receipt, Settings, BookOpen, Users,
-  Scale, ClipboardCheck, TrendingUp, CalendarRange, UserCog, Landmark, Layers,
+  Scale, ClipboardCheck, TrendingUp, UserCog, Landmark, Layers,
   Banknote, FileCheck2,
 } from 'lucide-react';
 
@@ -70,8 +70,9 @@ export const SECTIONS: NavSection[] = [
     group: 'People & Pay',
     root: { label: 'Payroll', href: '/app/payroll', icon: CircleDollarSign },
     tabs: [
-      { label: 'Pay Run',        href: '/app/payroll',                 icon: CircleDollarSign },
-      { label: 'Day Split',      href: '/app/payroll/split',           icon: CalendarRange },
+      // Day, week and month in one screen, switched by `?view=`. Day Split was
+      // a tab of its own until the two were merged.
+      { label: 'Pay Period',     href: '/app/payroll',                 icon: CircleDollarSign },
       { label: 'Employees',      href: '/app/payroll/employees',       icon: UserCog },
       { label: 'Direct Deposit', href: '/app/payroll/direct-deposit',  icon: Banknote },
       // Previously reachable only from a button on the pay run.

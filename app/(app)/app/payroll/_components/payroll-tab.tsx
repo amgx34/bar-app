@@ -14,10 +14,14 @@ import { cn } from '@/lib/utils';
 import type { WeeklyPoint } from './weekly-trend-chart';
 import ZReportTextUpload from './z-report-text-upload';
 import EmployeeShiftsUpload from './employee-shifts-upload';
+import { PeriodToggle } from './period-toggle';
+import { defaultPeriod, monthRange, shiftPeriod, todayIso, type PayrollView } from '@/lib/date-range';
 
 const WeeklyTrendChart = dynamic(() => import('./weekly-trend-chart'));
 
 interface PayrollTabProps {
+  /** 'week' or 'month'. The day view is the tip split, not this table. */
+  view: PayrollView;
   startDate: string;
   endDate: string;
   /** Owner/manager may correct hours and move tips; others see the run read-only. */
@@ -27,26 +31,33 @@ interface PayrollTabProps {
   weeklyTrend: WeeklyPoint[];
 }
 
-function addDays(dateStr: string, days: number): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(y, m - 1, d + days);
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-');
-}
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS_LONG = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
 
-function formatWeekLabel(start: string, end: string): string {
+/**
+ * What the navigator calls the period on screen.
+ *
+ * A month is named, not described: "Aug 1 – Aug 31, 2026" is the same
+ * information as "August 2026" and reads as an arbitrary range rather than
+ * the month it actually is.
+ */
+function formatPeriodLabel(view: PayrollView, start: string, end: string): string {
+  if (view === 'month') {
+    const [y, m] = start.split('-').map(Number);
+    return `${MONTHS_LONG[m - 1]} ${y}`;
+  }
   const s = new Date(start + 'T00:00:00');
   const e = new Date(end + 'T00:00:00');
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const sStr = `${months[s.getMonth()]} ${s.getDate()}`;
-  const eStr = `${months[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`;
+  const sStr = `${MONTHS[s.getMonth()]} ${s.getDate()}`;
+  const eStr = `${MONTHS[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`;
   return `${sStr} – ${eStr}`;
 }
 
 export default function PayrollTab({
+  view,
   startDate,
   endDate,
   payrollEntries,
@@ -71,12 +82,27 @@ export default function PayrollTab({
     { totalHours: 0, regularPay: 0, overtimePay: 0, tips: 0, totalCompensation: 0 }
   );
 
-  function navigateWeek(dir: 'prev' | 'next') {
-    const delta = dir === 'prev' ? -7 : 7;
-    const newStart = addDays(startDate, delta);
-    const newEnd = addDays(endDate, delta);
-    router.push(`/app/payroll?tab=payroll&startDate=${newStart}&endDate=${newEnd}`);
+  function navigatePeriod(dir: 'prev' | 'next') {
+    // Not `addDays(±7)` any more: stepping a month that way lands in the wrong
+    // month from the 29th onward. shiftPeriod knows which kind it is stepping.
+    const { start, end } = shiftPeriod(view, startDate, endDate, dir);
+    router.push(`/app/payroll?view=${view}&startDate=${start}&endDate=${end}`);
   }
+
+  const periodNoun = view === 'month' ? 'month' : 'week';
+
+  // Which night the Day view opens on when you switch to it. Today when today
+  // is inside the range you are looking at, otherwise the first of it — landing
+  // on today while browsing March would throw away the period you had chosen.
+  const today = todayIso();
+  const dayAnchor = today >= startDate && today <= endDate ? today : startDate;
+  const otherWeek = defaultPeriod('week', dayAnchor);
+  const otherMonth = monthRange(dayAnchor);
+  const hrefs: Record<PayrollView, string> = {
+    day: `/app/payroll?view=day&date=${dayAnchor}`,
+    week: `/app/payroll?view=week&startDate=${otherWeek.start}&endDate=${otherWeek.end}`,
+    month: `/app/payroll?view=month&startDate=${otherMonth.start}&endDate=${otherMonth.end}`,
+  };
 
   return (
     <div className="space-y-6">
@@ -92,7 +118,7 @@ export default function PayrollTab({
             </p>
           </div>
           <Link
-            href="/app/payroll?tab=employees"
+            href="/app/payroll/employees"
             className="shrink-0 text-sm font-medium text-yellow-900 underline underline-offset-2 hover:text-yellow-700 dark:text-yellow-100 dark:hover:text-yellow-50"
           >
             Configure →
@@ -120,16 +146,20 @@ export default function PayrollTab({
           each about 200-370px, so side by side they forced the page wider than
           the viewport and the whole of Payroll scrolled sideways. */}
       <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-8 w-8 p-0" aria-label="Previous week" onClick={() => navigateWeek('prev')}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-medium min-w-[170px] text-center">
-            {formatWeekLabel(startDate, endDate)}
-          </span>
-          <Button variant="outline" size="sm" className="h-8 w-8 p-0" aria-label="Next week" onClick={() => navigateWeek('next')}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <PeriodToggle view={view} hrefs={hrefs} />
+
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="h-8 w-8 p-0" aria-label={`Previous ${periodNoun}`} onClick={() => navigatePeriod('prev')}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-medium min-w-[170px] text-center">
+              {formatPeriodLabel(view, startDate, endDate)}
+            </span>
+            <Button variant="outline" size="sm" className="h-8 w-8 p-0" aria-label={`Next ${periodNoun}`} onClick={() => navigatePeriod('next')}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Manual date picker.
@@ -154,7 +184,7 @@ export default function PayrollTab({
             aria-label="End date"
             className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm sm:flex-none"
           />
-          <input type="hidden" name="tab" value="payroll" />
+          <input type="hidden" name="view" value={view} />
           <Button type="submit" size="sm" variant="secondary">
             Go
           </Button>
@@ -172,7 +202,7 @@ export default function PayrollTab({
           </CardHeader>
           <CardContent className="px-4 pb-4">
             <div className="text-2xl font-bold tabular-nums">{totals.totalHours.toFixed(1)}</div>
-            <p className="text-xs text-muted-foreground mt-0.5">hrs this week</p>
+            <p className="text-xs text-muted-foreground mt-0.5">hrs this {periodNoun}</p>
           </CardContent>
         </Card>
 

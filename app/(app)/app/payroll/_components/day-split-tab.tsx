@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { getDaySplitData, DaySplitData, DaySplitEmployee } from '../actions';
+import { getDaySplitData, computePayroll, DaySplitData, DaySplitEmployee } from '../actions';
+import { defaultPeriod, monthRange, type PayrollView } from '@/lib/date-range';
+import { PeriodToggle } from './period-toggle';
 import { openerBonus, type OpenerBonusConfig } from '@/lib/payroll/adjustments';
 import { splitBarbackTips, type BarbackSplitMethod, type BarbackTier } from '@/lib/payroll/tip-pool';
 import { CashTipsButton } from './cash-tips-card';
@@ -148,10 +150,51 @@ function describeBonus(type: OpenerBonusConfig['type'], value: number): string {
   return `${value} extra paid hours — paid by the bar, not from tips`;
 }
 
+// ── What this night cost in wages ──────────────────────────────────────────────
+
+interface NightPay {
+  hours: number;
+  wages: number;
+  tips: number;
+  total: number;
+}
+
+/**
+ * Totals one night's pay run.
+ *
+ * `computePayroll` over a single date is the SAME engine the week and month
+ * views run, so these figures cannot drift from the pay run the way a second
+ * hand-rolled calculation would.
+ *
+ * One thing it cannot tell you: overtime. The engine buckets hours per calendar
+ * week (`splitWeeklyOvertime`), so a night computed on its own never crosses the
+ * 40-hour line and never earns a premium — even when the week around it does.
+ * `wages` is therefore what these hours are worth at base rate, and the strip
+ * says so rather than calling it total pay.
+ */
+function sumNightPay(entries: { totalHours: number; regularPay: number; overtimePay: number; tipAmount: number }[]): NightPay {
+  return entries.reduce<NightPay>(
+    (acc, e) => ({
+      hours: acc.hours + e.totalHours,
+      wages: acc.wages + e.regularPay + e.overtimePay,
+      tips: acc.tips + e.tipAmount,
+      total: acc.total + e.regularPay + e.overtimePay + e.tipAmount,
+    }),
+    { hours: 0, wages: 0, tips: 0, total: 0 },
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function DaySplitTab({ canEdit = false }: { canEdit?: boolean }) {
-  const [date, setDate] = useState(toLocalDateStr(new Date()));
+export default function DaySplitTab({
+  canEdit = false,
+  initialDate,
+}: {
+  canEdit?: boolean;
+  /** The night a `?date=` link named, so a shared URL opens on that night. */
+  initialDate?: string;
+}) {
+  const [date, setDate] = useState(initialDate ?? toLocalDateStr(new Date()));
   const [states, setStates] = useState<Record<string, RowState>>({});
   // Bumped after cash tips are logged, so the split below re-reads the total it
   // is derived from rather than showing a figure that is now stale.
@@ -161,9 +204,16 @@ export default function DaySplitTab({ canEdit = false }: { canEdit?: boolean }) 
   // rather than set synchronously in the effect body — three setState calls
   // before the fetch even started was three extra renders on every date change.
   const [result, setResult] = useState<{ date: string; data: DaySplitData | null } | null>(null);
+  // Same shape, same reason: carrying the date means a stale response for the
+  // night you just navigated away from cannot paint over the current one.
+  const [pay, setPay] = useState<{ date: string; data: NightPay | null } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+
+    // In parallel. The pay figures are a strip above the split, not something
+    // the split waits on, and serialising them would double the time the whole
+    // screen sits empty on every arrow press.
     getDaySplitData(date).then((d) => {
       if (cancelled) return;
       setResult({ date, data: d });
@@ -175,12 +225,38 @@ export default function DaySplitTab({ canEdit = false }: { canEdit?: boolean }) 
       });
       setStates(init);
     });
+
+    computePayroll(date, date)
+      .then((entries) => {
+        if (!cancelled) setPay({ date, data: sumNightPay(entries) });
+      })
+      // A failed pay run must not take the tip split down with it: the split is
+      // what this screen is for, and it needs none of these numbers.
+      .catch(() => { if (!cancelled) setPay({ date, data: null }); });
+
     return () => { cancelled = true; };
   }, [date, refresh]);
 
   const loading = result?.date !== date;
   const data    = loading ? null : result?.data ?? null;
   const noData  = !loading && data === null;
+
+  // Independent of the split above: the two requests land separately, and the
+  // strip should appear as soon as its own answer does.
+  const nightPay = pay?.date === date ? pay.data : null;
+
+  // Where Week and Month go from here. Built from the night on screen rather
+  // than from today, so switching period keeps you near the night you were
+  // looking at instead of snapping to the current week.
+  const hrefs = useMemo(() => {
+    const week  = defaultPeriod('week', date);
+    const month = monthRange(date);
+    return {
+      day:   `/app/payroll?view=day&date=${date}`,
+      week:  `/app/payroll?view=week&startDate=${week.start}&endDate=${week.end}`,
+      month: `/app/payroll?view=month&startDate=${month.start}&endDate=${month.end}`,
+    } satisfies Record<PayrollView, string>;
+  }, [date]);
 
   const toggleActive = (id: string) =>
     setStates((s) => ({ ...s, [id]: { ...s[id], active: !s[id]?.active } }));
@@ -219,6 +295,11 @@ export default function DaySplitTab({ canEdit = false }: { canEdit?: boolean }) 
 
   return (
     <div className="space-y-6">
+      {/* Period switcher. Its own row rather than sharing the date nav's: the
+          date nav already runs to four controls, and on a phone a fifth pushed
+          the cash-tips button onto a line of its own anyway. */}
+      <PeriodToggle view="day" hrefs={hrefs} />
+
       {/* Date nav */}
       <div className="flex flex-wrap items-center gap-3">
         <button aria-label="Previous day" onClick={() => setDate(addDays(date, -1))} className="flex h-8 w-8 items-center justify-center rounded-md border hover:bg-muted transition-colors">
@@ -246,6 +327,36 @@ export default function DaySplitTab({ canEdit = false }: { canEdit?: boolean }) 
           />
         </div>
       </div>
+
+      {/* What the night cost. Sits above the tip split because it answers the
+          other question an operator has at close — the split says who gets
+          what, this says what the night is worth in total. */}
+      {nightPay && nightPay.hours > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-xl border bg-card p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Hours</p>
+            <p className="text-2xl font-bold tabular-nums mt-1">{nightPay.hours.toFixed(1)}</p>
+          </div>
+          <div className="rounded-xl border bg-card p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Wages</p>
+            <p className="text-2xl font-bold tabular-nums mt-1">${nightPay.wages.toFixed(2)}</p>
+          </div>
+          <div className="rounded-xl border bg-card p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Tips</p>
+            <p className="text-2xl font-bold tabular-nums mt-1">${nightPay.tips.toFixed(2)}</p>
+          </div>
+          <div className="rounded-xl border bg-primary/5 p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Night Total</p>
+            <p className="text-2xl font-bold tabular-nums mt-1 text-primary">${nightPay.total.toFixed(2)}</p>
+          </div>
+          {/* Said plainly rather than left for somebody to discover by adding
+              up seven nights and finding they miss the week. */}
+          <p className="col-span-2 text-xs text-muted-foreground sm:col-span-4">
+            Wages are at base rate — overtime is worked out across the whole week,
+            so it shows on the Week and Month views rather than on one night.
+          </p>
+        </div>
+      )}
 
       {/* Loading */}
       {loading && <p className="text-sm text-muted-foreground">Loading…</p>}

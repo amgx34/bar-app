@@ -106,6 +106,7 @@ export async function loadWeeklyTrend(): Promise<
  */
 export const LEGACY_TAB_ROUTES: Record<string, string> = {
   employees: '/app/payroll/employees',
-  split: '/app/payroll/split',
+  // The day view of the pay period screen, not a route of its own any more.
+  split: '/app/payroll?view=day',
   'direct-deposit': '/app/payroll/direct-deposit',
 };

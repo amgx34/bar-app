@@ -1,27 +1,21 @@
-import type { Metadata } from 'next';
-import { Suspense } from 'react';
-import { getCurrentOrg } from '@/lib/org';
-import { canManagePayroll } from '@/lib/permissions';
-import DaySplitTab from '../_components/day-split-tab';
+import { redirect } from 'next/navigation';
+import { isIsoDate } from '@/lib/date-range';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = { title: 'Day Split' };
-
 /**
- * Splitting one night's tips between the people who worked it.
+ * The Day Split's old home.
  *
- * Loads nothing here: the component fetches per-date on the client, because the
- * operator moves between nights far more often than they arrive at the page.
+ * It is the day view of `/app/payroll` now, so this route only forwards. Kept
+ * rather than deleted because the path has been in the sidebar, in bookmarks
+ * and in links sent to staff — the same reason `LEGACY_TAB_ROUTES` exists.
  */
-export default async function DaySplitPage() {
-  const { role } = await getCurrentOrg();
-
-  return (
-    <div className="p-5 sm:p-6">
-      <Suspense fallback={<div>Loading…</div>}>
-        <DaySplitTab canEdit={canManagePayroll(role)} />
-      </Suspense>
-    </div>
-  );
+export default async function DaySplitRedirect({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const params = await searchParams;
+  const date = isIsoDate(params.date) ? `&date=${params.date}` : '';
+  redirect(`/app/payroll?view=day${date}`);
 }

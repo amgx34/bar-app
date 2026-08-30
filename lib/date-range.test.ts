@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   resolveDateRange, addDays, isIsoDate, todayIso, resolvePayPeriod,
   payPeriodFromParams, payRunHref,
+  resolvePayrollView, monthRange, defaultPeriod, shiftPeriod,
 } from './date-range';
 
 const TODAY = '2026-08-20';
@@ -182,5 +183,98 @@ describe('payRunHref', () => {
   it('drops a malformed period rather than passing it on', () => {
     expect(payRunHref('/app/payroll/review', 'banana', 'kiwi'))
       .toBe('/app/payroll/review');
+  });
+});
+
+describe('resolvePayrollView', () => {
+  it('takes the three real views', () => {
+    expect(resolvePayrollView('day')).toBe('day');
+    expect(resolvePayrollView('week')).toBe('week');
+    expect(resolvePayrollView('month')).toBe('month');
+  });
+
+  it('falls back to the day for anything else', () => {
+    // These all arrive off a query string, where a stale bookmark or a typo is
+    // ordinary and an error screen is not an acceptable answer.
+    expect(resolvePayrollView('banana')).toBe('day');
+    expect(resolvePayrollView(undefined)).toBe('day');
+    expect(resolvePayrollView(null)).toBe('day');
+    expect(resolvePayrollView(['day', 'week'])).toBe('day');
+  });
+});
+
+describe('monthRange', () => {
+  it('spans the whole calendar month', () => {
+    expect(monthRange('2026-08-20')).toEqual({ start: '2026-08-01', end: '2026-08-31' });
+  });
+
+  it('handles a 30-day month and a short February', () => {
+    expect(monthRange('2026-09-15')).toEqual({ start: '2026-09-01', end: '2026-09-30' });
+    expect(monthRange('2026-02-10')).toEqual({ start: '2026-02-01', end: '2026-02-28' });
+  });
+
+  it('handles a leap February', () => {
+    expect(monthRange('2028-02-10')).toEqual({ start: '2028-02-01', end: '2028-02-29' });
+  });
+
+  it('is stable on the first and last day of the month', () => {
+    expect(monthRange('2026-08-01')).toEqual({ start: '2026-08-01', end: '2026-08-31' });
+    expect(monthRange('2026-08-31')).toEqual({ start: '2026-08-01', end: '2026-08-31' });
+  });
+});
+
+describe('defaultPeriod', () => {
+  // 2026-08-20 is a Thursday.
+  it('gives the Monday-to-Sunday week around today', () => {
+    expect(defaultPeriod('week', TODAY)).toEqual({ start: '2026-08-17', end: '2026-08-23' });
+  });
+
+  it('counts Sunday as the END of its week, not the start of the next', () => {
+    // A bar's Sunday trade is the tail of the week just worked. Getting this
+    // wrong pays Sunday into the following pay run.
+    expect(defaultPeriod('week', '2026-08-23')).toEqual({ start: '2026-08-17', end: '2026-08-23' });
+    expect(defaultPeriod('week', '2026-08-24')).toEqual({ start: '2026-08-24', end: '2026-08-30' });
+  });
+
+  it('gives the week for the day view too, so Run Payroll has a period', () => {
+    expect(defaultPeriod('day', TODAY)).toEqual({ start: '2026-08-17', end: '2026-08-23' });
+  });
+
+  it('gives the calendar month for the month view', () => {
+    expect(defaultPeriod('month', TODAY)).toEqual({ start: '2026-08-01', end: '2026-08-31' });
+  });
+});
+
+describe('shiftPeriod', () => {
+  it('steps a week by seven days', () => {
+    expect(shiftPeriod('week', '2026-08-17', '2026-08-23', 'next'))
+      .toEqual({ start: '2026-08-24', end: '2026-08-30' });
+    expect(shiftPeriod('week', '2026-08-17', '2026-08-23', 'prev'))
+      .toEqual({ start: '2026-08-10', end: '2026-08-16' });
+  });
+
+  it('steps a day by one night', () => {
+    expect(shiftPeriod('day', '2026-08-20', '2026-08-20', 'next'))
+      .toEqual({ start: '2026-08-21', end: '2026-08-21' });
+  });
+
+  it('steps a month to the next month, not 30 days on', () => {
+    expect(shiftPeriod('month', '2026-08-01', '2026-08-31', 'next'))
+      .toEqual({ start: '2026-09-01', end: '2026-09-30' });
+  });
+
+  it('does not skip February on the way past a 31-day month', () => {
+    // The bug this replaces: addDays(±30) from January 31st lands in March.
+    expect(shiftPeriod('month', '2026-01-01', '2026-01-31', 'next'))
+      .toEqual({ start: '2026-02-01', end: '2026-02-28' });
+    expect(shiftPeriod('month', '2026-03-01', '2026-03-31', 'prev'))
+      .toEqual({ start: '2026-02-01', end: '2026-02-28' });
+  });
+
+  it('crosses the year boundary in both directions', () => {
+    expect(shiftPeriod('month', '2026-12-01', '2026-12-31', 'next'))
+      .toEqual({ start: '2027-01-01', end: '2027-01-31' });
+    expect(shiftPeriod('month', '2026-01-01', '2026-01-31', 'prev'))
+      .toEqual({ start: '2025-12-01', end: '2025-12-31' });
   });
 });

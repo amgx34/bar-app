@@ -137,3 +137,92 @@ export function payRunHref(path: string, rawStart: unknown, rawEnd: unknown): st
   if (!period) return path;
   return `${path}?startDate=${period.start}&endDate=${period.end}`;
 }
+
+// ── Payroll period views ──────────────────────────────────────────────────────
+
+/**
+ * Which period the Payroll screen is showing.
+ *
+ * Day is the default because the operator's daily job is splitting one night's
+ * tips; the week and month are what they look at on pay day, which is once.
+ */
+export type PayrollView = 'day' | 'week' | 'month';
+
+const PAYROLL_VIEWS: PayrollView[] = ['day', 'week', 'month'];
+
+/**
+ * The view a query string names, defaulting to the day.
+ *
+ * Anything unrecognised falls back rather than erroring — `?view=` comes off a
+ * URL, where a typo or a stale bookmark is ordinary, and the day view is a
+ * correct answer to "which period" when the URL cannot say.
+ */
+export function resolvePayrollView(raw: unknown): PayrollView {
+  return PAYROLL_VIEWS.includes(raw as PayrollView) ? (raw as PayrollView) : 'day';
+}
+
+/**
+ * The calendar month containing `iso`, inclusive at both ends.
+ *
+ * A calendar month, not a rolling 30 days: payroll is reconciled against months
+ * that have names, and "August" has to mean the 1st to the 31st or it does not
+ * tie out against anything the bar's accountant has.
+ *
+ * UTC throughout, for the reason at the top of this file — `report_date` is
+ * already the bar's own idea of the night, and local-time arithmetic here would
+ * put the 1st of the month in the previous one for half the world.
+ */
+export function monthRange(iso: string): { start: string; end: string } {
+  const [y, m] = iso.split('-').map(Number);
+  const start = new Date(Date.UTC(y, m - 1, 1));
+  // Day 0 of the NEXT month is the last day of this one, which is what makes
+  // February and the leap year fall out for free rather than needing a table.
+  const end = new Date(Date.UTC(y, m, 0));
+  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+}
+
+/**
+ * The default period for a view, given today.
+ *
+ * The week is Monday–Sunday and matches `defaultWeek()` in the payroll route's
+ * `_shared.ts`; Sunday belongs to the week that preceded it, because a bar's
+ * Sunday trade is the tail of the week just worked, not the head of the next.
+ */
+export function defaultPeriod(view: PayrollView, today: string): { start: string; end: string } {
+  if (view === 'month') return monthRange(today);
+
+  const [y, m, d] = today.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const day = dt.getUTCDay();
+  const start = addDays(today, -(day === 0 ? 6 : day - 1));
+  // The day view still carries a period so that Run Payroll, and a switch to
+  // the week, land on the week the night being split belongs to.
+  return { start, end: addDays(start, 6) };
+}
+
+/**
+ * The next or previous period of the same kind.
+ *
+ * Stepping a month by adding days is what puts you in the wrong month on the
+ * 31st, so the month case rebuilds the range from the month number instead.
+ * The day view steps a single night, which is what its arrows have always done.
+ */
+export function shiftPeriod(
+  view: PayrollView,
+  start: string,
+  end: string,
+  dir: 'prev' | 'next',
+): { start: string; end: string } {
+  const delta = dir === 'prev' ? -1 : 1;
+
+  if (view === 'month') {
+    const [y, m] = start.split('-').map(Number);
+    // Anchored on the 1st: month arithmetic from the 31st would skip February
+    // entirely, since there is no 31st to land on.
+    const anchor = new Date(Date.UTC(y, m - 1 + delta, 1)).toISOString().slice(0, 10);
+    return monthRange(anchor);
+  }
+
+  const step = view === 'day' ? delta : delta * 7;
+  return { start: addDays(start, step), end: addDays(end, step) };
+}
