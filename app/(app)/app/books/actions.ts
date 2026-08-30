@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
 import { computePayroll } from '../payroll/actions';
-import { computeProfit, salesTaxFromSettings, splitRevenue } from '@/lib/books/sales-tax';
+import { salesTaxFromSettings, splitRevenue } from '@/lib/books/sales-tax';
 import {
   summariseCosts, buildProfitAndLoss, expandRecurring,
   type CostedUsage, type CostType, type OperatingExpense, type ExpenseCategory,
@@ -43,10 +43,10 @@ export type BooksData = {
   cogs: number;
   grossProfit: number;
   totalLabor: number;
-  netOperating: number;
   totalLosses: number;
-  netProfit: number;
-  netProfitPct: number;
+  /** Net revenue with every deduction taken out — what the bar actually kept. */
+  pureProfit: number;
+  pureProfitPct: number | null;
   /** Beverage cost of sales only — the figure pour cost is measured on. */
   beverageCogs: number;
   foodCogs: number;
@@ -170,19 +170,17 @@ export async function getBooksData(startDate: string, endDate: string): Promise<
 
   // Sales tax comes off the top before anything else. It is a liability the bar
   // is holding, not income — leaving it in would inflate revenue, gross profit,
-  // every margin percentage, and the net figure an owner judges the month by.
-  const profit = computeProfit(reportedSales, cogs, totalLabor, taxConfig);
-  const revenue = profit.netRevenue;
+  // every margin percentage, and the profit an owner judges the month by.
+  const split = splitRevenue(reportedSales, taxConfig);
+  const revenue = split.net;
 
-  // The full hospitality line: COGS above gross profit, supplies and overheads
-  // below it, so pour cost stays comparable to an industry benchmark.
-  const pnl = buildProfitAndLoss(profit.netRevenue, costs, totalLabor, totalLosses);
+  // The whole statement, from one function. There used to be two — this route
+  // called buildProfitAndLoss AND a shorter computeProfit, displayed the
+  // shorter one's bottom line under the longer one's rows, and so reported
+  // profit high by exactly supplies plus operating expenses.
+  const pnl = buildProfitAndLoss(revenue, costs, totalLabor, totalLosses);
 
-  const grossProfit  = profit.grossProfit;
-  // Losses are deducted here but not inside computeProfit, which models the
-  // standard revenue - COGS - labour line. Voids and comps are a separate
-  // operational leak that this page reports on its own terms.
-  const netOperating = grossProfit - totalLabor - totalLosses;
+  const grossProfit = pnl.grossProfit;
 
   // Monthly buckets
   const monthMap = new Map<string, { revenue: number; cogs: number; labor: number }>();
@@ -229,13 +227,13 @@ export async function getBooksData(startDate: string, endDate: string): Promise<
     expensesByCategory: costs.expensesByCategory,
     pourCostPct: pnl.pourCostPct,
     foodCostPct: pnl.foodCostPct,
-    grossTakings: profit.grossTakings,
-    salesTax: profit.salesTax,
+    grossTakings: split.gross,
+    salesTax: split.tax,
     salesTaxRatePct: taxConfig.ratePct,
-    taxConfigured: profit.taxConfigured,
-    netProfit: profit.netProfit,
-    netProfitPct: profit.netProfitPct,
-    revenue, tips, cogs, grossProfit, totalLabor, netOperating, totalLosses,
+    taxConfigured: split.configured,
+    pureProfit: pnl.pureProfit,
+    pureProfitPct: pnl.pureProfitPct,
+    revenue, tips, cogs, grossProfit, totalLabor, totalLosses,
     lossesBreakdown, monthlyData,
     grossMarginPct: revenue > 0 ? (grossProfit / revenue) * 100 : 0,
     laborPct:       revenue > 0 ? (totalLabor  / revenue) * 100 : 0,

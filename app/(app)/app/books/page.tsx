@@ -3,12 +3,13 @@ import dynamicImport from 'next/dynamic';
 import Link from 'next/link';
 import {
   BookOpen, TrendingUp, TrendingDown,
-  DollarSign, Users, Calculator, Percent, Landmark,
+  DollarSign, Users, Percent, Landmark,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getBooksData } from './actions';
 import { listExpenses } from './expense-actions';
 import { ExpensesPanel } from './_components/expenses-panel';
+import { PureProfitBand } from './_components/pure-profit-band';
 import { getCurrentOrg } from '@/lib/org';
 import { canEditInventory } from '@/lib/permissions';
 import { BENCHMARKS, judgeAgainstBenchmark } from '@/lib/books/cost-structure';
@@ -149,13 +150,6 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
       icon:  Users,
       color: 'text-rose-600',
     },
-    {
-      label: 'Net Operating',
-      value: fmtMoney(data.netOperating),
-      sub:   'after COGS + labor + losses',
-      icon:  Calculator,
-      color: data.netOperating >= 0 ? 'text-primary' : 'text-destructive',
-    },
   ];
 
   // Sales tax comes off the top, above COGS. It is not a cost of doing
@@ -184,7 +178,9 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
       ? [{ label: '− Operating expenses', value: -data.operatingExpenses, indent: true, border: false }]
       : []),
     { label: '− Losses',      value: -data.totalLosses,    indent: true,  border: false },
-    { label: 'Net Operating', value: data.netOperating,    indent: false, border: true  },
+    // Every row above is now actually subtracted from this one. It previously
+    // was not: supplies and operating expenses were listed and then skipped.
+    { label: 'Pure Profit',   value: data.pureProfit,      indent: false, border: true  },
   ];
 
   return (
@@ -214,6 +210,20 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
           ))}
         </div>
       </div>
+
+      {/* The answer to the question Books is opened to ask, above the inputs
+          that produce it. */}
+      <PureProfitBand
+        pureProfit={data.pureProfit}
+        pureProfitPct={data.pureProfitPct}
+        revenue={data.revenue}
+        cogs={data.cogs}
+        supplies={data.supplies}
+        labor={data.totalLabor}
+        operatingExpenses={data.operatingExpenses}
+        losses={data.totalLosses}
+        taxConfigured={data.taxConfigured}
+      />
 
       {/* KPI cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

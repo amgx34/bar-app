@@ -150,14 +150,23 @@ export type ProfitAndLoss = {
   labor: number;
   operatingExpenses: number;
   otherLosses: number;
-  netOperating: number;
+  /**
+   * What the bar actually kept: net revenue with every deduction taken out.
+   *
+   * One name, used from here to the screen. It was `netOperating` here and
+   * `netOperating` again in the Books route, where a SECOND, shorter
+   * calculation had quietly taken the name — so the page printed a figure that
+   * skipped supplies and operating expenses under a heading that promised
+   * otherwise.
+   */
+  pureProfit: number;
 
   /** Beverage cost as a share of net revenue — the benchmarked figure. */
   pourCostPct: number | null;
   foodCostPct: number | null;
   grossMarginPct: number | null;
   laborPct: number | null;
-  netOperatingPct: number | null;
+  pureProfitPct: number | null;
 };
 
 export function buildProfitAndLoss(
@@ -167,7 +176,10 @@ export function buildProfitAndLoss(
   otherLosses: number,
 ): ProfitAndLoss {
   const grossProfit = netRevenue - costs.totalCogs;
-  const netOperating =
+  // Every deduction, in one place. Supplies and operating expenses belong here
+  // as much as labour does — they are below gross profit so they cannot distort
+  // pour cost, not because they are optional.
+  const pureProfit =
     grossProfit - costs.supplies - labor - costs.totalExpenses - otherLosses;
 
   // Null rather than 0 when there is no revenue: "0% pour cost" reads as
@@ -184,12 +196,12 @@ export function buildProfitAndLoss(
     labor: round2(labor),
     operatingExpenses: costs.totalExpenses,
     otherLosses: round2(otherLosses),
-    netOperating: round2(netOperating),
+    pureProfit: round2(pureProfit),
     pourCostPct: pct(costs.beverageCogs),
     foodCostPct: costs.foodCogs > 0 ? pct(costs.foodCogs) : null,
     grossMarginPct: pct(grossProfit),
     laborPct: pct(labor),
-    netOperatingPct: pct(netOperating),
+    pureProfitPct: pct(pureProfit),
   };
 }
 

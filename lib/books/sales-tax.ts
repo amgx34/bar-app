@@ -6,6 +6,16 @@
  * every figure downstream — gross profit, margin percentage, and the net
  * operating number an owner uses to decide whether the month worked.
  *
+ * SCOPE
+ *
+ * This module splits a reported figure into revenue and tax, and nothing else.
+ * It used to also assemble a profit line — `computeProfit`, revenue minus COGS
+ * minus labour — which duplicated `buildProfitAndLoss` in cost-structure.ts
+ * while omitting supplies and operating expenses. Books wired the shorter one
+ * into a statement that listed the longer one's rows, so the column did not add
+ * up and profit read high by exactly the costs it had skipped. One statement
+ * function now: this file stops at the tax line.
+ *
  * Nothing here guesses. The rate and the tax treatment of the POS figures are
  * both explicit settings, and when either is unset the split is reported as
  * unknown rather than assumed. Assuming would be worse than silence: an owner
@@ -99,56 +109,6 @@ export function salesTaxFromSettings(settings: {
       typeof settings.pos_prices_include_tax === 'boolean'
         ? settings.pos_prices_include_tax
         : null,
-  };
-}
-
-export type ProfitBreakdown = {
-  grossTakings: number | null;
-  salesTax: number | null;
-  netRevenue: number;
-  cogs: number;
-  grossProfit: number;
-  labor: number;
-  netProfit: number;
-  /** Percentages are always of NET revenue, never of takings that include tax. */
-  grossMarginPct: number;
-  laborPct: number;
-  netProfitPct: number;
-  taxConfigured: boolean;
-};
-
-/**
- * The whole line, from what came through the till to what the bar keeps.
- *
- * Every percentage is computed against net revenue. Using gross would flatter
- * each one by the tax rate and make two bars in different states look different
- * when they are trading identically.
- */
-export function computeProfit(
-  reportedSales: number,
-  cogs: number,
-  labor: number,
-  config: SalesTaxConfig,
-): ProfitBreakdown {
-  const split = splitRevenue(reportedSales, config);
-  const netRevenue = split.net;
-  const grossProfit = netRevenue - cogs;
-  const netProfit = grossProfit - labor;
-
-  const pct = (n: number) => (netRevenue > 0 ? (n / netRevenue) * 100 : 0);
-
-  return {
-    grossTakings: split.gross,
-    salesTax: split.tax,
-    netRevenue: round2(netRevenue),
-    cogs: round2(cogs),
-    grossProfit: round2(grossProfit),
-    labor: round2(labor),
-    netProfit: round2(netProfit),
-    grossMarginPct: pct(grossProfit),
-    laborPct: pct(labor),
-    netProfitPct: pct(netProfit),
-    taxConfigured: split.configured,
   };
 }
 
