@@ -13,8 +13,11 @@ export default function BooksLoading() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+      {/* Pure profit band, then the six inputs behind it. */}
+      <Skeleton className="h-40 rounded-xl" />
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">

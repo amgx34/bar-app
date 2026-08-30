@@ -168,7 +168,16 @@ export default function PayrollTab({
             the whole document to 682px wide — the entire payroll page scrolled
             sideways. It wraps now, and the inputs share the row so the pair
             still reads as one range. */}
-        <form method="GET" className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+        {/* Keyed on the range so the inputs remount when it changes.
+            They are uncontrolled, and a client navigation between views does
+            not re-mount the component — so switching Week to Month left the
+            boxes showing the week's dates next to a heading that said August,
+            and pressing Go silently reverted you to the week. */}
+        <form
+          key={`${startDate}:${endDate}`}
+          method="GET"
+          className="flex w-full flex-wrap items-center gap-2 sm:w-auto"
+        >
           <input
             type="date"
             name="startDate"

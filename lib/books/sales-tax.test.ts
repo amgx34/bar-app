@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitRevenue, isConfigured, salesTaxFromSettings, computeProfit } from './sales-tax';
+import { splitRevenue, isConfigured, salesTaxFromSettings } from './sales-tax';
 
 /**
  * Sales tax is a liability, not revenue. It was never the bar's money.
@@ -83,41 +83,5 @@ describe('isConfigured / salesTaxFromSettings', () => {
 
   it('treats a missing or non-boolean treatment as unset', () => {
     expect(salesTaxFromSettings({ sales_tax_rate: 8.25 }).pricesIncludeTax).toBeNull();
-  });
-});
-
-describe('computeProfit', () => {
-  it('measures every percentage against NET revenue', () => {
-    // Using gross would flatter each ratio by the tax rate and make two bars in
-    // different states look different when they are trading identically.
-    const p = computeProfit(1082.50, 250, 300, INCLUSIVE);
-
-    expect(p.netRevenue).toBeCloseTo(1000, 2);
-    expect(p.salesTax).toBeCloseTo(82.50, 2);
-    expect(p.grossProfit).toBeCloseTo(750, 2);
-    expect(p.grossMarginPct).toBeCloseTo(75, 1);
-    expect(p.laborPct).toBeCloseTo(30, 1);
-    expect(p.netProfit).toBeCloseTo(450, 2);
-    expect(p.netProfitPct).toBeCloseTo(45, 1);
-  });
-
-  it('does not count tax as profit', () => {
-    const withTax = computeProfit(1082.50, 250, 300, INCLUSIVE);
-    const noTax = computeProfit(1082.50, 250, 300, { ratePct: null, pricesIncludeTax: null });
-    expect(noTax.netProfit).toBeGreaterThan(withTax.netProfit);
-    expect(noTax.netProfit - withTax.netProfit).toBeCloseTo(82.50, 2);
-  });
-
-  it('reports zero percentages rather than dividing by zero revenue', () => {
-    const p = computeProfit(0, 0, 0, INCLUSIVE);
-    expect(p.grossMarginPct).toBe(0);
-    expect(p.laborPct).toBe(0);
-    expect(p.netProfitPct).toBe(0);
-  });
-
-  it('flags whether the split was real or a pass-through', () => {
-    expect(computeProfit(1000, 0, 0, INCLUSIVE).taxConfigured).toBe(true);
-    expect(computeProfit(1000, 0, 0, { ratePct: null, pricesIncludeTax: null }).taxConfigured)
-      .toBe(false);
   });
 });

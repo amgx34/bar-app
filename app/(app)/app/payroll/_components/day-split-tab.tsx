@@ -8,6 +8,7 @@ import { PeriodToggle } from './period-toggle';
 import { openerBonus, type OpenerBonusConfig } from '@/lib/payroll/adjustments';
 import { splitBarbackTips, type BarbackSplitMethod, type BarbackTier } from '@/lib/payroll/tip-pool';
 import { CashTipsButton } from './cash-tips-card';
+import { DayHoursDialog } from './day-hours-dialog';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -184,6 +185,42 @@ function sumNightPay(entries: { totalHours: number; regularPay: number; overtime
   );
 }
 
+/**
+ * The hours cell, editable or not.
+ *
+ * One component for all three groups. Bartenders, barbacks and the people who
+ * are not in the pool are all PAID for their hours — only the tip split treats
+ * them differently — so a correction has to be reachable everywhere the figure
+ * appears, and the three must not drift apart.
+ */
+function HoursCell({
+  employee,
+  canEdit,
+  onEdit,
+}: {
+  employee: DaySplitEmployee;
+  canEdit: boolean;
+  onEdit: (employee: DaySplitEmployee) => void;
+}) {
+  if (!canEdit) {
+    return <span className="tabular-nums text-muted-foreground">{employee.hours.toFixed(2)}</span>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onEdit(employee)}
+      aria-label={`Adjust ${employee.name}'s hours`}
+      // Underlined rather than made to look like a button: it sits in a numeric
+      // column, and a button there would read as an action on the row instead
+      // of on the figure itself.
+      className="rounded-sm tabular-nums underline decoration-dotted decoration-muted-foreground/50 underline-offset-4 transition-colors hover:text-primary hover:decoration-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {employee.hours.toFixed(2)}
+    </button>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function DaySplitTab({
@@ -199,6 +236,9 @@ export default function DaySplitTab({
   // Bumped after cash tips are logged, so the split below re-reads the total it
   // is derived from rather than showing a figure that is now stale.
   const [refresh, setRefresh] = useState(0);
+  // The row being corrected, or null. Held rather than derived so the dialog
+  // keeps its subject through the closing animation.
+  const [editing, setEditing] = useState<DaySplitEmployee | null>(null);
 
   // Carries the date it was loaded for, so "loading" and "no data" are derived
   // rather than set synchronously in the effect body — three setState calls
@@ -443,8 +483,8 @@ export default function DaySplitTab({
                               </span>
                             )}
                           </td>
-                          <td className="px-3 py-3 sm:px-4 text-right tabular-nums text-muted-foreground">
-                            {emp.hours.toFixed(2)}
+                          <td className="px-3 py-3 sm:px-4 text-right">
+                            <HoursCell employee={emp} canEdit={canEdit} onEdit={setEditing} />
                           </td>
                           <td className="px-3 py-3 sm:px-4 text-center">
                             <Toggle
@@ -509,8 +549,8 @@ export default function DaySplitTab({
                       return (
                         <tr key={emp.id} className={`border-b last:border-b-0 ${!active ? 'opacity-40' : ''}`}>
                           <td className="px-3 py-3 sm:px-4 font-medium">{emp.name}</td>
-                          <td className="px-3 py-3 sm:px-4 text-right tabular-nums text-muted-foreground">
-                            {emp.hours.toFixed(2)}
+                          <td className="px-3 py-3 sm:px-4 text-right">
+                            <HoursCell employee={emp} canEdit={canEdit} onEdit={setEditing} />
                           </td>
                           <td className="px-3 py-3 sm:px-4 text-right tabular-nums font-semibold text-cyan-700 dark:text-cyan-300">
                             {active ? `$${(shares[emp.id] ?? 0).toFixed(2)}` : '—'}
@@ -561,8 +601,12 @@ export default function DaySplitTab({
                       )}
                     </span>
                     <span className="flex shrink-0 items-center gap-3">
-                      <span className="tabular-nums text-xs text-muted-foreground">
-                        {emp.hours.toFixed(2)} hrs
+                      <span className="text-xs">
+                        {/* Paid like anyone else, so correctable like anyone
+                            else — being out of the tip pool is not being out
+                            of payroll. */}
+                        <HoursCell employee={emp} canEdit={canEdit} onEdit={setEditing} />
+                        <span className="ml-1 text-muted-foreground">hrs</span>
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {emp.excludedReason}
@@ -589,7 +633,20 @@ export default function DaySplitTab({
             </div>
           )}
 
-          {/* No tips warning */}
+          {/* Correcting hours re-divides the split, because the split IS by hours.
+          Bumping `refresh` re-runs both the split and the night's pay rather
+          than patching the row in place, so the two cannot disagree. */}
+      {canEdit && (
+        <DayHoursDialog
+          open={editing !== null}
+          onOpenChange={(open) => { if (!open) setEditing(null); }}
+          employee={editing}
+          date={date}
+          onSaved={() => setRefresh((n) => n + 1)}
+        />
+      )}
+
+      {/* No tips warning */}
           {data.totalTips === 0 && (
             <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm text-yellow-400">
               No tip data for this date — import a Z report to see tip distributions.
