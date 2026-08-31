@@ -432,7 +432,6 @@ BEGIN
     'z_report_days','z_reports','z_report_server_tips',
     'z_report_cc_types','z_report_cc_batch',
     'losses_reports','employees','employee_shifts',
-    'pos_hourly_sales','pos_server_sales',
     'direct_deposit_accounts','dd_verification_codes','dd_audit_log'
   ] LOOP
     p := 'org members can manage ' || t;
