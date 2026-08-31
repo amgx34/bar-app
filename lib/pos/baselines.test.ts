@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { sameWeekdayNights, totalToHour, compareToBaseline, type HourlyRow } from './baselines';
+import {
+  sameWeekdayNights,
+  totalToHour,
+  compareToBaseline,
+  nightPosition,
+  type HourlyRow,
+} from './baselines';
+import { orderNightHours } from './daypart';
 
 const row = (hour: number, net: number): HourlyRow => ({
   business_date: '2026-08-29', hour, net_sales: net, ticket_count: 1, tips: 0,
@@ -65,6 +72,46 @@ describe('totalToHour', () => {
 
   it('is zero for a night with no rows', () => {
     expect(totalToHour([], 22, 4)).toBe(0);
+  });
+
+  // Every case above uses the default cutoff of 4. The spec calls out the
+  // "1am ticket" case specifically at OTHER cutoffs, because a cutoff bug is
+  // exactly the failure this module's own doc comment warns about: it would
+  // silently drop the evening from a running total, and a suite that only
+  // ever exercises the default cutoff could never catch a regression in the
+  // cutoff arithmetic itself.
+  it('counts a post-midnight hour as later than the evening at a non-default cutoff', () => {
+    // Cutoff 6: nightPosition(19, 6) = 13, nightPosition(1, 6) = 19. Both are
+    // within the night, so both must count when asked up to 1am.
+    const rows = [row(19, 100), row(1, 50)];
+    expect(totalToHour(rows, 1, 6)).toBe(150);
+    // Asked only up to 7pm (position 13), the 1am row (position 19) is still
+    // in the future of that ask and must be excluded.
+    expect(totalToHour(rows, 19, 6)).toBe(100);
+  });
+
+  it('behaves as a plain calendar day when the cutoff is midnight', () => {
+    // Cutoff 0 means nightPosition(hour, 0) === hour, so this is an ordinary
+    // "sum hours 0 through upToHour" — 9am is in, 8pm is not.
+    const rows = [row(9, 75), row(20, 500)];
+    expect(totalToHour(rows, 12, 0)).toBe(75);
+  });
+});
+
+describe('nightPosition / orderNightHours agreement', () => {
+  // baselines.ts and daypart.ts each reimplement "where does this hour sit in
+  // the night" from the same cutoff, but neither module's own suite can catch
+  // the two drifting apart — that only shows up by importing both. If they
+  // ever disagreed, the hourly chart (built from orderNightHours) and the
+  // "vs last Saturday" comparison (built from nightPosition) would tell
+  // different stories about the same night.
+  it('agrees with orderNightHours on the position of every hour, at every cutoff', () => {
+    for (let cutoff = 0; cutoff <= 12; cutoff++) {
+      const order = orderNightHours(cutoff);
+      for (let hour = 0; hour <= 23; hour++) {
+        expect(nightPosition(hour, cutoff)).toBe(order.indexOf(hour));
+      }
+    }
   });
 });
 

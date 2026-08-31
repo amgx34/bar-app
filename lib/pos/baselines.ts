@@ -26,8 +26,6 @@ export type HourlyRow = {
   tips: number;
 };
 
-export type NightTotal = { business_date: string; netSales: number };
-
 export type Baseline = {
   /** Mean of the comparable nights. Null when there is no history. */
   average: number | null;
@@ -76,7 +74,7 @@ export function sameWeekdayNights(
  * earliest hour of the night and silently drop the entire evening from the
  * running total.
  */
-function nightPosition(hour: number, cutoffHour: number): number {
+export function nightPosition(hour: number, cutoffHour: number): number {
   const start = ((Math.trunc(cutoffHour) % 24) + 24) % 24;
   return (hour - start + 24) % 24;
 }

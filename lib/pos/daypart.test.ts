@@ -96,4 +96,22 @@ describe('buildDaypart', () => {
   it('always returns 24 hours so a chart has a stable axis', () => {
     expect(buildDaypart([row(22, 1)], 4).hours).toHaveLength(24);
   });
+
+  it('reorders traded hours when the cutoff changes, not just when the default is used', () => {
+    // Every case above uses cutoff 4, which places the start of the night
+    // between 1am and 7pm, giving the order [19, 22, 1]. Moving the cutoff to
+    // 8pm (20) instead places the start of the night between 7pm and 10pm, so
+    // 10pm becomes the FIRST of these three hours traded and 7pm becomes the
+    // LAST — a genuinely different order, not just a relabelling.
+    const rows = [row(22, 100), row(1, 50), row(19, 25)];
+    const atFour = buildDaypart(rows, 4);
+    const atEightPm = buildDaypart(rows, 20);
+
+    const tradedAtFour = atFour.hours.filter((h) => h.traded).map((h) => h.hour);
+    const tradedAtEightPm = atEightPm.hours.filter((h) => h.traded).map((h) => h.hour);
+
+    expect(tradedAtFour).toEqual([19, 22, 1]);
+    expect(tradedAtEightPm).toEqual([22, 1, 19]);
+    expect(tradedAtEightPm).not.toEqual(tradedAtFour);
+  });
 });

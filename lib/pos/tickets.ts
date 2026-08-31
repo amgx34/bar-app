@@ -7,8 +7,24 @@
  * the mix changes, when an upsell lands, when a promotion drags spend down. Net
  * sales alone cannot tell those apart from a quieter night.
  *
- * One ticket is one visit however many lines it carries, which is why Stage A
- * captures COUNT(DISTINCT ticket) rather than a line count.
+ * One ticket is meant to be one visit however many lines it carries, which is
+ * why Stage A captures COUNT(DISTINCT ticket) rather than a line count. But
+ * that count is taken PER HOUR, and a tab left open across the turn of the
+ * hour — say 22:59 to 23:01 — is a distinct ticket in both hours' counts.
+ * `summariseTickets` sums `ticket_count` across whatever rows it is given, so
+ * a long-running tab is counted more than once and `averageTicket` is
+ * therefore slightly UNDERSTATED for a bar with slow tables or open tabs.
+ * This is inherent to the hourly grain the figure was captured at, not a bug
+ * this module can fix — treat `averageTicket` as a close approximation, not
+ * an exact one, for any bar where tickets commonly outlive an hour boundary.
+ *
+ * PASS ONE FEED, NEVER BOTH
+ *
+ * `TicketRow` matches the hourly feed and the per-server feed equally well,
+ * and the optional `hour` on both invites passing whichever is on hand — or
+ * both at once. Summing both for the same night double-counts every ticket
+ * and every dollar, because the same sales are represented twice under a
+ * different grouping. Callers must pick one feed for a given call.
  */
 
 export type TicketRow = {
