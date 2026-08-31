@@ -65,6 +65,8 @@ public sealed class SyncService(SqlReader sql, RailClient rail, IOptions<AgentCo
         List<ZReportRow> z = [];
         List<EwReportRow> ew = [];
         List<ItemAuditRow> audit = [];
+        List<HourlySalesRow>? hourly = null;
+        List<ServerSalesRow>? server = null;
 
         await using var conn = await sql.OpenAsync(ct);
         log.LogInformation("SQL Server connected via {DataSource}", conn.DataSource);
@@ -110,16 +112,39 @@ public sealed class SyncService(SqlReader sql, RailClient rail, IOptions<AgentCo
         }
         else log.LogInformation("  Item Audit: not configured — skipped");
 
+        // Hourly needs an actual clock reading off the raw column: a date-only
+        // column has no hour to report. Emitting hour 0 for every ticket would
+        // draw a curve showing the whole night landing at midnight — worse than
+        // no curve at all, because it looks like real data. So this feed is
+        // gated on DateHasTime in addition to the usual Enabled() check.
+        if (Enabled(_cfg.Tables.HourlySales) && _cfg.Columns.HourlySales.DateHasTime)
+        {
+            try { hourly = await sql.QueryHourlySalesAsync(conn, days, ct); log.LogInformation("  Hourly:     {Count} row(s)", hourly.Count); }
+            catch (Exception e) { log.LogWarning("Hourly Sales query failed: {Message}", e.Message); }
+        }
+        else if (Enabled(_cfg.Tables.HourlySales))
+            log.LogInformation("  Hourly:     skipped — configured date column has no time component, so it cannot yield an hour");
+        else log.LogInformation("  Hourly:     not configured — skipped");
+
+        if (Enabled(_cfg.Tables.ServerSales))
+        {
+            try { server = await sql.QueryServerSalesAsync(conn, days, ct); log.LogInformation("  Server:     {Count} row(s)", server.Count); }
+            catch (Exception e) { log.LogWarning("Server Sales query failed: {Message}", e.Message); }
+        }
+        else log.LogInformation("  Server:     not configured — skipped");
+
         if (test)
         {
             if (z.Count > 0) log.LogInformation("Z sample:     {Row}", z[0]);
             if (ew.Count > 0) log.LogInformation("EW sample:    {Row}", ew[0]);
             if (audit.Count > 0) log.LogInformation("Audit sample: {Row}", audit[0]);
+            if (hourly is { Count: > 0 }) log.LogInformation("Hourly sample: {Row}", hourly[0]);
+            if (server is { Count: > 0 }) log.LogInformation("Server sample: {Row}", server[0]);
             log.LogInformation("✓ SQL connection and queries OK (test mode — nothing sent to Rail)");
             return new SyncResult(true, z.Count, ew.Count, audit.Count);
         }
 
-        await rail.PushAsync(z, ew, audit, ct);
+        await rail.PushAsync(z, ew, audit, ct, hourly, server);
         log.LogInformation("✓ Sync complete — Z:{Z} EW:{EW} Audit:{Audit}", z.Count, ew.Count, audit.Count);
         return new SyncResult(true, z.Count, ew.Count, audit.Count);
     }

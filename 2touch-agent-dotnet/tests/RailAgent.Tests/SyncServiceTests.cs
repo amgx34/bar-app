@@ -15,9 +15,11 @@ namespace RailAgent.Tests;
 /// </summary>
 public class SyncServiceTests
 {
-    private static AgentConfig Config(string z, string ew, string audit) => new()
+    // HourlySales/ServerSales default to "" (unconfigured) so existing calls to
+    // this factory keep the assertions they had before those two feeds existed.
+    private static AgentConfig Config(string z, string ew, string audit, string hourly = "", string server = "") => new()
     {
-        Tables = { ZReport = z, EwReport = ew, ItemAudit = audit },
+        Tables = { ZReport = z, EwReport = ew, ItemAudit = audit, HourlySales = hourly, ServerSales = server },
         Rail = { OrgId = "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d", AuthToken = new string('a', 64) },
     };
 
@@ -46,6 +48,18 @@ public class SyncServiceTests
             Queried.Add("audit");
             return Task.FromResult(new List<ItemAuditRow> { new("2026-08-06", "Lager", "Beer", 3m, 21m) });
         }
+
+        public override Task<List<HourlySalesRow>> QueryHourlySalesAsync(SqlConnection c, int days, CancellationToken ct)
+        {
+            Queried.Add("hourly");
+            return Task.FromResult(new List<HourlySalesRow> { new("2026-08-06", 20, 100m, 5, 10m) });
+        }
+
+        public override Task<List<ServerSalesRow>> QueryServerSalesAsync(SqlConnection c, int days, CancellationToken ct)
+        {
+            Queried.Add("server");
+            return Task.FromResult(new List<ServerSalesRow> { new("2026-08-06", "Alex", 100m, 5, 10m) });
+        }
     }
 
     /// <summary>Captures the payload instead of posting it.</summary>
@@ -55,13 +69,17 @@ public class SyncServiceTests
         public IReadOnlyList<ZReportRow>? Z { get; private set; }
         public IReadOnlyList<EwReportRow>? Ew { get; private set; }
         public IReadOnlyList<ItemAuditRow>? Audit { get; private set; }
+        public IReadOnlyList<HourlySalesRow>? Hourly { get; private set; }
+        public IReadOnlyList<ServerSalesRow>? Server { get; private set; }
         public int Pushes { get; private set; }
 
         public override Task<string> PushAsync(
             IReadOnlyList<ZReportRow> z, IReadOnlyList<EwReportRow> ew,
-            IReadOnlyList<ItemAuditRow> audit, CancellationToken ct)
+            IReadOnlyList<ItemAuditRow> audit, CancellationToken ct,
+            IReadOnlyList<HourlySalesRow>? hourlySales = null,
+            IReadOnlyList<ServerSalesRow>? serverSales = null)
         {
-            Z = z; Ew = ew; Audit = audit; Pushes++;
+            Z = z; Ew = ew; Audit = audit; Hourly = hourlySales; Server = serverSales; Pushes++;
             return Task.FromResult("{\"zReports\":0,\"ewReports\":0,\"itemAudit\":0,\"errors\":[]}");
         }
     }
@@ -139,4 +157,64 @@ public class SyncServiceTests
     [InlineData("[dbo].[vwZReport]", true)]
     public void EnabledTreatsBlankAsSkipped(string? table, bool expected)
         => Assert.Equal(expected, SyncService.Enabled(table));
+
+    [Fact]
+    public async Task HourlyAndServerFeedsAreQueriedWhenConfigured()
+    {
+        var cfg = Config("", "", "", hourly: "[dbo].[vwHourlySales]", server: "[dbo].[vwServerTickets]");
+
+        var (reader, rail, _) = await RunAsync(cfg);
+
+        Assert.Equal(["hourly", "server"], reader.Queried);
+        Assert.Single(rail.Hourly!);
+        Assert.Single(rail.Server!);
+    }
+
+    /// <summary>
+    /// The gate: a POS date column with no time component cannot yield an
+    /// hour. Running the query anyway would put every ticket in hour 0 — a
+    /// curve showing the whole night's trade landing at midnight, which reads
+    /// as real data instead of the absence of any. So when
+    /// Columns.HourlySales.DateHasTime is false, the hourly query must never
+    /// run and hourlySales must reach Rail as null (omitted from the wire
+    /// payload), not as an empty or zero-filled array.
+    /// </summary>
+    [Fact]
+    public async Task DateHasTimeFalseSkipsTheHourlyQueryAndSendsNull()
+    {
+        var cfg = Config("", "", "", hourly: "[dbo].[vwHourlySales]", server: "");
+        cfg.Columns.HourlySales.DateHasTime = false;
+
+        var (reader, rail, _) = await RunAsync(cfg);
+
+        Assert.DoesNotContain("hourly", reader.Queried);
+        Assert.Null(rail.Hourly);
+    }
+
+    [Fact]
+    public async Task DateHasTimeTrueStillRunsTheHourlyQuery()
+    {
+        // Sanity check for the gate above: the default (DateHasTime = true)
+        // must not be accidentally caught by the same condition.
+        var cfg = Config("", "", "", hourly: "[dbo].[vwHourlySales]", server: "");
+
+        var (reader, rail, _) = await RunAsync(cfg);
+
+        Assert.Contains("hourly", reader.Queried);
+        Assert.Single(rail.Hourly!);
+    }
+
+    [Fact]
+    public async Task ServerFeedIsUnaffectedByTheHourlyDateHasTimeGate()
+    {
+        // ServerSalesSql does not compute an hour, so its own DateHasTime only
+        // governs the business-day cutoff — it has no reason to be skipped.
+        var cfg = Config("", "", "", hourly: "", server: "[dbo].[vwServerTickets]");
+        cfg.Columns.ServerSales.DateHasTime = false;
+
+        var (reader, rail, _) = await RunAsync(cfg);
+
+        Assert.Contains("server", reader.Queried);
+        Assert.Single(rail.Server!);
+    }
 }

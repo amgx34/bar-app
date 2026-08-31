@@ -199,6 +199,7 @@ public class SqlReader(IOptions<AgentConfig> cfg)
         """;
 
     private static decimal Dec(object v) => v is null or DBNull ? 0m : Convert.ToDecimal(v);
+    private static int Int(object v) => v is null or DBNull ? 0 : Convert.ToInt32(v);
     private static string DateStr(object v) => Convert.ToDateTime(v).ToString("yyyy-MM-dd");
     private static string Str(object v) => v is null or DBNull ? string.Empty : Convert.ToString(v)?.Trim() ?? string.Empty;
 
@@ -264,6 +265,48 @@ public class SqlReader(IOptions<AgentConfig> cfg)
                 Str(r["category_name"]),
                 Dec(r["qty_sold"]),
                 Dec(r["net_sales"])));
+        }
+        return rows;
+    }
+
+    public virtual async Task<List<HourlySalesRow>> QueryHourlySalesAsync(SqlConnection conn, int lookbackDays, CancellationToken ct)
+    {
+        var sql = HourlySalesSql(_cfg.Tables.HourlySales, _cfg.Columns.HourlySales, lookbackDays,
+            FeedCutoff(_cfg.Columns.HourlySales.DateHasTime, _cfg.Sync.ResolvedCutoffHour));
+
+        var rows = new List<HourlySalesRow>();
+        await using var cmd = new SqlCommand(sql, conn);
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+        {
+            rows.Add(new HourlySalesRow(
+                DateStr(r["business_date"]),
+                Int(r["hour"]),
+                Dec(r["net_sales"]),
+                Int(r["ticket_count"]),
+                Dec(r["tips"])));
+        }
+        return rows;
+    }
+
+    public virtual async Task<List<ServerSalesRow>> QueryServerSalesAsync(SqlConnection conn, int lookbackDays, CancellationToken ct)
+    {
+        var sql = ServerSalesSql(_cfg.Tables.ServerSales, _cfg.Columns.ServerSales, lookbackDays,
+            FeedCutoff(_cfg.Columns.ServerSales.DateHasTime, _cfg.Sync.ResolvedCutoffHour));
+
+        var rows = new List<ServerSalesRow>();
+        await using var cmd = new SqlCommand(sql, conn);
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+        {
+            var name = Str(r["server_name"]);
+            if (name.Length == 0) continue;
+            rows.Add(new ServerSalesRow(
+                DateStr(r["business_date"]),
+                name,
+                Dec(r["net_sales"]),
+                Int(r["ticket_count"]),
+                Dec(r["tips"])));
         }
         return rows;
     }

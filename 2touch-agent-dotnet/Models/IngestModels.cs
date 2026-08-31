@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace RailAgent.Models;
 
 // Property names are snake_case ON PURPOSE — they are serialized verbatim and
@@ -28,12 +30,34 @@ public sealed record ItemAuditRow(
     decimal qty_sold,
     decimal net_sales);
 
+public sealed record HourlySalesRow(
+    string business_date,
+    int hour,
+    decimal net_sales,
+    int ticket_count,
+    decimal tips);
+
+public sealed record ServerSalesRow(
+    string business_date,
+    string server_name,
+    decimal net_sales,
+    int ticket_count,
+    decimal tips);
+
 public sealed record IngestPayload(
     string org_id,
     string source,
     string pulledAt,
     IReadOnlyList<ZReportRow> zReports,
     IReadOnlyList<EwReportRow> ewReports,
-    IReadOnlyList<ItemAuditRow> itemAudit);
+    IReadOnlyList<ItemAuditRow> itemAudit,
+    // Nullable and omitted-when-null (not emitted as JSON null): a feed that
+    // did not run should say so honestly rather than claim an empty result.
+    // The server treats `payload.hourlySales ?? []` the same either way, so
+    // this is about what the payload says, not about data safety.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<HourlySalesRow>? hourlySales = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<ServerSalesRow>? serverSales = null);
 
 public sealed record SyncResult(bool Ok, int ZReports, int EwReports, int ItemAudit, string? Error = null);
