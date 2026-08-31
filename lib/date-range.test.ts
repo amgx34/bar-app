@@ -3,6 +3,7 @@ import {
   resolveDateRange, addDays, isIsoDate, todayIso, resolvePayPeriod,
   payPeriodFromParams, payRunHref,
   resolvePayrollView, monthRange, defaultPeriod, shiftPeriod,
+  resolveSalesView, defaultSalesPeriod, shiftSalesPeriod,
 } from './date-range';
 
 const TODAY = '2026-08-20';
@@ -276,5 +277,56 @@ describe('shiftPeriod', () => {
       .toEqual({ start: '2027-01-01', end: '2027-01-31' });
     expect(shiftPeriod('month', '2026-01-01', '2026-01-31', 'prev'))
       .toEqual({ start: '2025-12-01', end: '2025-12-31' });
+  });
+});
+
+describe('resolveSalesView', () => {
+  it('takes the four real views', () => {
+    for (const v of ['tonight', 'day', 'week', 'month'] as const) {
+      expect(resolveSalesView(v)).toBe(v);
+    }
+  });
+
+  it('defaults to tonight for anything else', () => {
+    // Sales opens on tonight because the question a bar asks most often is
+    // "how is tonight going", and the answer is only useful during service.
+    expect(resolveSalesView('banana')).toBe('tonight');
+    expect(resolveSalesView(undefined)).toBe('tonight');
+    expect(resolveSalesView(['tonight'])).toBe('tonight');
+  });
+});
+
+describe('defaultSalesPeriod', () => {
+  it('makes tonight and day a single night', () => {
+    expect(defaultSalesPeriod('tonight', TODAY)).toEqual({ start: TODAY, end: TODAY });
+    expect(defaultSalesPeriod('day', TODAY)).toEqual({ start: TODAY, end: TODAY });
+  });
+
+  it('gives the Monday-to-Sunday week for week', () => {
+    // 2026-08-20 is a Thursday.
+    expect(defaultSalesPeriod('week', TODAY)).toEqual({ start: '2026-08-17', end: '2026-08-23' });
+  });
+
+  it('gives the calendar month for month', () => {
+    expect(defaultSalesPeriod('month', TODAY)).toEqual({ start: '2026-08-01', end: '2026-08-31' });
+  });
+});
+
+describe('shiftSalesPeriod', () => {
+  it('steps tonight and day by one night', () => {
+    expect(shiftSalesPeriod('tonight', TODAY, TODAY, 'prev'))
+      .toEqual({ start: '2026-08-19', end: '2026-08-19' });
+    expect(shiftSalesPeriod('day', TODAY, TODAY, 'next'))
+      .toEqual({ start: '2026-08-21', end: '2026-08-21' });
+  });
+
+  it('steps a week by seven days', () => {
+    expect(shiftSalesPeriod('week', '2026-08-17', '2026-08-23', 'next'))
+      .toEqual({ start: '2026-08-24', end: '2026-08-30' });
+  });
+
+  it('steps a month to the next month, not thirty days on', () => {
+    expect(shiftSalesPeriod('month', '2026-01-01', '2026-01-31', 'next'))
+      .toEqual({ start: '2026-02-01', end: '2026-02-28' });
   });
 });
