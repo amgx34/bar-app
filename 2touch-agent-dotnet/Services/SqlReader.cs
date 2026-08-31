@@ -6,52 +6,6 @@ using RailAgent.Models;
 namespace RailAgent.Services;
 
 /// <summary>
-/// Columns the hourly feed needs from a ticket header.
-///
-/// A class with settable properties rather than a positional record, to
-/// match ZReportColumns and the other Columns types.
-/// </summary>
-public sealed class HourlySalesColumns
-{
-    public string Date  { get; set; } = "BusinessDate";
-    public string Sales { get; set; } = "NetSales";
-    public string Tips  { get; set; } = "Tips";
-
-    /// <summary>
-    /// The ticket number column, for COUNT(DISTINCT) — one ticket is one visit
-    /// however many lines it has. Defaults to the literal NULL, not a column
-    /// name: see the CashSales note on ZReportColumns for why a bad default
-    /// here would break the whole statement. COUNT(DISTINCT NULL) is valid
-    /// SQL and returns 0, the same honest zero the tender split uses.
-    /// </summary>
-    public string TicketNo { get; set; } = "NULL";
-}
-
-/// <summary>
-/// Columns the per-server feed needs from a ticket header.
-///
-/// A class with settable properties rather than a positional record, to
-/// match ZReportColumns and EwReportColumns — these are bound from
-/// appsettings.json, and FeedSpecs mirrors their property names.
-/// </summary>
-public sealed class ServerSalesColumns
-{
-    public string Date       { get; set; } = "BusinessDate";
-    public string ServerName { get; set; } = "ServerName";
-    public string Sales      { get; set; } = "NetSales";
-    public string Tips       { get; set; } = "Tips";
-
-    /// <summary>
-    /// The ticket number column, for COUNT(DISTINCT) — one ticket is one visit
-    /// however many lines it has. Defaults to the literal NULL, not a column
-    /// name: see the CashSales note on ZReportColumns for why a bad default
-    /// here would break the whole statement. COUNT(DISTINCT NULL) is valid
-    /// SQL and returns 0, the same honest zero the tender split uses.
-    /// </summary>
-    public string TicketNo   { get; set; } = "NULL";
-}
-
-/// <summary>
 /// Read-only reader for the local TwoTouch SQL Server. Connects over shared
 /// memory (no TCP port, no SQL Server Browser) and runs the three report
 /// queries. Table/column names come from config so each bar's schema can differ.

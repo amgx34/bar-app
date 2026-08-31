@@ -65,6 +65,8 @@ public sealed class TablesConfig
     public string ZReport { get; set; } = "vwZReport";
     public string EwReport { get; set; } = "vwServerSales";
     public string ItemAudit { get; set; } = "vwItemAudit";
+    public string HourlySales { get; set; } = "vwHourlySales";
+    public string ServerSales { get; set; } = "vwServerTickets";
 }
 
 public sealed class ColumnsConfig
@@ -72,6 +74,8 @@ public sealed class ColumnsConfig
     public ZReportColumns ZReport { get; set; } = new();
     public EwReportColumns EwReport { get; set; } = new();
     public ItemAuditColumns ItemAudit { get; set; } = new();
+    public HourlySalesColumns HourlySales { get; set; } = new();
+    public ServerSalesColumns ServerSales { get; set; } = new();
 }
 
 public sealed class ZReportColumns
@@ -173,6 +177,52 @@ public sealed class ItemAuditColumns
     /// setup is re-run; the wizard sets it from INFORMATION_SCHEMA.
     /// </summary>
     public bool DateHasTime { get; set; } = true;
+}
+
+/// <summary>
+/// Columns the hourly feed needs from a ticket header.
+///
+/// A class with settable properties rather than a positional record, to
+/// match ZReportColumns and the other Columns types.
+/// </summary>
+public sealed class HourlySalesColumns
+{
+    public string Date  { get; set; } = "BusinessDate";
+    public string Sales { get; set; } = "NetSales";
+    public string Tips  { get; set; } = "Tips";
+
+    /// <summary>
+    /// The ticket number column, for COUNT(DISTINCT) — one ticket is one visit
+    /// however many lines it has. Defaults to the literal NULL, not a column
+    /// name: see the CashSales note on ZReportColumns for why a bad default
+    /// here would break the whole statement. COUNT(DISTINCT NULL) is valid
+    /// SQL and returns 0, the same honest zero the tender split uses.
+    /// </summary>
+    public string TicketNo { get; set; } = "NULL";
+}
+
+/// <summary>
+/// Columns the per-server feed needs from a ticket header.
+///
+/// A class with settable properties rather than a positional record, to
+/// match ZReportColumns and EwReportColumns — these are bound from
+/// appsettings.json, and FeedSpecs mirrors their property names.
+/// </summary>
+public sealed class ServerSalesColumns
+{
+    public string Date       { get; set; } = "BusinessDate";
+    public string ServerName { get; set; } = "ServerName";
+    public string Sales      { get; set; } = "NetSales";
+    public string Tips       { get; set; } = "Tips";
+
+    /// <summary>
+    /// The ticket number column, for COUNT(DISTINCT) — one ticket is one visit
+    /// however many lines it has. Defaults to the literal NULL, not a column
+    /// name: see the CashSales note on ZReportColumns for why a bad default
+    /// here would break the whole statement. COUNT(DISTINCT NULL) is valid
+    /// SQL and returns 0, the same honest zero the tender split uses.
+    /// </summary>
+    public string TicketNo   { get; set; } = "NULL";
 }
 
 public sealed class SyncConfig

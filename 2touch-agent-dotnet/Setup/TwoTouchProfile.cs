@@ -148,7 +148,46 @@ public static class TwoTouchProfile
         ["tblSalesHist", "tblSalesHistRptCtg", "tblSalesDailyDtl", "tblSalesDailyRptCtg", "tblItem", "tblCategory"],
         "sale lines joined to the item catalogue for names, and to RptCtg for amounts");
 
-    public static readonly ProfileFeed[] All = [ZReport, EwReport, ItemAudit];
+    public static readonly ProfileFeed HourlySales = new(
+        FeedSpecs.HourlySalesKey,
+        """
+        (
+            SELECT h.dtmTicketDate    AS BusinessDate,
+                   h.fNetAmt          AS NetSales,
+                   h.szTicketNo       AS TicketNo,
+                   ISNULL(h.fTipAmt, 0) AS Tips
+            FROM dbo.tblSalesHdrHist h
+            WHERE h.dtmTicketDate >= '{cutoff}'
+            UNION ALL
+            SELECT h.dtmTicketDate,
+                   h.fNetAmt,
+                   h.szTicketNo,
+                   ISNULL(h.fTipAmt, 0)
+            FROM dbo.tblSalesDailyHdr h
+            WHERE h.dtmTicketDate >= '{cutoff}'
+        ) AS rail_hourly
+        """,
+        ["tblSalesHdrHist", "tblSalesDailyHdr"],
+        "Trade by hour of the night, so the Sales screen can show when the rush lands.");
+
+    public static readonly ProfileFeed ServerSales = new(
+        FeedSpecs.ServerSalesKey,
+        """
+        (
+            SELECT h.dtmTicketDate                                                       AS BusinessDate,
+                   LTRIM(RTRIM(ISNULL(u.szFirstName, '') + ' ' + ISNULL(u.szLastName, ''))) AS ServerName,
+                   h.fNetAmt                                                              AS NetSales,
+                   h.szTicketNo                                                           AS TicketNo,
+                   ISNULL(h.fTipAmt, 0)                                                   AS Tips
+            FROM dbo.tblSalesHdrHist h
+            JOIN dbo.tblUser u ON u.pkID = h.fkUserID
+            WHERE h.dtmTicketDate >= '{cutoff}'
+        ) AS rail_server
+        """,
+        ["tblSalesHdrHist", "tblUser"],
+        "Trade by whoever rang it up.");
+
+    public static readonly ProfileFeed[] All = [ZReport, EwReport, ItemAudit, HourlySales, ServerSales];
 
     /// <summary>The feeds this database can supply through the built-in mapping.</summary>
     public static IReadOnlyList<ProfileFeed> Match(IEnumerable<RelationInfo> relations)
@@ -196,6 +235,23 @@ public static class TwoTouchProfile
                 {
                     Date = "[SaleDate]", ItemName = "[ItemName]", Category = "[CategoryName]",
                     QtySold = "[QtySold]", NetSales = "[NetSales]",
+                };
+                break;
+
+            case FeedSpecs.HourlySalesKey:
+                cfg.Tables.HourlySales = feed.Source;
+                cfg.Columns.HourlySales = new HourlySalesColumns
+                {
+                    Date = "[BusinessDate]", Sales = "[NetSales]", Tips = "[Tips]", TicketNo = "[TicketNo]",
+                };
+                break;
+
+            case FeedSpecs.ServerSalesKey:
+                cfg.Tables.ServerSales = feed.Source;
+                cfg.Columns.ServerSales = new ServerSalesColumns
+                {
+                    Date = "[BusinessDate]", ServerName = "[ServerName]", Sales = "[NetSales]",
+                    Tips = "[Tips]", TicketNo = "[TicketNo]",
                 };
                 break;
         }

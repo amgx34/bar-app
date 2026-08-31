@@ -53,17 +53,19 @@ public class TwoTouchProfileTests
     }
 
     [SkippableFact]
-    public async Task RecognisesAllThreeFeeds()
+    public async Task RecognisesAllFiveFeeds()
     {
         await using var conn = await ConnectOrSkipAsync();
         var relations = await SqlProbe.EnumerateAsync(conn, CancellationToken.None);
 
         var matched = TwoTouchProfile.Match(relations).Select(f => f.FeedKey).ToList();
 
-        Assert.Equal(3, matched.Count);
+        Assert.Equal(5, matched.Count);
         Assert.Contains(FeedSpecs.ZReportKey, matched);
         Assert.Contains(FeedSpecs.EwReportKey, matched);
         Assert.Contains(FeedSpecs.ItemAuditKey, matched);
+        Assert.Contains(FeedSpecs.HourlySalesKey, matched);
+        Assert.Contains(FeedSpecs.ServerSalesKey, matched);
     }
 
     [SkippableFact]

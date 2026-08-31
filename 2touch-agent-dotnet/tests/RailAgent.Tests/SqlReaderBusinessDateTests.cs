@@ -174,6 +174,10 @@ public class SqlReaderBusinessDateTests
         Assert.Contains("DATEPART(HOUR, [dtmTicketDate])", sql);
         Assert.Contains("CAST(DATEADD(HOUR, -4, [dtmTicketDate]) AS DATE)", sql);
         Assert.Contains("COUNT(DISTINCT", sql);
+
+        Assert.Equal(
+            "GROUP BY CAST(DATEADD(HOUR, -4, [dtmTicketDate]) AS DATE), DATEPART(HOUR, [dtmTicketDate])",
+            GroupByClause(sql));
     }
 
     [Fact]
@@ -200,7 +204,10 @@ public class SqlReaderBusinessDateTests
         var sql = SqlReader.ServerSalesSql("dbo.tblSalesHdrHist", SrvCols, lookbackDays: 2, cutoffHour: 4);
         Assert.Contains("CAST(DATEADD(HOUR, -4, [dtmTicketDate]) AS DATE)", sql);
         Assert.Contains("COUNT(DISTINCT", sql);
-        Assert.Contains("GROUP BY", sql);
+
+        Assert.Equal(
+            "GROUP BY CAST(DATEADD(HOUR, -4, [dtmTicketDate]) AS DATE), [szServerName]",
+            GroupByClause(sql));
     }
 
     [Fact]
@@ -245,6 +252,20 @@ public class SqlReaderBusinessDateTests
     {
         var rungAt = new DateTime(2026, 8, 16, 14, 0, 0);
         Assert.Equal(DayOfWeek.Sunday, rungAt.AddHours(-4).Date.DayOfWeek);
+    }
+
+    /// <summary>
+    /// The GROUP BY clause on its own line, trimmed — so an assertion on it
+    /// checks what is actually grouped rather than merely that the keyword
+    /// is present somewhere in the statement.
+    /// </summary>
+    private static string GroupByClause(string sql)
+    {
+        var start = sql.IndexOf("GROUP BY", StringComparison.Ordinal);
+        Assert.True(start >= 0, "expected a GROUP BY clause");
+        var end = sql.IndexOf('\n', start);
+        var clause = end < 0 ? sql[start..] : sql[start..end];
+        return clause.Trim();
     }
 
     private static int Occurrences(string haystack, string needle)
