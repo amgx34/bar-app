@@ -52,6 +52,27 @@ public class TwoTouchProfileTests
         return (cfg, conn);
     }
 
+    [Fact]
+    public void ServerSalesIncludesTonightsUnZdBusinessDay()
+    {
+        // ZReport, ItemAudit and HourlySales all UNION tblSalesHdrHist with the
+        // tblSalesDaily* pair, because the Daily tables hold the business day
+        // that has not been Z'd out yet (see the class comment on
+        // TwoTouchProfile). ServerSales must do the same, or per-server trade
+        // for tonight stays empty until the Z runs — defeating the point of a
+        // feed meant to be intraday.
+        Assert.Contains("tblSalesDailyHdr", TwoTouchProfile.ServerSales.RequiredRelations);
+        Assert.Contains("FROM dbo.tblSalesDailyHdr h", TwoTouchProfile.ServerSales.Source);
+
+        // The Daily leg must expose the same aliases as the Hist leg so the two
+        // sides of the UNION line up.
+        Assert.Contains("AS BusinessDate", TwoTouchProfile.ServerSales.Source);
+        Assert.Contains("AS ServerName", TwoTouchProfile.ServerSales.Source);
+        Assert.Contains("AS NetSales", TwoTouchProfile.ServerSales.Source);
+        Assert.Contains("AS TicketNo", TwoTouchProfile.ServerSales.Source);
+        Assert.Contains("AS Tips", TwoTouchProfile.ServerSales.Source);
+    }
+
     [SkippableFact]
     public async Task RecognisesAllFiveFeeds()
     {

@@ -92,6 +92,17 @@ public static class ProfileMigration
         // source that guarantees it.
         cfg.Columns.ZReport.DateHasTime = true;
 
+        // The ZReportV1 fingerprint only ever appears in a config the 1.1.0
+        // wizard wrote against a real 2Touch database — see the class comment.
+        // HourlySales and ServerSales did not exist yet, so a config from that
+        // era has nothing in Tables.HourlySales / Tables.ServerSales beyond the
+        // compiled-in default. Since the whole config is already confirmed to be
+        // a 2Touch profile, hand it the same mapping a fresh wizard run against
+        // this schema would produce, through the one place that mapping is
+        // defined rather than a second copy of it here.
+        TwoTouchProfile.Apply(TwoTouchProfile.HourlySales, cfg);
+        TwoTouchProfile.Apply(TwoTouchProfile.ServerSales, cfg);
+
         cfg.ProfileUpgraded = true;
     }
 

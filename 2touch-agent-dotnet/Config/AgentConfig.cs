@@ -65,8 +65,18 @@ public sealed class TablesConfig
     public string ZReport { get; set; } = "vwZReport";
     public string EwReport { get; set; } = "vwServerSales";
     public string ItemAudit { get; set; } = "vwItemAudit";
-    public string HourlySales { get; set; } = "vwHourlySales";
-    public string ServerSales { get; set; } = "vwServerTickets";
+
+    /// <summary>
+    /// Unlike the three original feeds above, these default to empty rather than
+    /// a view name. Every install that predates them arrives at this default
+    /// through ProfileMigration.Apply (a fresh setup run always writes an
+    /// explicit value), and a config it does not recognise as a 2Touch profile
+    /// has no such view — SqlReader.Enabled() treats empty as "not configured"
+    /// and skips the query, where a nonexistent view name would instead throw
+    /// every five minutes forever.
+    /// </summary>
+    public string HourlySales { get; set; } = "";
+    public string ServerSales { get; set; } = "";
 }
 
 public sealed class ColumnsConfig

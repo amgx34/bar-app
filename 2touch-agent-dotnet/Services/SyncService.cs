@@ -145,7 +145,9 @@ public sealed class SyncService(SqlReader sql, RailClient rail, IOptions<AgentCo
         }
 
         await rail.PushAsync(z, ew, audit, ct, hourly, server);
-        log.LogInformation("✓ Sync complete — Z:{Z} EW:{EW} Audit:{Audit}", z.Count, ew.Count, audit.Count);
+        log.LogInformation(
+            "✓ Sync complete — Z:{Z} EW:{EW} Audit:{Audit} Hourly:{Hourly} Server:{Server}",
+            z.Count, ew.Count, audit.Count, hourly?.Count ?? 0, server?.Count ?? 0);
         return new SyncResult(true, z.Count, ew.Count, audit.Count);
     }
 }

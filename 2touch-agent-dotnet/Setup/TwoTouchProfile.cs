@@ -182,10 +182,19 @@ public static class TwoTouchProfile
             FROM dbo.tblSalesHdrHist h
             JOIN dbo.tblUser u ON u.pkID = h.fkUserID
             WHERE h.dtmTicketDate >= '{cutoff}'
+            UNION ALL
+            SELECT h.dtmTicketDate,
+                   LTRIM(RTRIM(ISNULL(u.szFirstName, '') + ' ' + ISNULL(u.szLastName, ''))),
+                   h.fNetAmt,
+                   h.szTicketNo,
+                   ISNULL(h.fTipAmt, 0)
+            FROM dbo.tblSalesDailyHdr h
+            JOIN dbo.tblUser u ON u.pkID = h.fkUserID
+            WHERE h.dtmTicketDate >= '{cutoff}'
         ) AS rail_server
         """,
-        ["tblSalesHdrHist", "tblUser"],
-        "Trade by whoever rang it up.");
+        ["tblSalesHdrHist", "tblSalesDailyHdr", "tblUser"],
+        "Trade by whoever rang it up, including tonight's business day before it is Z'd out.");
 
     public static readonly ProfileFeed[] All = [ZReport, EwReport, ItemAudit, HourlySales, ServerSales];
 
