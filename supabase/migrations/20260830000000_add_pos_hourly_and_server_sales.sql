@@ -62,3 +62,29 @@ DROP TABLE IF EXISTS z_report_server_sales;
 DROP TABLE IF EXISTS z_report_register_sales;
 DROP TABLE IF EXISTS z_report_category_sales;
 DROP TABLE IF EXISTS z_report_department_sales;
+
+-- ── Row level security ───────────────────────────────────────────────────────
+
+ALTER TABLE pos_hourly_sales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pos_server_sales  ENABLE ROW LEVEL SECURITY;
+
+-- Postgres has no CREATE POLICY IF NOT EXISTS, so a re-run would abort on the
+-- first one and leave the rest of this file unapplied. Dropping first keeps the
+-- migration safe to run more than once.
+DROP POLICY IF EXISTS "org_members_read_pos_hourly_sales" ON pos_hourly_sales;
+DROP POLICY IF EXISTS "org_members_read_pos_server_sales" ON pos_server_sales;
+
+-- Sales are written only by the ingest route (service role, which bypasses RLS).
+-- Members get read access so the UI can show them; nothing in the app should
+-- ever write these by hand.
+CREATE POLICY "org_members_read_pos_hourly_sales"
+  ON pos_hourly_sales FOR SELECT
+  USING (
+    organization_id IN (SELECT organization_id FROM memberships WHERE user_id = auth.uid())
+  );
+
+CREATE POLICY "org_members_read_pos_server_sales"
+  ON pos_server_sales FOR SELECT
+  USING (
+    organization_id IN (SELECT organization_id FROM memberships WHERE user_id = auth.uid())
+  );

@@ -128,73 +128,38 @@ CREATE INDEX IF NOT EXISTS idx_z_server_tips_org  ON z_report_server_tips(organi
 CREATE INDEX IF NOT EXISTS idx_z_server_tips_date ON z_report_server_tips(report_date);
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Z_REPORT child tables (all depend on z_reports.id)
+-- POS_HOURLY_SALES & POS_SERVER_SALES (ticket-grain sales, independent of Z reports)
 -- ─────────────────────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS z_report_category_sales (
-  id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID          NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  z_report_id     UUID          NOT NULL REFERENCES z_reports(id) ON DELETE CASCADE,
-  category_name   TEXT          NOT NULL,
-  sales_amount    DECIMAL(10,2) DEFAULT 0,
-  sales_percentage DECIMAL(5,2) DEFAULT 0,
-  created_at      TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (organization_id, z_report_id, category_name)
-);
-CREATE INDEX IF NOT EXISTS idx_z_report_category_org    ON z_report_category_sales(organization_id);
-CREATE INDEX IF NOT EXISTS idx_z_report_category_report ON z_report_category_sales(z_report_id);
-
-CREATE TABLE IF NOT EXISTS z_report_department_sales (
-  id               UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id  UUID          NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  z_report_id      UUID          NOT NULL REFERENCES z_reports(id) ON DELETE CASCADE,
-  department_name  TEXT          NOT NULL,
-  sales_amount     DECIMAL(10,2) DEFAULT 0,
-  sales_percentage DECIMAL(5,2)  DEFAULT 0,
-  created_at       TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (organization_id, z_report_id, department_name)
+CREATE TABLE IF NOT EXISTS pos_hourly_sales (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  business_date   DATE NOT NULL,
+  hour            SMALLINT NOT NULL CHECK (hour BETWEEN 0 AND 23),
+  net_sales       NUMERIC(14,2) NOT NULL DEFAULT 0,
+  ticket_count    INTEGER       NOT NULL DEFAULT 0,
+  tips            NUMERIC(14,2) NOT NULL DEFAULT 0,
+  updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, business_date, hour)
 );
 
-CREATE TABLE IF NOT EXISTS z_report_register_sales (
-  id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID          NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  z_report_id     UUID          NOT NULL REFERENCES z_reports(id) ON DELETE CASCADE,
-  register_number INTEGER       NOT NULL,
-  cash_sales      DECIMAL(10,2) DEFAULT 0,
-  credit_card_sales DECIMAL(10,2) DEFAULT 0,
-  tips_paid_out   DECIMAL(10,2) DEFAULT 0,
-  total_sales     DECIMAL(10,2) DEFAULT 0,
-  total_collected DECIMAL(10,2) DEFAULT 0,
-  created_at      TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (organization_id, z_report_id, register_number)
+CREATE INDEX IF NOT EXISTS idx_pos_hourly_org_date
+  ON pos_hourly_sales(organization_id, business_date);
+
+CREATE TABLE IF NOT EXISTS pos_server_sales (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  business_date   DATE NOT NULL,
+  server_name     TEXT NOT NULL,
+  employee_id     UUID REFERENCES employees(id) ON DELETE SET NULL,
+  net_sales       NUMERIC(14,2) NOT NULL DEFAULT 0,
+  ticket_count    INTEGER       NOT NULL DEFAULT 0,
+  tips            NUMERIC(14,2) NOT NULL DEFAULT 0,
+  updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  UNIQUE (organization_id, business_date, server_name)
 );
 
-CREATE TABLE IF NOT EXISTS z_report_server_sales (
-  id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID          NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  z_report_id     UUID          NOT NULL REFERENCES z_reports(id) ON DELETE CASCADE,
-  employee_id     UUID          REFERENCES employees(id) ON DELETE SET NULL,
-  server_name     TEXT          NOT NULL,
-  cash_sales      DECIMAL(10,2) DEFAULT 0,
-  credit_card_sales DECIMAL(10,2) DEFAULT 0,
-  tips_paid_out   DECIMAL(10,2) DEFAULT 0,
-  total_sales     DECIMAL(10,2) DEFAULT 0,
-  cash_due        DECIMAL(10,2),
-  created_at      TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (organization_id, z_report_id, server_name)
-);
-
-CREATE TABLE IF NOT EXISTS z_report_hourly_sales (
-  id               UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id  UUID          NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  z_report_id      UUID          NOT NULL REFERENCES z_reports(id) ON DELETE CASCADE,
-  hour_start       TIME          NOT NULL,
-  hour_end         TIME          NOT NULL,
-  sales_amount     DECIMAL(10,2) DEFAULT 0,
-  sales_percentage DECIMAL(5,2)  DEFAULT 0,
-  ticket_count     INTEGER       DEFAULT 0,
-  created_at       TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (organization_id, z_report_id, hour_start, hour_end)
-);
+CREATE INDEX IF NOT EXISTS idx_pos_server_org_date
+  ON pos_server_sales(organization_id, business_date);
 
 CREATE TABLE IF NOT EXISTS z_report_cc_types (
   id                UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -435,14 +400,11 @@ ALTER TABLE employee_shifts            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE z_report_days              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE z_reports                  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE z_report_server_tips       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE z_report_category_sales    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE z_report_department_sales  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE z_report_register_sales    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE z_report_server_sales      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE z_report_hourly_sales      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE z_report_cc_types          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE z_report_cc_batch          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE losses_reports             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pos_hourly_sales           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pos_server_sales           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reps                       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rep_orders                 ENABLE ROW LEVEL SECURITY;
 ALTER TABLE weigh_reports              ENABLE ROW LEVEL SECURITY;
@@ -468,10 +430,9 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'reps','rep_orders','weigh_reports','weigh_report_items',
     'z_report_days','z_reports','z_report_server_tips',
-    'z_report_category_sales','z_report_department_sales',
-    'z_report_register_sales','z_report_server_sales',
-    'z_report_hourly_sales','z_report_cc_types','z_report_cc_batch',
+    'z_report_cc_types','z_report_cc_batch',
     'losses_reports','employees','employee_shifts',
+    'pos_hourly_sales','pos_server_sales',
     'direct_deposit_accounts','dd_verification_codes','dd_audit_log'
   ] LOOP
     p := 'org members can manage ' || t;
@@ -510,6 +471,22 @@ BEGIN
   ) THEN
     CREATE POLICY "org members can delete bar messages" ON bar_messages FOR DELETE
       USING (organization_id IN (SELECT organization_id FROM memberships WHERE user_id = auth.uid()));
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='pos_hourly_sales' AND policyname='org_members_read_pos_hourly_sales'
+  ) THEN
+    CREATE POLICY "org_members_read_pos_hourly_sales" ON pos_hourly_sales FOR SELECT
+      USING (
+        organization_id IN (SELECT organization_id FROM memberships WHERE user_id = auth.uid())
+      );
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='pos_server_sales' AND policyname='org_members_read_pos_server_sales'
+  ) THEN
+    CREATE POLICY "org_members_read_pos_server_sales" ON pos_server_sales FOR SELECT
+      USING (
+        organization_id IN (SELECT organization_id FROM memberships WHERE user_id = auth.uid())
+      );
   END IF;
 END $policies$;
 
