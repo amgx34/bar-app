@@ -14,6 +14,8 @@ public static class FeedSpecs
     public const string ZReportKey   = "ZReport";
     public const string EwReportKey  = "EwReport";
     public const string ItemAuditKey = "ItemAudit";
+    public const string HourlySalesKey = "HourlySales";
+    public const string ServerSalesKey = "ServerSales";
 
     private static readonly string[] DateSynonyms =
         ["businessdate", "reportdate", "saledate", "workdate", "shiftdate", "closedate", "date", "trandate", "transactiondate", "daydate", "postdate"];

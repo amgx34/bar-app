@@ -52,18 +52,41 @@ public class TwoTouchProfileTests
         return (cfg, conn);
     }
 
+    [Fact]
+    public void ServerSalesIncludesTonightsUnZdBusinessDay()
+    {
+        // ZReport, ItemAudit and HourlySales all UNION tblSalesHdrHist with the
+        // tblSalesDaily* pair, because the Daily tables hold the business day
+        // that has not been Z'd out yet (see the class comment on
+        // TwoTouchProfile). ServerSales must do the same, or per-server trade
+        // for tonight stays empty until the Z runs — defeating the point of a
+        // feed meant to be intraday.
+        Assert.Contains("tblSalesDailyHdr", TwoTouchProfile.ServerSales.RequiredRelations);
+        Assert.Contains("FROM dbo.tblSalesDailyHdr h", TwoTouchProfile.ServerSales.Source);
+
+        // The Daily leg must expose the same aliases as the Hist leg so the two
+        // sides of the UNION line up.
+        Assert.Contains("AS BusinessDate", TwoTouchProfile.ServerSales.Source);
+        Assert.Contains("AS ServerName", TwoTouchProfile.ServerSales.Source);
+        Assert.Contains("AS NetSales", TwoTouchProfile.ServerSales.Source);
+        Assert.Contains("AS TicketNo", TwoTouchProfile.ServerSales.Source);
+        Assert.Contains("AS Tips", TwoTouchProfile.ServerSales.Source);
+    }
+
     [SkippableFact]
-    public async Task RecognisesAllThreeFeeds()
+    public async Task RecognisesAllFiveFeeds()
     {
         await using var conn = await ConnectOrSkipAsync();
         var relations = await SqlProbe.EnumerateAsync(conn, CancellationToken.None);
 
         var matched = TwoTouchProfile.Match(relations).Select(f => f.FeedKey).ToList();
 
-        Assert.Equal(3, matched.Count);
+        Assert.Equal(5, matched.Count);
         Assert.Contains(FeedSpecs.ZReportKey, matched);
         Assert.Contains(FeedSpecs.EwReportKey, matched);
         Assert.Contains(FeedSpecs.ItemAuditKey, matched);
+        Assert.Contains(FeedSpecs.HourlySalesKey, matched);
+        Assert.Contains(FeedSpecs.ServerSalesKey, matched);
     }
 
     [SkippableFact]

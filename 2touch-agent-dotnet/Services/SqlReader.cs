@@ -152,7 +152,54 @@ public class SqlReader(IOptions<AgentConfig> cfg)
         ORDER BY sale_date DESC, net_sales DESC
         """;
 
+    /// <summary>
+    /// Trade by hour of the night.
+    ///
+    /// The business date is offset by the cutoff so a 1am ticket files against
+    /// the night before, but the HOUR is taken from the raw column. Reading the
+    /// hour off the shifted value would report an 11pm rush as 7pm — the two
+    /// need different treatments of the same column, which is the whole
+    /// subtlety here.
+    ///
+    /// COUNT(DISTINCT ticket) rather than COUNT(*): one ticket is one visit,
+    /// however many lines it has, and average ticket is the figure a busy bar
+    /// is actually managed by.
+    /// </summary>
+    public static string HourlySalesSql(
+        string table, HourlySalesColumns c, int lookbackDays, int cutoffHour, int? top = null) => $"""
+        SELECT {Top(top)}{BusinessDate(c.Date, cutoffHour)} AS business_date,
+               DATEPART(HOUR, {c.Date})                     AS hour,
+               SUM({c.Sales})                               AS net_sales,
+               COUNT(DISTINCT {c.TicketNo})                 AS ticket_count,
+               SUM({c.Tips})                                AS tips
+        FROM {Source(table, lookbackDays, cutoffHour)}
+        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'
+        GROUP BY {BusinessDate(c.Date, cutoffHour)}, DATEPART(HOUR, {c.Date})
+        ORDER BY business_date DESC, hour
+        """;
+
+    /// <summary>
+    /// Trade by whoever rang it up.
+    ///
+    /// Grouped on the name rather than the user id: the id is meaningless
+    /// outside the POS database, and the name is what has to appear on a Rail
+    /// screen.
+    /// </summary>
+    public static string ServerSalesSql(
+        string table, ServerSalesColumns c, int lookbackDays, int cutoffHour, int? top = null) => $"""
+        SELECT {Top(top)}{BusinessDate(c.Date, cutoffHour)} AS business_date,
+               {c.ServerName}                               AS server_name,
+               SUM({c.Sales})                               AS net_sales,
+               COUNT(DISTINCT {c.TicketNo})                 AS ticket_count,
+               SUM({c.Tips})                                AS tips
+        FROM {Source(table, lookbackDays, cutoffHour)}
+        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'
+        GROUP BY {BusinessDate(c.Date, cutoffHour)}, {c.ServerName}
+        ORDER BY business_date DESC, net_sales DESC
+        """;
+
     private static decimal Dec(object v) => v is null or DBNull ? 0m : Convert.ToDecimal(v);
+    private static int Int(object v) => v is null or DBNull ? 0 : Convert.ToInt32(v);
     private static string DateStr(object v) => Convert.ToDateTime(v).ToString("yyyy-MM-dd");
     private static string Str(object v) => v is null or DBNull ? string.Empty : Convert.ToString(v)?.Trim() ?? string.Empty;
 
@@ -218,6 +265,48 @@ public class SqlReader(IOptions<AgentConfig> cfg)
                 Str(r["category_name"]),
                 Dec(r["qty_sold"]),
                 Dec(r["net_sales"])));
+        }
+        return rows;
+    }
+
+    public virtual async Task<List<HourlySalesRow>> QueryHourlySalesAsync(SqlConnection conn, int lookbackDays, CancellationToken ct)
+    {
+        var sql = HourlySalesSql(_cfg.Tables.HourlySales, _cfg.Columns.HourlySales, lookbackDays,
+            FeedCutoff(_cfg.Columns.HourlySales.DateHasTime, _cfg.Sync.ResolvedCutoffHour));
+
+        var rows = new List<HourlySalesRow>();
+        await using var cmd = new SqlCommand(sql, conn);
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+        {
+            rows.Add(new HourlySalesRow(
+                DateStr(r["business_date"]),
+                Int(r["hour"]),
+                Dec(r["net_sales"]),
+                Int(r["ticket_count"]),
+                Dec(r["tips"])));
+        }
+        return rows;
+    }
+
+    public virtual async Task<List<ServerSalesRow>> QueryServerSalesAsync(SqlConnection conn, int lookbackDays, CancellationToken ct)
+    {
+        var sql = ServerSalesSql(_cfg.Tables.ServerSales, _cfg.Columns.ServerSales, lookbackDays,
+            FeedCutoff(_cfg.Columns.ServerSales.DateHasTime, _cfg.Sync.ResolvedCutoffHour));
+
+        var rows = new List<ServerSalesRow>();
+        await using var cmd = new SqlCommand(sql, conn);
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+        {
+            var name = Str(r["server_name"]);
+            if (name.Length == 0) continue;
+            rows.Add(new ServerSalesRow(
+                DateStr(r["business_date"]),
+                name,
+                Dec(r["net_sales"]),
+                Int(r["ticket_count"]),
+                Dec(r["tips"])));
         }
         return rows;
     }

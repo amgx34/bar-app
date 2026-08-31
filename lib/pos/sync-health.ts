@@ -48,6 +48,10 @@ export type SyncSummary = {
   itemAudit?: number;
   stockMoved?: number;
   unresolvedItems?: number;
+  /** Hourly rows written this sync. Zero for agents that do not send them. */
+  hoursRecorded?: number;
+  /** Per-server rows written this sync. Zero for agents that do not send them. */
+  serversRecorded?: number;
 };
 
 export type PosConfigShape = {

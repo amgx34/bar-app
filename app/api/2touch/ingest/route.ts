@@ -20,6 +20,8 @@ import { buildExclusionSet, isExcluded, posItemMatchKey } from '@/lib/pos/exclud
 import { resolveSales, toRpcComponents, type BundleRecipe, type InventoryRef } from '@/lib/pos/bundles';
 import { partitionShifts, shiftKey } from '@/lib/payroll/manual-hours';
 import type { SyncSummary } from '@/lib/pos/sync-health';
+import { normaliseHourlyRows, groupByNight } from '@/lib/pos/hourly-sales';
+import { normaliseServerRows, groupServerRowsByNight } from '@/lib/pos/server-sales';
 
 export const runtime     = 'nodejs';
 export const maxDuration = 30;
@@ -54,6 +56,28 @@ type ItemAuditRow = {
   net_sales:     number;
 };
 
+/**
+ * Hourly and per-server trade. Both OPTIONAL: an agent older than the release
+ * that added these sections sends neither, and its request must still succeed.
+ * That is also what makes "this bar has no hourly data" a real state the Sales
+ * screens can report rather than a theoretical one.
+ */
+type HourlySalesPayloadRow = {
+  business_date: string;
+  hour:          number;
+  net_sales:     number;
+  ticket_count:  number;
+  tips:          number;
+};
+
+type ServerSalesPayloadRow = {
+  business_date: string;
+  server_name:   string;
+  net_sales:     number;
+  ticket_count:  number;
+  tips:          number;
+};
+
 type Payload = {
   org_id:    string;           // REQUIRED — which bar is sending this
   source:    string;
@@ -61,6 +85,8 @@ type Payload = {
   zReports:  ZReportRow[];
   ewReports: EWReportRow[];
   itemAudit: ItemAuditRow[];
+  hourlySales?: HourlySalesPayloadRow[];
+  serverSales?: ServerSalesPayloadRow[];
 };
 
 // Shapes written to Supabase. Collected into arrays and sent as one upsert per
@@ -238,6 +264,8 @@ export async function POST(req: NextRequest) {
     salesRecorded: 0,
     stockMoved: 0,
     unresolvedItems: 0,
+    hoursRecorded: 0,
+    serversRecorded: 0,
     errors: [] as string[],
   };
 
@@ -623,6 +651,84 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── Hourly trade ────────────────────────────────────────────────────────
+  //
+  // A per-night REPLACE, not an upsert. An hour can LOSE sales when a ticket
+  // is voided after the fact, and a blind merge leaves the old figure
+  // standing — the night would only ever grow. This is safe precisely because
+  // the agent always sends a whole night rather than a delta.
+  const hourlyRows = normaliseHourlyRows(data.hourlySales ?? []);
+  for (const [night, rows] of groupByNight(hourlyRows)) {
+    // admin-scope-ok: resolvedOrgId came from resolveOrgAndVerify above, which
+    // matched the payload's org_id against that org's own agent_token. A
+    // request cannot reach here for an org it cannot sign for.
+    const { error: delErr } = await supabase
+      .from('pos_hourly_sales')
+      .delete()
+      .eq('organization_id', resolvedOrgId)
+      .eq('business_date', night);
+
+    if (delErr) {
+      result.errors.push(`pos_hourly_sales delete(${night}): ${delErr.message}`);
+      // Skip the insert for THIS night only: inserting on top of rows that
+      // were not cleared would double the night's takings.
+      continue;
+    }
+
+    const { error: insErr } = await supabase
+      .from('pos_hourly_sales')
+      .insert(
+        rows.map((r) => ({
+          organization_id: resolvedOrgId,
+          business_date:   r.business_date,
+          hour:            r.hour,
+          net_sales:       r.net_sales,
+          ticket_count:    r.ticket_count,
+          tips:            r.tips,
+          updated_at:      new Date().toISOString(),
+        })),
+      );
+
+    if (insErr) result.errors.push(`pos_hourly_sales(${night}): ${insErr.message}`);
+    else result.hoursRecorded += rows.length;
+  }
+
+  // ── Per-server trade ────────────────────────────────────────────────────
+  //
+  // Same per-night replace, same reason: a server's night can shrink.
+  // employee_id is deliberately NOT resolved here — see lib/pos/server-sales.ts.
+  const serverRows = normaliseServerRows(data.serverSales ?? []);
+  for (const [night, rows] of groupServerRowsByNight(serverRows)) {
+    // admin-scope-ok: as above, resolvedOrgId is the signing org.
+    const { error: delErr } = await supabase
+      .from('pos_server_sales')
+      .delete()
+      .eq('organization_id', resolvedOrgId)
+      .eq('business_date', night);
+
+    if (delErr) {
+      result.errors.push(`pos_server_sales delete(${night}): ${delErr.message}`);
+      continue;
+    }
+
+    const { error: insErr } = await supabase
+      .from('pos_server_sales')
+      .insert(
+        rows.map((r) => ({
+          organization_id: resolvedOrgId,
+          business_date:   r.business_date,
+          server_name:     r.server_name,
+          net_sales:       r.net_sales,
+          ticket_count:    r.ticket_count,
+          tips:            r.tips,
+          updated_at:      new Date().toISOString(),
+        })),
+      );
+
+    if (insErr) result.errors.push(`pos_server_sales(${night}): ${insErr.message}`);
+    else result.serversRecorded += rows.length;
+  }
+
   // Record the outcome on the org so a failing sync is visible in the app.
   //
   // This exists because pos_apply_item_sales failed on every single sync for
@@ -637,6 +743,8 @@ export async function POST(req: NextRequest) {
     itemAudit: result.itemAudit,
     stockMoved: result.stockMoved,
     unresolvedItems: result.unresolvedItems,
+    hoursRecorded: result.hoursRecorded,
+    serversRecorded: result.serversRecorded,
   });
 
   if (result.errors.length) {

@@ -123,6 +123,25 @@ public class ProfileMigrationTests
     }
 
     [Fact]
+    public void UpgradingAlsoWiresTheFeedsThatDidNotExistYet()
+    {
+        // A config written before 1.1.0 has never heard of HourlySales or
+        // ServerSales — Tables.HourlySales/ServerSales sit on the compiled-in
+        // default. Recognising the config as a 2Touch profile at all should be
+        // enough to also hand it the mapping a fresh wizard run would produce,
+        // exactly as TwoTouchProfile.Apply would for a brand-new setup.
+        var cfg = WithZSource(ProfileMigration.ZReportV1);
+
+        ProfileMigration.Apply(cfg);
+
+        Assert.True(cfg.ProfileUpgraded);
+        Assert.Equal(TwoTouchProfile.HourlySales.Source, cfg.Tables.HourlySales);
+        Assert.Equal("[TicketNo]", cfg.Columns.HourlySales.TicketNo);
+        Assert.Equal(TwoTouchProfile.ServerSales.Source, cfg.Tables.ServerSales);
+        Assert.Equal("[ServerName]", cfg.Columns.ServerSales.ServerName);
+    }
+
+    [Fact]
     public void ASkippedFeedIsNotMistakenForAnOldOne()
     {
         // An empty Tables entry means "this bar has no Z feed". It must not
