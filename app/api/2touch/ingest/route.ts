@@ -743,6 +743,8 @@ export async function POST(req: NextRequest) {
     itemAudit: result.itemAudit,
     stockMoved: result.stockMoved,
     unresolvedItems: result.unresolvedItems,
+    hoursRecorded: result.hoursRecorded,
+    serversRecorded: result.serversRecorded,
   });
 
   if (result.errors.length) {
