@@ -6,6 +6,52 @@ using RailAgent.Models;
 namespace RailAgent.Services;
 
 /// <summary>
+/// Columns the hourly feed needs from a ticket header.
+///
+/// A class with settable properties rather than a positional record, to
+/// match ZReportColumns and the other Columns types.
+/// </summary>
+public sealed class HourlySalesColumns
+{
+    public string Date  { get; set; } = "BusinessDate";
+    public string Sales { get; set; } = "NetSales";
+    public string Tips  { get; set; } = "Tips";
+
+    /// <summary>
+    /// The ticket number column, for COUNT(DISTINCT) — one ticket is one visit
+    /// however many lines it has. Defaults to the literal NULL, not a column
+    /// name: see the CashSales note on ZReportColumns for why a bad default
+    /// here would break the whole statement. COUNT(DISTINCT NULL) is valid
+    /// SQL and returns 0, the same honest zero the tender split uses.
+    /// </summary>
+    public string TicketNo { get; set; } = "NULL";
+}
+
+/// <summary>
+/// Columns the per-server feed needs from a ticket header.
+///
+/// A class with settable properties rather than a positional record, to
+/// match ZReportColumns and EwReportColumns — these are bound from
+/// appsettings.json, and FeedSpecs mirrors their property names.
+/// </summary>
+public sealed class ServerSalesColumns
+{
+    public string Date       { get; set; } = "BusinessDate";
+    public string ServerName { get; set; } = "ServerName";
+    public string Sales      { get; set; } = "NetSales";
+    public string Tips       { get; set; } = "Tips";
+
+    /// <summary>
+    /// The ticket number column, for COUNT(DISTINCT) — one ticket is one visit
+    /// however many lines it has. Defaults to the literal NULL, not a column
+    /// name: see the CashSales note on ZReportColumns for why a bad default
+    /// here would break the whole statement. COUNT(DISTINCT NULL) is valid
+    /// SQL and returns 0, the same honest zero the tender split uses.
+    /// </summary>
+    public string TicketNo   { get; set; } = "NULL";
+}
+
+/// <summary>
 /// Read-only reader for the local TwoTouch SQL Server. Connects over shared
 /// memory (no TCP port, no SQL Server Browser) and runs the three report
 /// queries. Table/column names come from config so each bar's schema can differ.
@@ -150,6 +196,52 @@ public class SqlReader(IOptions<AgentConfig> cfg)
         WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'
         GROUP BY {BusinessDate(c.Date, cutoffHour)}, {c.ItemName}, {c.Category}
         ORDER BY sale_date DESC, net_sales DESC
+        """;
+
+    /// <summary>
+    /// Trade by hour of the night.
+    ///
+    /// The business date is offset by the cutoff so a 1am ticket files against
+    /// the night before, but the HOUR is taken from the raw column. Reading the
+    /// hour off the shifted value would report an 11pm rush as 7pm — the two
+    /// need different treatments of the same column, which is the whole
+    /// subtlety here.
+    ///
+    /// COUNT(DISTINCT ticket) rather than COUNT(*): one ticket is one visit,
+    /// however many lines it has, and average ticket is the figure a busy bar
+    /// is actually managed by.
+    /// </summary>
+    public static string HourlySalesSql(
+        string table, HourlySalesColumns c, int lookbackDays, int cutoffHour, int? top = null) => $"""
+        SELECT {Top(top)}{BusinessDate(c.Date, cutoffHour)} AS business_date,
+               DATEPART(HOUR, {c.Date})                     AS hour,
+               SUM({c.Sales})                               AS net_sales,
+               COUNT(DISTINCT {c.TicketNo})                 AS ticket_count,
+               SUM({c.Tips})                                AS tips
+        FROM {Source(table, lookbackDays, cutoffHour)}
+        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'
+        GROUP BY {BusinessDate(c.Date, cutoffHour)}, DATEPART(HOUR, {c.Date})
+        ORDER BY business_date DESC, hour
+        """;
+
+    /// <summary>
+    /// Trade by whoever rang it up.
+    ///
+    /// Grouped on the name rather than the user id: the id is meaningless
+    /// outside the POS database, and the name is what has to appear on a Rail
+    /// screen.
+    /// </summary>
+    public static string ServerSalesSql(
+        string table, ServerSalesColumns c, int lookbackDays, int cutoffHour, int? top = null) => $"""
+        SELECT {Top(top)}{BusinessDate(c.Date, cutoffHour)} AS business_date,
+               {c.ServerName}                               AS server_name,
+               SUM({c.Sales})                               AS net_sales,
+               COUNT(DISTINCT {c.TicketNo})                 AS ticket_count,
+               SUM({c.Tips})                                AS tips
+        FROM {Source(table, lookbackDays, cutoffHour)}
+        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'
+        GROUP BY {BusinessDate(c.Date, cutoffHour)}, {c.ServerName}
+        ORDER BY business_date DESC, net_sales DESC
         """;
 
     private static decimal Dec(object v) => v is null or DBNull ? 0m : Convert.ToDecimal(v);

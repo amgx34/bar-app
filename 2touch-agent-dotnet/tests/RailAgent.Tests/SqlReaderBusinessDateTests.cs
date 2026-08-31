@@ -19,6 +19,17 @@ public class SqlReaderBusinessDateTests
         Date = "[BusinessDate]", Sales = "[NetSales]", CcTips = "[CcTips]", CashTips = "[CashTips]",
     };
 
+    private static readonly HourlySalesColumns HourlyCols = new()
+    {
+        Date = "[dtmTicketDate]", Sales = "[fNetAmt]", Tips = "[fTipAmt]", TicketNo = "[szTicketNo]",
+    };
+
+    private static readonly ServerSalesColumns SrvCols = new()
+    {
+        Date = "[dtmTicketDate]", ServerName = "[szServerName]",
+        Sales = "[fNetAmt]", Tips = "[fTipAmt]", TicketNo = "[szTicketNo]",
+    };
+
     // ── The rule itself ──────────────────────────────────────────────────────
 
     [Fact]
@@ -150,6 +161,54 @@ public class SqlReaderBusinessDateTests
     [Fact]
     public void Default_is_four()
         => Assert.Equal(4, new SyncConfig().ResolvedCutoffHour);
+
+    // ── Hourly and per-server trade, added for ticket-grain capture ──────────
+
+    [Fact]
+    public void HourlySalesSql_GroupsByBusinessDateAndClockHour()
+    {
+        var sql = SqlReader.HourlySalesSql("dbo.tblSalesHdrHist", HourlyCols, lookbackDays: 2, cutoffHour: 4);
+
+        // The hour must come off the RAW column, not the offset one. Taking
+        // DATEPART on the shifted value reports 11pm trade as 7pm.
+        Assert.Contains("DATEPART(HOUR, [dtmTicketDate])", sql);
+        Assert.Contains("CAST(DATEADD(HOUR, -4, [dtmTicketDate]) AS DATE)", sql);
+        Assert.Contains("COUNT(DISTINCT", sql);
+    }
+
+    [Fact]
+    public void HourlySalesSql_WithZeroCutoff_StillGroupsByHour()
+    {
+        // A bar that closes before midnight has cutoff 0. It still has hours.
+        var sql = SqlReader.HourlySalesSql("dbo.tblSalesHdrHist", HourlyCols, lookbackDays: 2, cutoffHour: 0);
+        Assert.Contains("DATEPART(HOUR, [dtmTicketDate])", sql);
+        Assert.DoesNotContain("DATEADD", sql);
+    }
+
+    [Fact]
+    public void HourlySalesSql_SumsTheSingleTipsColumn()
+    {
+        // The feed's source query exposes one Tips alias, not a cc/cash split —
+        // unlike ZReportSql, which sums CcTips and CashTips separately.
+        var sql = SqlReader.HourlySalesSql("dbo.tblSalesHdrHist", HourlyCols, lookbackDays: 2, cutoffHour: 4);
+        Assert.Contains("SUM([fTipAmt])", sql);
+    }
+
+    [Fact]
+    public void ServerSalesSql_GroupsByBusinessDateAndServer()
+    {
+        var sql = SqlReader.ServerSalesSql("dbo.tblSalesHdrHist", SrvCols, lookbackDays: 2, cutoffHour: 4);
+        Assert.Contains("CAST(DATEADD(HOUR, -4, [dtmTicketDate]) AS DATE)", sql);
+        Assert.Contains("COUNT(DISTINCT", sql);
+        Assert.Contains("GROUP BY", sql);
+    }
+
+    [Fact]
+    public void ServerSalesSql_SumsTheSingleTipsColumn()
+    {
+        var sql = SqlReader.ServerSalesSql("dbo.tblSalesHdrHist", SrvCols, lookbackDays: 2, cutoffHour: 4);
+        Assert.Contains("SUM([fTipAmt])", sql);
+    }
 
     // ── The regression that started all this ─────────────────────────────────
 
