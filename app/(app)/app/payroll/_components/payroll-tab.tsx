@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import type { WeeklyPoint } from './weekly-trend-chart';
 import ZReportTextUpload from './z-report-text-upload';
 import EmployeeShiftsUpload from './employee-shifts-upload';
-import { PeriodToggle } from './period-toggle';
+import { PeriodToggle } from '../../_components/period-toggle';
 import { defaultPeriod, monthRange, shiftPeriod, todayIso, type PayrollView } from '@/lib/date-range';
 
 const WeeklyTrendChart = dynamic(() => import('./weekly-trend-chart'));
@@ -147,7 +147,15 @@ export default function PayrollTab({
           the viewport and the whole of Payroll scrolled sideways. */}
       <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
         <div className="flex flex-wrap items-center gap-3">
-          <PeriodToggle view={view} hrefs={hrefs} />
+          <PeriodToggle
+            view={view}
+            items={[
+              { key: 'day', label: 'Day' },
+              { key: 'week', label: 'Week' },
+              { key: 'month', label: 'Month' },
+            ]}
+            hrefs={hrefs}
+          />
 
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="h-8 w-8 p-0" aria-label={`Previous ${periodNoun}`} onClick={() => navigatePeriod('prev')}>
