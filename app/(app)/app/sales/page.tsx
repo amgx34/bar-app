@@ -11,9 +11,11 @@ import { HourlyCurve } from './_components/hourly-curve';
 import { ServerTable } from './_components/server-table';
 import { MenuQuadrant } from './_components/menu-quadrant';
 import { TrendChart } from './_components/trend-chart';
+import { TonightClock } from './_components/tonight-clock';
 import { Stat, CostCoverageNotice, TaxInclusiveNotice, SizeSplit, money, pct } from './_components/sales-bits';
 import { rankByMargin } from '@/lib/pos/sales-analytics';
 import { assessSyncHealth, describeAge } from '@/lib/pos/sync-health';
+import { cutoffHourFromSettings } from '@/lib/business-date';
 import { cn } from '@/lib/utils';
 import {
   resolveSalesView, defaultSalesPeriod, shiftSalesPeriod,
@@ -53,19 +55,48 @@ export default async function SalesPage({
 }) {
   const params = await searchParams;
   const view = resolveSalesView(params.view);
+  // Used only to build hrefs for the OTHER period views below — a few hours
+  // of server-clock drift there is a mistargeted link, never a rendered
+  // number, so it does not need the bar's own clock the way the query below
+  // does.
   const today = todayIso();
 
-  const period = payPeriodFromParams(params.start, params.end)
-    ?? defaultSalesPeriod(view, today);
+  const explicitPeriod = payPeriodFromParams(params.start, params.end);
 
   const { org } = await getCurrentOrg();
   if (!org?.id) return <div className="p-6">Organization not found</div>;
 
+  const cutoffHour = cutoffHourFromSettings(org.bar_settings ?? {});
+
+  // A bare landing on Tonight with no explicit start/end: the server has no
+  // way to know which business night "tonight" means for this bar (see
+  // AGENTS.md — the server clock is UTC, bars are US-based) and, after roughly
+  // 7-8pm US-Eastern, would guess a UTC date that hasn't opened yet. Rather
+  // than query that guess and render an empty night as "no sales", this skips
+  // the fetch entirely and waits for the browser to say what night it is.
+  if (view === 'tonight' && !explicitPeriod) {
+    return (
+      <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+        <TonightClock cutoffHour={cutoffHour} active />
+        <p className="text-sm text-muted-foreground">Loading tonight&rsquo;s numbers…</p>
+      </main>
+    );
+  }
+
+  const period = explicitPeriod ?? defaultSalesPeriod(view, today);
+
   const singleNight = view === 'tonight' || view === 'day';
-  // Tonight compares like for like: past nights are measured only as far into
-  // the evening as tonight has reached. Comparing a half-finished Saturday
-  // against four complete ones reports a disaster every time.
-  const upToHour = view === 'tonight' ? new Date().getHours() : undefined;
+
+  // The hour tonight has reached, on the BAR's own clock — supplied by
+  // TonightClock below, never guessed from the server clock. Tonight compares
+  // like for like: past nights are measured only as far into the evening as
+  // tonight has reached, so comparing a half-finished Saturday against four
+  // complete ones does not report a disaster every time. Until the browser has
+  // reported in, this stays undefined and the baseline is omitted — see
+  // `hourKnown` below.
+  const rawHour = typeof params.hour === 'string' ? Number(params.hour) : NaN;
+  const hourKnown = view === 'tonight' && Number.isInteger(rawHour) && rawHour >= 0 && rawHour <= 23;
+  const upToHour = hourKnown ? rawHour : undefined;
 
   const [data, legacy] = await Promise.all([
     getPeriodSalesData(view, period.start, period.end, upToHour),
@@ -127,6 +158,13 @@ export default async function SalesPage({
            href={`/app/sales?view=${view}&start=${next.start}&end=${next.end}`}>→</a>
       </div>
 
+      {/* Keeps `hour` (and, on a bare landing, `start`/`end`) synced from the
+          browser's own clock. Mounted here rather than only on the early-return
+          path above, because switching to Tonight from another view arrives
+          with an explicit start/end already (see the toggle's href below) and
+          so skips that path, but still needs its `hour` filled in. */}
+      <TonightClock cutoffHour={cutoffHour} active={view === 'tonight'} />
+
       {legacy.revenueIncludesTax && <TaxInclusiveNotice rate={legacy.salesTaxRate} />}
 
       {singleNight ? (
@@ -136,7 +174,11 @@ export default async function SalesPage({
               title={view === 'tonight' ? 'Tonight' : period.start}
               netSales={data.daypart.totalNet}
               tickets={data.tickets}
-              baseline={data.baseline?.netSales ?? null}
+              // A baseline computed against the SERVER's hour would be a
+              // confidently wrong percentage rendered on a financial screen —
+              // worse than none. On day/week/month there is no partial night
+              // to protect against, so those pass the real baseline through.
+              baseline={view === 'tonight' && !hourKnown ? null : (data.baseline?.netSales ?? null)}
               hasTickets={data.capabilities.hasTickets}
               asOf={asOf}
               live={view === 'tonight'}
