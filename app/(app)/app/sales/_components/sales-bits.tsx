@@ -90,3 +90,40 @@ export function TaxInclusiveNotice({ rate }: { rate: number }) {
     </div>
   );
 }
+
+/**
+ * How an item's sales split across SGL / DBL / RDB.
+ *
+ * Rendered only when the item actually rang up at more than one size — a bar
+ * that never uses the tokens should see no extra furniture at all.
+ *
+ * The pour count is shown alongside the drink count because they genuinely
+ * differ: 20 doubles is 20 drinks and 40 pours, and the margin on the row is
+ * computed from the second figure. Showing only the first makes the cost look
+ * wrong to anyone checking the arithmetic by hand.
+ */
+export function SizeSplit({
+  sizes,
+  pourUnits,
+  units,
+}: {
+  sizes: { token: string | null; label: string; unitsSold: number }[];
+  pourUnits: number;
+  units: number;
+}) {
+  const real = sizes.filter((s) => s.token !== null);
+  if (real.length === 0) return null;
+
+  return (
+    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+      {sizes
+        .map((s) => `${Math.round(s.unitsSold).toLocaleString()} ${s.label.toLowerCase()}`)
+        .join(' · ')}
+      {Math.abs(pourUnits - units) > 0.001 && (
+        <span className="ml-1 opacity-70">
+          ({Math.round(pourUnits).toLocaleString()} pours)
+        </span>
+      )}
+    </span>
+  );
+}

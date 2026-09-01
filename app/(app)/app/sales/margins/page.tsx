@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Scale, TrendingDown, TrendingUp } from 'lucide-react';
 import { getSalesData } from '../actions';
 import { RangeFilter } from '../_components/range-filter';
-import { CostCoverageNotice, money, pct } from '../_components/sales-bits';
+import { CostCoverageNotice, money, pct, SizeSplit } from '../_components/sales-bits';
 import { rankByMargin, flagThinMargins } from '@/lib/pos/sales-analytics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -202,6 +202,11 @@ export default async function SalesMarginsPage({
                         <span className="block text-xs font-normal text-muted-foreground">
                           {i.categoryName ?? 'Uncategorised'}
                         </span>
+                        <SizeSplit
+                          sizes={i.sizes}
+                          pourUnits={i.pourUnitsSold}
+                          units={i.unitsSold}
+                        />
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums">
                         {Math.round(i.unitsSold).toLocaleString()}

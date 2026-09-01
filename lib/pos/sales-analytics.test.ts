@@ -493,3 +493,174 @@ describe('slowMovers and recipe ingredients', () => {
     expect(slowMovers(sold, shelf).map((r) => r.matchKey)).toContain('lemon vodka');
   });
 });
+
+/**
+ * Size variants in the sales report.
+ *
+ * The rollup has to agree with what depletion actually spent (resolveSales in
+ * lib/pos/bundles.ts). If the report groups a line one way and the ledger
+ * spends it another, the two screens describe different bars.
+ */
+describe('computeItemMargins — size variants', () => {
+  const variant = (
+    matchKey: string,
+    baseMatchKey: string,
+    sizeToken: string | null,
+    sizeMultiplier: number,
+    qtySold: number,
+    netSales: number,
+    sizeLabel: string | null = null,
+  ): SoldLine => ({
+    matchKey,
+    itemName: matchKey,
+    categoryName: 'Vodka',
+    qtySold,
+    netSales,
+    saleDate: '2026-08-19',
+    baseMatchKey,
+    sizeToken,
+    sizeMultiplier,
+    sizeLabel,
+  });
+
+  // $6.68 a litre poured 1oz — about 19.76 cents a single.
+  const costs = new Map([['well vodka', spirit('well vodka', 6.68)]]);
+
+  it('rolls singles and doubles into one row for the item', () => {
+    const out = computeItemMargins(
+      [
+        variant('sgl well vodka', 'well vodka', 'sgl', 1, 100, 500),
+        variant('dbl well vodka', 'well vodka', 'dbl', 2, 20, 200),
+      ],
+      costs,
+    );
+
+    expect(out).toHaveLength(1);
+    expect(out[0].matchKey).toBe('well vodka');
+    // 120 drinks were poured, not two menu lines.
+    expect(out[0].unitsSold).toBe(120);
+    expect(out[0].revenue).toBe(700);
+  });
+
+  it('costs a double as two pours, not one', () => {
+    // The whole point: 20 doubles drink 40 ounces out of the bottle.
+    const out = computeItemMargins(
+      [variant('dbl well vodka', 'well vodka', 'dbl', 2, 20, 200)],
+      costs,
+    );
+
+    expect(out[0].pourUnitsSold).toBe(40);
+    expect(out[0].cost).toBeCloseTo(40 * 0.19755, 2);
+    // costPerDrink stays the BASE pour, so a reader knows what one single costs.
+    expect(out[0].costPerDrink).toBeCloseTo(0.1976, 3);
+  });
+
+  it('counts a double as one drink but two pours', () => {
+    const out = computeItemMargins(
+      [variant('dbl well vodka', 'well vodka', 'dbl', 2, 20, 200)],
+      costs,
+    );
+    expect(out[0].unitsSold).toBe(20);
+    expect(out[0].pourUnitsSold).toBe(40);
+  });
+
+  it('reports how the sales split by size', () => {
+    const out = computeItemMargins(
+      [
+        variant('sgl well vodka', 'well vodka', 'sgl', 1, 100, 500, 'Single'),
+        variant('dbl well vodka', 'well vodka', 'dbl', 2, 20, 200, 'Double'),
+        variant('rdb well vodka', 'well vodka', 'rdb', 2, 5, 60, 'Double + Red Bull'),
+      ],
+      costs,
+    );
+
+    const split = Object.fromEntries(out[0].sizes.map((s) => [s.token, s.unitsSold]));
+    expect(split).toEqual({ sgl: 100, dbl: 20, rdb: 5 });
+    // Largest earner first, so the UI does not have to sort it again.
+    expect(out[0].sizes[0].token).toBe('sgl');
+    expect(out[0].sizes.find((s) => s.token === 'rdb')?.label).toBe('Double + Red Bull');
+  });
+
+  it('folds one size seen across several days into a single split entry', () => {
+    const out = computeItemMargins(
+      [
+        { ...variant('dbl well vodka', 'well vodka', 'dbl', 2, 5, 50), saleDate: '2026-08-19' },
+        { ...variant('dbl well vodka', 'well vodka', 'dbl', 2, 7, 70), saleDate: '2026-08-20' },
+      ],
+      costs,
+    );
+    expect(out[0].sizes).toHaveLength(1);
+    expect(out[0].sizes[0].unitsSold).toBe(12);
+  });
+
+  it('merges a variant with a plain sale of the same item', () => {
+    const out = computeItemMargins(
+      [
+        line('well vodka', 50, 250),
+        variant('dbl well vodka', 'well vodka', 'dbl', 2, 10, 100),
+      ],
+      costs,
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].unitsSold).toBe(60);
+    expect(out[0].pourUnitsSold).toBe(70);
+    // The untokenised line is its own split entry, not silently absorbed.
+    expect(out[0].sizes.map((s) => s.token).sort()).toEqual(['dbl', null]);
+  });
+
+  it('names the rolled-up row after the inventory item', () => {
+    const named = new Map([
+      ['well vodka', { ...spirit('well vodka', 6.68), itemName: 'Well Vodka' }],
+    ]);
+    const out = computeItemMargins(
+      [variant('dbl well vodka', 'well vodka', 'dbl', 2, 10, 100)],
+      named,
+    );
+    expect(out[0].itemName).toBe('Well Vodka');
+  });
+
+  it('leaves the variant alone when the base is not a known item', () => {
+    // Rolling onto a key nothing knows about would merge unrelated lines
+    // behind an item that does not exist.
+    const out = computeItemMargins(
+      [variant('dbl malort', 'malort', 'dbl', 2, 10, 100)],
+      costs,
+    );
+    expect(out[0].matchKey).toBe('dbl malort');
+    expect(out[0].pourUnitsSold).toBe(10);
+    expect(out[0].costKnown).toBe(false);
+  });
+
+  it('does not touch an item with no token at all', () => {
+    const out = computeItemMargins([line('well vodka', 34, 170)], costs);
+    expect(out[0].unitsSold).toBe(34);
+    expect(out[0].pourUnitsSold).toBe(34);
+    expect(out[0].sizes).toEqual([
+      { token: null, label: 'Standard', multiplier: 1, unitsSold: 34, revenue: 170 },
+    ]);
+  });
+
+  it('weights the trend by pour on the same night', () => {
+    const flat = revenueTrend([variant('sgl well vodka', 'well vodka', 'sgl', 1, 20, 200)], costs);
+    const dbl = revenueTrend([variant('dbl well vodka', 'well vodka', 'dbl', 2, 20, 200)], costs);
+    // Same revenue, same drink count, twice the liquor.
+    expect(dbl[0].cost).toBeCloseTo(flat[0].cost * 2, 4);
+    expect(dbl[0].margin).toBeLessThan(flat[0].margin);
+  });
+
+  it('rolls the split up into the category totals once, not twice', () => {
+    const out = computeItemMargins(
+      [
+        variant('sgl well vodka', 'well vodka', 'sgl', 1, 100, 500),
+        variant('dbl well vodka', 'well vodka', 'dbl', 2, 20, 200),
+      ],
+      costs,
+    );
+    const cats = groupByCategory(out);
+    expect(cats).toHaveLength(1);
+    expect(cats[0].unitsSold).toBe(120);
+    expect(cats[0].revenue).toBe(700);
+    // One item, not one per size.
+    expect(cats[0].itemCount).toBe(1);
+  });
+});
