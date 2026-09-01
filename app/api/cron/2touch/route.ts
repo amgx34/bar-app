@@ -10,6 +10,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { poll2TouchEmails } from '@/lib/2touch/poll-emails';
 import { purgeExpiredDemoUsers } from '@/lib/demo/purge';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { runDailyNotifications } from '@/lib/notifications/run-daily';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -62,7 +63,18 @@ export async function GET(req: NextRequest) {
     }
   })();
 
-  const result = { emails, demoPurge, rateLimitRowsSwept, jsonbPruned };
+  // Runs last, deliberately: it reads z_report_days and inventory_items, so it
+  // wants the email ingest above to have landed last night's Z report first.
+  const notifications = await (async () => {
+    try {
+      return await runDailyNotifications();
+    } catch (e) {
+      console.warn('[cron/2touch] notification pass threw:', e);
+      return { orgsScanned: 0, notified: 0, errors: [String(e)] };
+    }
+  })();
+
+  const result = { emails, demoPurge, rateLimitRowsSwept, jsonbPruned, notifications };
   console.log('[cron/2touch]', result);
   return NextResponse.json(result);
 }

@@ -119,12 +119,67 @@ BEFORE bundles are resolved, so an item that is both is never expanded —
 `saveBundle()` removes the exclusion for that reason.
 - AI parsing uses Groq (`lib/ai-parsers/`).
 
+**Demo orgs are swept by slug, never by membership.** Deleting a demo auth user
+cascades its `memberships` row away, so a purge that finds orgs by joining
+through memberships destroys its own only handle on them — 34 orgs were orphaned
+that way, each counting permanently against `MAX_LIVE_DEMO_ORGS`. `lib/demo/`
+sweeps `organizations` by `DEMO_SLUG_PREFIX` + age instead, which is idempotent
+and self-healing. The prefix is shared from `lib/demo/constants.ts` by all three
+places that need it; do not re-inline it.
+
+**Notifications are two streams in one bell.** `bar_messages` is rep
+correspondence; `notifications` is system-generated alerts (low stock, nightly
+sales, sales anomaly, payroll approval). They are deliberately separate tables —
+every rep column (`sender_email`, `requested_amount`, `ai_breakdown`) is NULL for
+a system alert.
+
+Detection is **pure and tested** in `lib/notifications/detect.ts`; everything
+touching the network is in `deliver.ts`. The three periodic alerts run from
+`lib/notifications/run-daily.ts`, driven by the one Vercel cron
+(`/api/cron/2touch`, daily) — the Hobby plan allows exactly one cron per day, and
+all three alerts want to fire once after the night reconciles anyway. Payroll
+approval delivers inline instead, because a manager waiting a day for sign-off is
+useless.
+
+Two invariants that are easy to break:
+- **Low stock is edge-triggered.** The digest's `payload.itemIds` is the full set
+  of low items and is read back on the next run as "already announced". Write
+  only the new ones there and the alert re-fires nightly forever.
+- **`notifications.dedupe_key` is what makes the cron re-runnable.** A unique
+  index on `(user_id, dedupe_key)` turns a repeat pass into a no-op. Periodic
+  alerts key on the business date; payroll keys on the run plus a timestamp,
+  because a resubmission after a send-back *is* a new ask.
+
+Preferences store only explicit choices — **a missing row means "use the role
+default"** (`ROLE_DEFAULTS` in `lib/notifications/types.ts`). That is what lets a
+new event type behave sensibly for existing users with no backfill.
+
+Push is optional infrastructure: with no VAPID keys the bell still works, nothing
+buzzes, and nothing throws. A `404`/`410` from the push service is the only thing
+that may delete a `push_subscriptions` row — a transient 500 must not cost a
+manager their notifications.
+
+**A pay run is a snapshot, not a status flag.** `computePayroll()` recalculates
+live, so approving a period would otherwise mean approving whatever the numbers
+happen to be at read time. `payroll_runs.snapshot` freezes them at submit, and
+`lib/payroll/run-diff.ts` diffs that against a fresh recompute before an owner can
+sign off. Approving accepted changes REPLACES the snapshot — storing the
+superseded one would record an approval of numbers nobody agreed to. The NACHA
+export is gated on an approved run, escapable only via `overrideApprovalGate()`,
+which writes down the reason.
+
 ## Env vars (`.env.local`)
 
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
 `GROQ_API_KEY`, `DD_ENCRYPTION_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
 `TWILIO_FROM_NUMBER`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `TWOTOUCH_INGEST_SECRET`,
 `CLOVER_CLIENT_ID`, `CLOVER_REDIRECT_URI`, `CLOVER_SANDBOX`. Plus `CRON_SECRET` on Vercel.
+
+Web Push (all three, or push silently no-ops and only the in-app bell works):
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (a
+`mailto:` or https URL). Generate a pair with `npx web-push generate-vapid-keys`.
+Rotating them invalidates every stored `push_subscriptions` row — devices must
+re-enable.
 
 Agent release manifest (`GET /api/agent/manifest`, Vercel only — the route returns
 `204` until all three are set, which every agent reads as "you are current"):

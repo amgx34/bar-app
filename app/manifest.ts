@@ -1,67 +1,31 @@
 import type { MetadataRoute } from 'next';
-import { SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from '@/lib/site';
+import { SITE_NAME, SITE_TAGLINE } from '@/lib/site';
 
 /**
- * Web app manifest — what makes Rail installable to a phone home screen.
+ * Installability, which Web Push depends on.
  *
- * The audience is bar staff mid-shift: one hand, a dim room, a phone that may
- * be on bad wifi. Launching from the home screen into a standalone window
- * removes the browser chrome that otherwise eats a fifth of a small screen and
- * puts a reload button next to a stock count.
+ * On iOS 16.4+ push works ONLY for an app added to the Home Screen — Safari
+ * will not grant the permission otherwise. So this manifest is not cosmetic:
+ * without it, notifications are desktop-and-Android only.
  *
- * `start_url` is the dashboard rather than `/`: someone installing this is a
- * signed-in operator, and landing them on the marketing page every time would
- * be a bug. The auth gate in proxy.ts redirects to login if the session lapsed.
+ * start_url points at the dashboard rather than '/' because anyone installing
+ * this is a logged-in operator; landing them on the marketing page would be a
+ * redirect on every launch.
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: `${SITE_NAME} — ${SITE_TAGLINE}`,
-    short_name: SITE_NAME,
-    description: SITE_DESCRIPTION,
-    start_url: '/app/dashboard',
-    scope: '/',
-    display: 'standalone',
-    orientation: 'portrait',
-    // Matches --sidebar / --background so the splash and the app agree.
-    background_color: '#0E1729',
-    theme_color: '#0E1729',
-    categories: ['business', 'productivity', 'finance'],
+    name:             SITE_NAME,
+    short_name:       SITE_NAME,
+    description:      SITE_TAGLINE,
+    start_url:        '/app/dashboard',
+    scope:            '/',
+    display:          'standalone',
+    background_color: '#0a0a0a',
+    theme_color:      '#0a0a0a',
     icons: [
-      {
-        src: '/icon',
-        sizes: '512x512',
-        type: 'image/png',
-        // 'any' rather than 'maskable': the mark is not padded for a maskable
-        // safe zone, and declaring it maskable would let Android crop the bars.
-        purpose: 'any',
-      },
-      {
-        src: '/apple-icon',
-        sizes: '180x180',
-        type: 'image/png',
-        purpose: 'any',
-      },
-    ],
-    // Deep links straight to the work, so a home-screen long-press is useful.
-    shortcuts: [
-      {
-        name: 'Inventory',
-        short_name: 'Inventory',
-        description: 'Adjust stock and check par levels',
-        url: '/app/inventory',
-      },
-      {
-        name: 'Payroll',
-        short_name: 'Payroll',
-        description: 'Hours, tips and pay for the current period',
-        url: '/app/payroll',
-      },
-      {
-        name: 'Tips',
-        short_name: 'Tips',
-        description: "Tonight's tip totals and splits",
-        url: '/app/tips',
-      },
+      { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
   };
 }

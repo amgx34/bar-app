@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentOrg } from '@/lib/org';
+import { hasPar, isBelowPar } from '@/lib/inventory/par';
 
 const OZ_PER_ML = 0.033814;
 
@@ -165,8 +166,8 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
     (s, i) => s + (i.current_stock ?? 0) * (i.cost_price ?? 0), 0,
   );
 
-  const itemsWithPar   = items.filter((i) => i.par_level !== null && i.par_level > 0);
-  const lowStockCount  = itemsWithPar.filter((i) => i.current_stock < i.par_level!).length;
+  const itemsWithPar   = items.filter(hasPar);
+  const lowStockCount  = itemsWithPar.filter(isBelowPar).length;
   const outOfStockCount = items.filter((i) => i.current_stock === 0).length;
   const parCompliancePct = itemsWithPar.length > 0
     ? ((itemsWithPar.length - lowStockCount) / itemsWithPar.length) * 100
@@ -181,7 +182,7 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
     const e = catMap.get(cat)!;
     e.itemCount++;
     e.totalValue += (item.current_stock ?? 0) * (item.cost_price ?? 0);
-    if (item.par_level !== null && item.current_stock < item.par_level) e.lowCount++;
+    if (isBelowPar(item)) e.lowCount++;
   }
 
   for (const log of logs30 ?? []) {

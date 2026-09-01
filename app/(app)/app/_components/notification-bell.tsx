@@ -1,13 +1,18 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useTransition } from 'react';
-import { Bell, X, CheckCheck, Trash2, ExternalLink, RefreshCw, CheckCircle, XCircle, DollarSign } from 'lucide-react';
+import Link from 'next/link';
+import { Bell, X, CheckCheck, Trash2, ExternalLink, RefreshCw, CheckCircle, XCircle, DollarSign, Package, TrendingUp, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   getBarMessages, markMessageRead, markAllMessagesRead,
   deleteMessage, approveOrderReply, denyOrderReply,
 } from '../actions/messages';
 import type { BarMessage, BreakdownItem } from '../actions/messages';
+import {
+  getNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification,
+} from '../actions/notifications';
+import type { AppNotification } from '../actions/notifications';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -202,12 +207,81 @@ function MessageRow({
   );
 }
 
+// ── System alert row ──────────────────────────────────────────────────────────
+
+/**
+ * System alerts are a separate stream from rep correspondence, not a variant of
+ * it. They have no sender, no amount, no AI breakdown — the whole MessageRow
+ * shape would be empty for them — so they get their own compact row.
+ */
+const ALERT_ICONS: Record<string, typeof Package> = {
+  'inventory.low_stock':       Package,
+  'sales.z_report_closed':     TrendingUp,
+  'sales.anomaly':             TrendingUp,
+  'payroll.approval_needed':   Wallet,
+  'payroll.approved':          Wallet,
+  'payroll.changes_requested': Wallet,
+};
+
+function AlertRow({
+  alert, onOpen, onDelete,
+}: {
+  alert:    AppNotification;
+  onOpen:   (a: AppNotification) => void;
+  onDelete: (id: string) => void;
+}) {
+  const Icon = ALERT_ICONS[alert.event_type] ?? Bell;
+
+  const inner = (
+    <div className="flex items-start gap-3 px-4 py-3">
+      <div className={cn(
+        'mt-0.5 shrink-0 rounded-lg p-1.5',
+        alert.is_read ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary',
+      )}>
+        <Icon className="h-3.5 w-3.5" />
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <p className={cn('text-sm truncate', !alert.is_read && 'font-semibold')}>
+            {alert.title}
+          </p>
+          <span className="text-xs text-muted-foreground shrink-0">{timeAgo(alert.created_at)}</span>
+        </div>
+        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{alert.body}</p>
+      </div>
+
+      <button
+        className="shrink-0 text-muted-foreground hover:text-destructive transition-colors mt-0.5"
+        aria-label="Dismiss"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(alert.id); }}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+
+  return (
+    <div className={cn(
+      'border-b last:border-0 transition-colors hover:bg-muted/20',
+      alert.is_read ? 'bg-card' : 'bg-primary/5',
+    )}>
+      {alert.link ? (
+        <Link href={alert.link} onClick={() => onOpen(alert)} className="block">{inner}</Link>
+      ) : (
+        <div className="cursor-pointer" onClick={() => onOpen(alert)}>{inner}</div>
+      )}
+    </div>
+  );
+}
+
 // ── Main bell component ───────────────────────────────────────────────────────
 
 export function NotificationBell({ orgSlug }: { orgSlug: string }) {
   const [open,       setOpen]      = useState(false);
   const [messages,   setMessages]  = useState<BarMessage[]>([]);
-  const [filter,     setFilter]    = useState<'all' | 'unread'>('all');
+  const [alerts,     setAlerts]    = useState<AppNotification[]>([]);
+  const [stream,     setStream]    = useState<'alerts' | 'inbox'>('alerts');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loaded,     setLoaded]    = useState(false);
   const [checking,   setChecking]  = useState(false);
@@ -221,8 +295,11 @@ export function NotificationBell({ orgSlug }: { orgSlug: string }) {
   const reload = useCallback(() => {
     start(async () => {
       try {
-        const msgs = await getBarMessages();
+        // Both streams together: the badge counts them as one number, so a
+        // sequential load would flash a wrong count between the two.
+        const [msgs, alertRows] = await Promise.all([getBarMessages(), getNotifications()]);
         setMessages(msgs);
+        setAlerts(alertRows);
         setLoaded(true);
       } catch { /* silent */ }
     });
@@ -253,11 +330,18 @@ export function NotificationBell({ orgSlug }: { orgSlug: string }) {
     }
   }
 
-  // Poll automatically when panel opens
-  useEffect(() => {
-    if (open) checkForReplies();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  /**
+   * Gmail is polled when the Inbox tab is selected, not when the bell opens.
+   *
+   * The bell now opens on Alerts, so polling on open would fire an IMAP round
+   * trip for every manager glancing at a low-stock digest. Doing it from the
+   * tab press also keeps it out of an effect, where it was a cascading-render
+   * warning.
+   */
+  function selectStream(next: 'alerts' | 'inbox') {
+    setStream(next);
+    if (next === 'inbox') checkForReplies();
+  }
 
   // ── Click outside ───────────────────────────────────────────────────────────
 
@@ -302,10 +386,37 @@ export function NotificationBell({ orgSlug }: { orgSlug: string }) {
     await denyOrderReply(id);
   }
 
+  // ── Alert interactions ──────────────────────────────────────────────────────
+
+  async function handleOpenAlert(alert: AppNotification) {
+    if (alert.is_read) return;
+    setAlerts((prev) => prev.map((a) => a.id === alert.id ? { ...a, is_read: true } : a));
+    await markNotificationRead(alert.id);
+  }
+
+  async function handleDeleteAlert(id: string) {
+    setAlerts((prev) => prev.filter((a) => a.id !== id));
+    await deleteNotification(id);
+  }
+
+  /** Clears whichever stream is on screen, not both — the button sits in a tab. */
+  async function handleMarkAllReadInStream() {
+    if (stream === 'alerts') {
+      setAlerts((prev) => prev.map((a) => ({ ...a, is_read: true })));
+      await markAllNotificationsRead();
+    } else {
+      await handleMarkAllRead();
+    }
+  }
+
   // ── Derived ─────────────────────────────────────────────────────────────────
 
-  const unread    = messages.filter((m) => !m.is_read).length;
-  const displayed = filter === 'unread' ? messages.filter((m) => !m.is_read) : messages;
+  const unreadMessages = messages.filter((m) => !m.is_read).length;
+  const unreadAlerts   = alerts.filter((a) => !a.is_read).length;
+  // One badge for both streams: a manager cares that *something* needs them,
+  // not which table it came from.
+  const unread         = unreadMessages + unreadAlerts;
+  const unreadInStream = stream === 'alerts' ? unreadAlerts : unreadMessages;
 
   return (
     <div className="relative">
@@ -330,19 +441,22 @@ export function NotificationBell({ orgSlug }: { orgSlug: string }) {
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b bg-card">
-            <h2 className="text-sm font-semibold">Inbox</h2>
+            <h2 className="text-sm font-semibold">Notifications</h2>
             <div className="flex items-center gap-2">
-              <button
-                onClick={checkForReplies}
-                disabled={checking}
-                title="Check Gmail for order replies"
-                className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-40"
-              >
-                <RefreshCw className={cn('h-3.5 w-3.5', checking && 'animate-spin')} />
-              </button>
-              {unread > 0 && (
+              {/* Gmail polling only has meaning for the rep inbox. */}
+              {stream === 'inbox' && (
                 <button
-                  onClick={handleMarkAllRead}
+                  onClick={checkForReplies}
+                  disabled={checking}
+                  title="Check Gmail for order replies"
+                  className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-40"
+                >
+                  <RefreshCw className={cn('h-3.5 w-3.5', checking && 'animate-spin')} />
+                </button>
+              )}
+              {unreadInStream > 0 && (
+                <button
+                  onClick={handleMarkAllReadInStream}
                   className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
                 >
                   <CheckCheck className="h-3.5 w-3.5" /> Mark all read
@@ -354,20 +468,23 @@ export function NotificationBell({ orgSlug }: { orgSlug: string }) {
             </div>
           </div>
 
-          {/* Filter tabs */}
+          {/* Stream tabs — system alerts vs. rep correspondence */}
           <div className="flex border-b bg-muted/30 text-xs">
-            {(['all', 'unread'] as const).map((tab) => (
+            {([
+              { key: 'alerts' as const, label: 'Alerts', count: unreadAlerts },
+              { key: 'inbox'  as const, label: 'Inbox',  count: unreadMessages },
+            ]).map((tab) => (
               <button
-                key={tab}
-                onClick={() => setFilter(tab)}
+                key={tab.key}
+                onClick={() => selectStream(tab.key)}
                 className={cn(
-                  'flex-1 py-2 font-medium capitalize transition-colors',
-                  filter === tab
+                  'flex-1 py-2 font-medium transition-colors',
+                  stream === tab.key
                     ? 'text-primary border-b-2 border-primary -mb-px bg-card'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
-                {tab === 'unread' ? `Unread${unread > 0 ? ` (${unread})` : ''}` : 'All'}
+                {tab.label}{tab.count > 0 ? ` (${tab.count})` : ''}
               </button>
             ))}
           </div>
@@ -376,17 +493,28 @@ export function NotificationBell({ orgSlug }: { orgSlug: string }) {
           <div className="max-h-[460px] overflow-y-auto">
             {!loaded ? (
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">Loading…</p>
-            ) : displayed.length === 0 ? (
+            ) : (stream === 'alerts' ? alerts.length : messages.length) === 0 ? (
               <div className="px-4 py-10 text-center space-y-1">
                 <p className="text-sm text-muted-foreground">
-                  {filter === 'unread' ? 'No unread messages' : 'No messages yet'}
+                  {stream === 'alerts' ? 'No alerts' : 'No messages yet'}
                 </p>
                 <p className="text-xs text-muted-foreground/60">
-                  Reply emails from reps appear here automatically
+                  {stream === 'alerts'
+                    ? 'Low stock, nightly sales and payroll approvals show up here'
+                    : 'Reply emails from reps appear here automatically'}
                 </p>
               </div>
+            ) : stream === 'alerts' ? (
+              alerts.map((alert) => (
+                <AlertRow
+                  key={alert.id}
+                  alert={alert}
+                  onOpen={handleOpenAlert}
+                  onDelete={handleDeleteAlert}
+                />
+              ))
             ) : (
-              displayed.map((msg) => (
+              messages.map((msg) => (
                 <MessageRow
                   key={msg.id}
                   msg={msg}

@@ -15,6 +15,7 @@ import { createClient }              from '@/lib/supabase/server';
 import { createAdminClient }         from '@/lib/supabase/admin';
 import { getCurrentOrg }             from '@/lib/org';
 import { computePayroll }            from '@/app/(app)/app/payroll/actions';
+import { getPayrollRun }             from '@/app/(app)/app/payroll/approval-actions';
 import { decrypt }                   from '@/lib/direct-deposit/crypto';
 import { generateNachaFile }         from '@/lib/payroll/nacha';
 import type { NachaEntry, NachaConfig } from '@/lib/payroll/nacha';
@@ -59,6 +60,22 @@ export async function GET(req: NextRequest) {
     companyName: (bs.nacha_company_name as string | undefined) ?? org.name,
     companyEin,
   };
+
+  // ── Approval gate ────────────────────────────────────────────────────────────
+  // Money must not move on numbers nobody reviewed. The gate is escapable —
+  // overrideApprovalGate() records an owner's reason and marks the period
+  // approved — because a bug in this workflow must never stop a bar making
+  // payroll. It just cannot be escaped silently.
+  const approvalRun = await getPayrollRun(startDate, endDate);
+  if (approvalRun?.status !== 'approved') {
+    return NextResponse.json({
+      error: 'Payroll not approved',
+      detail: approvalRun
+        ? `This period is ${approvalRun.status === 'changes_requested' ? 'awaiting changes' : 'awaiting approval'}. Approve it in Payroll → Review before exporting ACH.`
+        : 'Submit and approve this pay period in Payroll → Review before exporting ACH.',
+      status: approvalRun?.status ?? 'not_submitted',
+    }, { status: 409 });
+  }
 
   // ── Payroll entries ──────────────────────────────────────────────────────────
   const payrollEntries = await computePayroll(startDate, endDate);

@@ -6,6 +6,9 @@ import { getCurrentOrg } from '@/lib/org';
 import { defaultWeek } from '../_shared';
 import { addDays, payRunHref, resolvePayPeriod } from '@/lib/date-range';
 import { PayrollReviewClient } from './_components/payroll-review-client';
+import { ApprovalPanel } from './_components/approval-panel';
+import { getPayrollRun, getPayrollRunDiff } from '../approval-actions';
+import { canSubmitPayroll, canApprovePayroll } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +31,7 @@ export const metadata: Metadata = { title: 'Pay Period Review' };
 
 export default async function PayrollReviewPage({ searchParams }: { searchParams: SearchParams }) {
   const params    = await searchParams;
-  const { org }   = await getCurrentOrg();
+  const { org, role } = await getCurrentOrg();
   const { start: startDate, end: endDate } = resolvePayPeriod(
     params.startDate,
     params.endDate,
@@ -36,6 +39,14 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
   );
 
   const entries = await computePayroll(startDate, endDate);
+
+  // The diff is only meaningful once something has been submitted, and only
+  // an approver can act on it — so it costs a second computePayroll() run
+  // exclusively for the person who needs it.
+  const approvalRun = await getPayrollRun(startDate, endDate);
+  const approvalDiff = approvalRun?.status === 'pending_approval' && canApprovePayroll(role)
+    ? await getPayrollRunDiff(startDate, endDate)
+    : null;
 
   const totals = entries.reduce(
     (acc, e) => ({
@@ -87,6 +98,15 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
       </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+
+        <ApprovalPanel
+          run={approvalRun}
+          diff={approvalDiff}
+          startDate={startDate}
+          endDate={endDate}
+          canSubmit={canSubmitPayroll(role)}
+          canApprove={canApprovePayroll(role)}
+        />
 
         {/* ── Period + totals summary ─────────────────────────────────────────── */}
         <div className="space-y-1">

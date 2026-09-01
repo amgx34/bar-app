@@ -40,5 +40,12 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  // sw.js and the manifest are excluded because the browser re-fetches the
+  // service worker on every update check, and each pass through this proxy is a
+  // full supabase.auth.getUser() network round trip. Neither file is ever
+  // user-specific, and neither is an /app route, so the auth gate has nothing
+  // to decide about them.
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 };

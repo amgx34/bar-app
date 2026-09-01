@@ -26,3 +26,18 @@ export const canManageReps = (role: Role) =>
  */
 export const canManagePayroll = (role: Role) =>
   role === 'owner' || role === 'manager';
+
+/** Freezing a pay period and sending it up for sign-off. */
+export const canSubmitPayroll = (role: Role) =>
+  role === 'owner' || role === 'manager';
+
+/**
+ * Signing off a pay run, and overriding the approval gate on a NACHA export.
+ *
+ * Owner only — separating submitter from approver is the entire point of the
+ * workflow. Note that most bars are one owner and no managers, so an owner who
+ * submits may approve their own run; the run records both fields as the same
+ * user rather than blocking on a second person who does not exist.
+ */
+export const canApprovePayroll = (role: Role) =>
+  role === 'owner';

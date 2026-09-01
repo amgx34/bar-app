@@ -10,6 +10,8 @@ import { canEditInventory } from '@/lib/permissions';
 import { TeamTab } from './_components/team-tab';
 import { listTeamMembers } from './team-actions';
 import ImportTab from '../payroll/_components/import-tab';
+import { NotificationsTab } from './_components/notifications-tab';
+import { getNotificationPreferences, getRegisteredDevices } from '../actions/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +21,7 @@ const TABS = [
   { key: 'inventory',   label: 'Inventory' },
   { key: 'import-data', label: 'Import Data' },
   { key: 'pos',         label: 'POS Integration' },
+  { key: 'notifications', label: 'Notifications' },
   { key: 'team',        label: 'Team' },
 ];
 
@@ -51,6 +54,11 @@ export default async function SettingsPage({
   const tab      = params.tab ?? 'general';
   const settings = org.bar_settings ?? { tip_split_percent: 15, default_hourly_rate: 15 };
   const team     = tab === 'team' ? await listTeamMembers() : null;
+
+  // Same pattern as the tabs above: fetched only for the tab that renders it.
+  const notifications = tab === 'notifications'
+    ? await Promise.all([getNotificationPreferences(), getRegisteredDevices()])
+    : null;
 
   // Fetched only for the tab that renders them, and in parallel — the
   // suggestion scan reads the whole active item list.
@@ -95,6 +103,12 @@ export default async function SettingsPage({
         <div className="max-w-none">
           <ImportTab posProvider={org.pos_provider} />
         </div>
+      )}
+      {tab === 'notifications' && notifications && (
+        <NotificationsTab
+          initialPreferences={notifications[0]}
+          initialDevices={notifications[1]}
+        />
       )}
       {tab === 'team' && team && (
         <TeamTab initialMembers={team.members} canManage={team.canManage} />

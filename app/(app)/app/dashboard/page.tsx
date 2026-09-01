@@ -15,6 +15,7 @@ import { unitsPerSale } from '@/lib/pos/pour';
 import { assessSyncHealth } from '@/lib/pos/sync-health';
 import { SyncStatusStrip } from './_components/sync-status-strip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { hasPar, isBelowPar, parRatio } from '@/lib/inventory/par';
 
 const RevenueChart = dynamicImport(() => import('./_components/DashBoardRevenueChart'));
 
@@ -188,20 +189,10 @@ export default async function DashboardPage() {
     return s + (i.current_stock ?? 0) * cost;
   }, 0);
 
-  const itemsWithPar  = items.filter((i) => {
-    const par = Number((i as RawItem).par_level ?? null);
-    return par !== null && !isNaN(par) && par > 0;
-  });
+  const itemsWithPar  = items.filter((i) => hasPar(i as RawItem));
   const lowStockItems = itemsWithPar
-    .filter((i) => {
-      const par = Number((i as RawItem).par_level ?? 0);
-      return i.current_stock < par;
-    })
-    .sort((a, b) => {
-      const pa = Number((a as RawItem).par_level ?? 1);
-      const pb = Number((b as RawItem).par_level ?? 1);
-      return (a.current_stock / pa) - (b.current_stock / pb);
-    });
+    .filter((i) => isBelowPar(i as RawItem))
+    .sort((a, b) => parRatio(a as RawItem) - parRatio(b as RawItem));
   const parCompliancePct = itemsWithPar.length > 0
     ? ((itemsWithPar.length - lowStockItems.length) / itemsWithPar.length) * 100
     : 100;
@@ -255,10 +246,9 @@ export default async function DashboardPage() {
   const fastMovers = movers.slice(0, 5).map((m) => ({ name: m.name, qty: m.unitsMoved }));
 
   // Reorder suggestions — use the separately-fetched repAssignMap
-  const reorderItems = items.filter((i) => {
-    const par = Number((i as RawItem).par_level ?? 0);
-    return par > 0 && i.current_stock < par && repAssignMap.has(i.id);
-  });
+  const reorderItems = items.filter(
+    (i) => isBelowPar(i as RawItem) && repAssignMap.has(i.id),
+  );
   const reorderByRep = new Map<string, { rep: { id: string; name: string }; items: typeof reorderItems }>();
   for (const item of reorderItems) {
     const repId   = repAssignMap.get(item.id);
@@ -397,7 +387,7 @@ export default async function DashboardPage() {
                   <div className="space-y-1">
                     {lowStockItems.slice(0, 5).map((item) => {
                       const par      = Number((item as RawItem).par_level ?? 0);
-                      const pct      = par > 0 ? (item.current_stock / par) * 100 : 0;
+                      const pct      = parRatio(item as RawItem) * 100;
                       const critical = item.current_stock === 0;
                       const catId    = (item as RawItem).category_id;
                       const cat      = (catId ? catNameMap.get(catId) : undefined) ?? 'Uncategorized';

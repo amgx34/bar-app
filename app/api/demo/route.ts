@@ -16,14 +16,14 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { seedDemoOrg } from '@/lib/demo/seed';
+import { DEMO_EMAIL_SUFFIX, DEMO_SLUG_PREFIX } from '@/lib/demo/constants';
 import { recordTermsAcceptanceForUser } from '@/lib/terms';
 import { checkRateLimit, clientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 
 export const DEMO_TTL_HOURS = 24;
-export const DEMO_EMAIL_SUFFIX = '@rail.demo';
-export const DEMO_SLUG_PREFIX = 'demo-tipsy-tavern-';
+export { DEMO_EMAIL_SUFFIX, DEMO_SLUG_PREFIX } from '@/lib/demo/constants';
 
 /**
  * Ceiling on demo orgs alive at once. The per-IP limit alone does not bound

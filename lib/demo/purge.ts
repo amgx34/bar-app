@@ -1,5 +1,7 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { selectExpiredDemoOrgs } from './expired';
+import { DEMO_EMAIL_SUFFIX, DEMO_SLUG_PREFIX } from './constants';
 
 /**
  * Deletes demo accounts past their TTL.
@@ -11,7 +13,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
  */
 
 const DEMO_TTL_HOURS = 24;
-const DEMO_EMAIL_SUFFIX = '@rail.demo';
+
 
 export type PurgeResult = {
   usersDeleted: number;
@@ -46,26 +48,45 @@ export async function purgeExpiredDemoUsers(): Promise<PurgeResult> {
     page++;
   }
 
-  if (expiredIds.length === 0) {
-    return { usersDeleted: 0, orgsDeleted: 0, errors };
-  }
+  // ── Organizations ──────────────────────────────────────────────────────────
+  // Swept by their OWN slug and age, not by joining through memberships.
+  //
+  // The membership-driven version could not be made to work: deleting the demo
+  // user cascades the membership away, so the purge destroyed its own only
+  // handle on the org. Anything that missed a pass — an org-delete error (users
+  // were deleted regardless), a user removed by hand, the older inline purge
+  // that swept users only — was orphaned permanently. 35 had built up, each one
+  // counting forever against MAX_LIVE_DEMO_ORGS in /api/demo and walking that
+  // endpoint toward a 503 it could never recover from.
+  //
+  // A demo org's slug and created_at depend on nothing this function deletes, so
+  // this sweep reclaims the existing orphans and cannot create new ones. It runs
+  // even when no expired users were found, which is exactly the case the old
+  // code could not handle.
+  // admin-scope-ok: demo orgs are not tenant data — this is the cross-org
+  // housekeeping job that owns their lifecycle, and the filter below restricts
+  // it to the demo slug prefix and the TTL cutoff.
+  const { data: orgRows, error: orgListErr } = await admin
+    .from('organizations')
+    .select('id, slug, created_at')
+    .like('slug', `${DEMO_SLUG_PREFIX}%`);
 
-  // Organizations first — the cascade clears every child table
-  // (inventory_items, z_report_days, employees, reps, weigh_reports, …).
-  const { data: memberRows, error: memberErr } = await admin
-    .from('memberships')
-    .select('organization_id')
-    .in('user_id', expiredIds);
+  if (orgListErr) errors.push(`organizations list: ${orgListErr.message}`);
 
-  if (memberErr) errors.push(`memberships: ${memberErr.message}`);
-
-  const orgIds = [...new Set((memberRows ?? []).map((m) => m.organization_id))];
+  const orgIds = selectExpiredDemoOrgs(orgRows ?? [], DEMO_SLUG_PREFIX, cutoff);
   let orgsDeleted = 0;
 
   if (orgIds.length > 0) {
+    // The cascade clears every child table (inventory_items, z_report_days,
+    // employees, reps, weigh_reports, …).
     const { error: orgErr } = await admin.from('organizations').delete().in('id', orgIds);
     if (orgErr) errors.push(`organizations: ${orgErr.message}`);
     else orgsDeleted = orgIds.length;
+  }
+
+  // ── Users ──────────────────────────────────────────────────────────────────
+  if (expiredIds.length === 0) {
+    return { usersDeleted: 0, orgsDeleted, errors };
   }
 
   const results = await Promise.allSettled(

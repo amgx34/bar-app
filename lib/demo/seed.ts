@@ -5,6 +5,7 @@
  *   usage logs (deliveries, spillage, comps, staff drinks, recounts)
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { DEMO_SLUG_PREFIX } from './constants';
 
 // ── Static seed tables ─────────────────────────────────────────────────────
 
@@ -210,7 +211,7 @@ export async function seedDemoOrg(admin: SupabaseClient, userId: string): Promis
     .from('organizations')
     .insert({
       name: 'Demo Bar — The Tipsy Tavern',
-      slug: `demo-tipsy-tavern-${Date.now().toString(36)}`,
+      slug: `${DEMO_SLUG_PREFIX}${Date.now().toString(36)}`,
       bar_type: 'bar',
       bar_address: '123 Demo St, Chicago, IL',
       bar_settings: {
