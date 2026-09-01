@@ -9,7 +9,18 @@
  */
 import { getCurrentOrg } from '@/lib/org';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { resolveDateRange, todayIso, type DateRange } from '@/lib/date-range';
+import {
+  resolveDateRange, todayIso, addDays, type DateRange, type SalesView,
+} from '@/lib/date-range';
+import { cutoffHourFromSettings } from '@/lib/business-date';
+import { assessCapabilities, type SalesCapabilities } from '@/lib/pos/sales-capabilities';
+import { buildDaypart, type Daypart } from '@/lib/pos/daypart';
+import { summariseTickets, type TicketMetrics } from '@/lib/pos/tickets';
+import {
+  sameWeekdayNights, totalToHour, compareToBaseline, type Baseline,
+} from '@/lib/pos/baselines';
+import { buildServerPerformance, type ServerPerformance } from '@/lib/pos/server-performance';
+import { classifyMenu, type MenuBoard } from '@/lib/pos/menu-engineering';
 import {
   computeItemMargins,
   groupByCategory,
@@ -247,5 +258,148 @@ export async function getSalesData(
     // Built from inventory, not sales: an item that never rang up is absent
     // from pos_item_sales entirely, and those are the ones worth knowing about.
     slowMovers: slowMovers(itemMargins, stocked, { consumedByRecipe: recipeIngredients, limit: 10 }),
+  };
+}
+
+export type PeriodSalesData = {
+  capabilities: SalesCapabilities;
+  /** The bar's own day-rollover hour, so the client orders the night correctly. */
+  cutoffHour: number;
+  daypart: Daypart | null;
+  tickets: TicketMetrics | null;
+  servers: ServerPerformance[] | null;
+  /** Only ever computed for a single night. Null for week and month. */
+  baseline: { netSales: Baseline; sampleDates: string[] } | null;
+  /** Only computed for week and month, where a menu has enough sales to rank. */
+  menu: MenuBoard | null;
+};
+
+/**
+ * Everything the Sales screen needs for one period.
+ *
+ * Every arithmetic decision here is delegated to lib/pos/* — this function's
+ * only jobs are to fetch rows, decide what the data can support, and hand the
+ * pure functions their arguments. Any calculation that appears in this file is
+ * a calculation that will eventually disagree with the one in lib.
+ *
+ * `upToHour` is how a live night compares fairly. Passing it makes the baseline
+ * measure past nights only as far into the evening as tonight has reached;
+ * omitting it compares whole nights. Measuring a half-finished Saturday against
+ * four complete ones reports a disaster every time — see lib/pos/baselines.ts.
+ */
+export async function getPeriodSalesData(
+  view: SalesView,
+  start: string,
+  end: string,
+  upToHour?: number,
+): Promise<PeriodSalesData> {
+  const { org } = await getCurrentOrg();
+  const supabase = createAdminClient();
+  const orgId = org.id;
+  const cutoffHour = cutoffHourFromSettings(org.bar_settings ?? {});
+
+  const singleNight = view === 'tonight' || view === 'day';
+
+  // Baselines need history well before the period, so the hourly fetch reaches
+  // back five weeks on a single night. Anything less cannot find four
+  // same-weekday nights, and four is what separates a baseline from an anecdote.
+  const hourlyFrom = singleNight ? addDays(start, -35) : start;
+
+  const [{ data: hourly }, { data: servers }, { data: shifts }] = await Promise.all([
+    supabase
+      .from('pos_hourly_sales')
+      .select('business_date, hour, net_sales, ticket_count, tips')
+      .eq('organization_id', orgId)
+      .gte('business_date', hourlyFrom)
+      .lte('business_date', end),
+    supabase
+      .from('pos_server_sales')
+      .select('business_date, server_name, net_sales, ticket_count, tips')
+      .eq('organization_id', orgId)
+      .gte('business_date', start)
+      .lte('business_date', end),
+    supabase
+      .from('employee_shifts')
+      .select('regular_hours, overtime_hours, employees(name)')
+      .eq('organization_id', orgId)
+      .gte('shift_date', start)
+      .lte('shift_date', end),
+  ]);
+
+  const allHourly = hourly ?? [];
+  const inPeriod = allHourly.filter((r) => r.business_date >= start && r.business_date <= end);
+  const serverRows = servers ?? [];
+
+  const capabilities = assessCapabilities({
+    hourlyRowCount: inPeriod.length,
+    serverRowCount: serverRows.length,
+    totalTicketCount:
+      inPeriod.reduce((s, r) => s + (Number(r.ticket_count) || 0), 0) +
+      serverRows.reduce((s, r) => s + (Number(r.ticket_count) || 0), 0),
+  });
+
+  // Payroll hours, so the per-server panel can report sales per hour worked.
+  // Left undefined rather than [] when the query itself did not come back —
+  // "payroll was not consulted" and "payroll knows nobody" are different
+  // facts, and buildServerPerformance distinguishes them (see
+  // lib/pos/server-performance.ts). A successful fetch that simply found no
+  // shifts in the window IS "payroll knows nobody" and must stay an array,
+  // so the undefined check is on `shifts` (the query result) rather than on
+  // whether any rows survived the map/filter below.
+  const shiftHours = shifts == null
+    ? undefined
+    : shifts.map((s) => {
+      const emp = Array.isArray(s.employees) ? s.employees[0] : s.employees;
+      return {
+        employeeName: (emp as { name?: string } | null)?.name ?? '',
+        hours: (Number(s.regular_hours) || 0) + (Number(s.overtime_hours) || 0),
+      };
+    }).filter((s) => s.employeeName);
+
+  const daypart = capabilities.hasHourly && singleNight
+    ? buildDaypart(inPeriod, cutoffHour)
+    : null;
+
+  const tickets = capabilities.hasHourly
+    ? summariseTickets(inPeriod)
+    : capabilities.hasServer
+      // The per-server feed carries no hour, so revenuePerHour comes back null
+      // from it — which is the honest answer rather than an invented one.
+      ? summariseTickets(serverRows)
+      : null;
+
+  let baseline: PeriodSalesData['baseline'] = null;
+  if (capabilities.hasHourly && singleNight) {
+    const history = [...new Set(allHourly.map((r) => r.business_date as string))];
+    const sampleDates = sameWeekdayNights(start, history);
+
+    const actual = upToHour === undefined
+      ? inPeriod.reduce((s, r) => s + (Number(r.net_sales) || 0), 0)
+      : totalToHour(inPeriod, upToHour, cutoffHour);
+
+    const comparables = sampleDates.map((d) => {
+      const night = allHourly.filter((r) => r.business_date === d);
+      return upToHour === undefined
+        ? night.reduce((s, r) => s + (Number(r.net_sales) || 0), 0)
+        : totalToHour(night, upToHour, cutoffHour);
+    });
+
+    baseline = { netSales: compareToBaseline(actual, comparables), sampleDates };
+  }
+
+  // Menu engineering needs a period long enough for a median to mean something.
+  // One night's mix is noise; a week's is a menu.
+  const menu = singleNight
+    ? null
+    : classifyMenu((await getSalesData('custom', start, end)).items);
+
+  return {
+    capabilities,
+    cutoffHour,
+    daypart,
+    tickets,
+    servers: capabilities.hasServer ? buildServerPerformance(serverRows, shiftHours) : null,
+    baseline,
+    menu,
   };
 }

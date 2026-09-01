@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { getDaySplitData, computePayroll, DaySplitData, DaySplitEmployee } from '../actions';
 import { defaultPeriod, monthRange, type PayrollView } from '@/lib/date-range';
-import { PeriodToggle } from './period-toggle';
+import { PeriodToggle } from '../../_components/period-toggle';
 import { openerBonus, type OpenerBonusConfig } from '@/lib/payroll/adjustments';
 import { splitBarbackTips, type BarbackSplitMethod, type BarbackTier } from '@/lib/payroll/tip-pool';
 import { CashTipsButton } from './cash-tips-card';
@@ -338,7 +338,15 @@ export default function DaySplitTab({
       {/* Period switcher. Its own row rather than sharing the date nav's: the
           date nav already runs to four controls, and on a phone a fifth pushed
           the cash-tips button onto a line of its own anyway. */}
-      <PeriodToggle view="day" hrefs={hrefs} />
+      <PeriodToggle
+        view="day"
+        items={[
+          { key: 'day', label: 'Day' },
+          { key: 'week', label: 'Week' },
+          { key: 'month', label: 'Month' },
+        ]}
+        hrefs={hrefs}
+      />
 
       {/* Date nav */}
       <div className="flex flex-wrap items-center gap-3">

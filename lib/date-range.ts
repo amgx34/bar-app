@@ -226,3 +226,45 @@ export function shiftPeriod(
   const step = view === 'day' ? delta : delta * 7;
   return { start: addDays(start, step), end: addDays(end, step) };
 }
+
+// ── Sales period views ────────────────────────────────────────────────────────
+
+/**
+ * Which period the Sales screen is showing.
+ *
+ * `tonight` and `day` are the same range — one night — and differ only in what
+ * the screen does with it: tonight refreshes during service and compares to the
+ * same hour on past nights, day reports a night that is finished. Keeping them
+ * as separate views rather than one plus a flag means the URL says which
+ * question was asked, and a link to a past night cannot start polling.
+ */
+export type SalesView = 'tonight' | 'day' | 'week' | 'month';
+
+const SALES_VIEWS: SalesView[] = ['tonight', 'day', 'week', 'month'];
+
+export function resolveSalesView(raw: unknown): SalesView {
+  return SALES_VIEWS.includes(raw as SalesView) ? (raw as SalesView) : 'tonight';
+}
+
+export function defaultSalesPeriod(
+  view: SalesView,
+  today: string,
+): { start: string; end: string } {
+  if (view === 'month') return monthRange(today);
+  if (view === 'week') return defaultPeriod('week', today);
+  return { start: today, end: today };
+}
+
+export function shiftSalesPeriod(
+  view: SalesView,
+  start: string,
+  end: string,
+  dir: 'prev' | 'next',
+): { start: string; end: string } {
+  if (view === 'month') return shiftPeriod('month', start, end, dir);
+  if (view === 'week') return shiftPeriod('week', start, end, dir);
+
+  const step = dir === 'prev' ? -1 : 1;
+  const moved = addDays(start, step);
+  return { start: moved, end: moved };
+}

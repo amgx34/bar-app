@@ -1,6 +1,6 @@
 import {
   Home, Package, CircleDollarSign, Receipt, Settings, BookOpen, Users,
-  Scale, ClipboardCheck, TrendingUp, UserCog, Landmark, Layers,
+  Scale, ClipboardCheck, TrendingUp, UserCog, Landmark,
   Banknote, FileCheck2,
 } from 'lucide-react';
 
@@ -81,12 +81,11 @@ export const SECTIONS: NavSection[] = [
   },
   {
     group: 'Money',
+    // Tonight/Day/Week/Month on one screen, switched by `?view=`. Categories
+    // and Margins were tabs of their own until they were absorbed into the
+    // Week and Month views — both routes still redirect, per SalesLayout's
+    // SectionTabs no longer listing them.
     root: { label: 'Sales', href: '/app/sales', icon: TrendingUp },
-    tabs: [
-      { label: 'Overview',   href: '/app/sales',            icon: TrendingUp },
-      { label: 'Categories', href: '/app/sales/categories', icon: Layers },
-      { label: 'Margins',    href: '/app/sales/margins',    icon: Scale },
-    ],
   },
   {
     group: 'Money',
