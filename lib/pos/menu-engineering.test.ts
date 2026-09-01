@@ -9,6 +9,9 @@ const item = (
   itemName: name,
   categoryName: null,
   unitsSold: units,
+  // No size variants in these fixtures, so pour units track drink count 1:1.
+  pourUnitsSold: units,
+  sizes: [{ token: null, label: 'Standard', multiplier: 1, unitsSold: units, revenue: units * 10 }],
   revenue: units * 10,
   costPerDrink: costKnown ? 3 : null,
   cost: costKnown ? units * 3 : 0,

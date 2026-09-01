@@ -33,6 +33,30 @@ export type SoldLine = {
   qtySold: number;
   netSales: number;
   saleDate: string;
+  /**
+   * The item this line is really about, with any size token stripped — a
+   * "DBL TITO'S" line carries "tito's". Equal to `matchKey` when the name has
+   * no token, so grouping on it is unconditional.
+   */
+  baseMatchKey?: string;
+  /** The size token on the name, or null. */
+  sizeToken?: string | null;
+  /** Pour multiplier for that token. A double is 2. Defaults to 1. */
+  sizeMultiplier?: number;
+  /** Display label for the token, e.g. 'Double'. */
+  sizeLabel?: string | null;
+};
+
+/** One size a drink rang up as, within a rolled-up item row. */
+export type SizeSplit = {
+  /** Null for lines that carried no token at all. */
+  token: string | null;
+  label: string;
+  /** Pour multiplier this size represents. */
+  multiplier: number;
+  /** Drinks sold at this size. */
+  unitsSold: number;
+  revenue: number;
 };
 
 /** What inventory knows about the thing that was sold. */
@@ -40,15 +64,36 @@ export type CostRef = PourItem & {
   matchKey: string;
   /** Per STOCK UNIT. Null when the operator has not entered one. */
   costPrice: number | null;
+  /**
+   * What inventory calls this item. Used to name a row that variants rolled up
+   * into, so it reads "Tito's" rather than whichever of "DBL TITO'S" or
+   * "SGL TITO'S" happened to be first.
+   */
+  itemName?: string;
 };
 
 export type ItemMargin = {
   matchKey: string;
   itemName: string;
   categoryName: string | null;
+  /** Drinks sold, counting a double as ONE drink. */
   unitsSold: number;
+  /**
+   * Drinks sold weighted by pour, so a double counts as two. This is what cost
+   * is computed from — `unitsSold` is the count a human recognises, this is the
+   * quantity of liquor behind it.
+   */
+  pourUnitsSold: number;
   revenue: number;
-  /** Cost of one drink. Null when the item has no cost price. */
+  /**
+   * How the sales split by size. One entry when the item never rang up as a
+   * variant. Ordered by revenue, largest first.
+   */
+  sizes: SizeSplit[];
+  /**
+   * Cost of one drink at the BASE pour — a single. A double costs twice this.
+   * Null when the item has no cost price.
+   */
   costPerDrink: number | null;
   /** Total cost over the period. 0 when unknown — see costKnown before using. */
   cost: number;
@@ -116,10 +161,54 @@ export function recipeCostPerDrink(recipe: RecipeRef): number | null {
 }
 
 /**
+ * The key a line reports under, and whether its size multiplier applies.
+ *
+ * This MUST mirror the resolution order in `resolveSales` (lib/pos/bundles.ts).
+ * If the report groups a line differently from the way depletion spent it, the
+ * sales screen and the stock ledger describe two different bars.
+ *
+ * The order, and why:
+ *   1. A recipe on the exact name wins. A bundle already describes the whole
+ *      drink, so it is its own row and its multiplier is spent inside the
+ *      recipe, not on top of it.
+ *   2. Otherwise a size variant rolls up to its base — but only when the base
+ *      is a known item. Rolling onto a key nothing knows about would merge
+ *      unrelated lines behind an item that does not exist.
+ *   3. Otherwise the line stands on its own name, exactly as before.
+ */
+function resolveLineKey(
+  line: SoldLine,
+  costs: Map<string, CostRef>,
+  recipes?: Map<string, RecipeRef>,
+): { key: string; multiplier: number; rolledUp: boolean } {
+  if (recipes?.has(line.matchKey)) {
+    return { key: line.matchKey, multiplier: 1, rolledUp: false };
+  }
+
+  const base = line.baseMatchKey;
+  if (line.sizeToken && base && base !== line.matchKey && costs.has(base)) {
+    const m = Number(line.sizeMultiplier);
+    return {
+      key: base,
+      multiplier: Number.isFinite(m) && m > 0 ? m : 1,
+      rolledUp: true,
+    };
+  }
+
+  return { key: line.matchKey, multiplier: 1, rolledUp: false };
+}
+
+/**
  * Folds POS lines into one row per item, with cost and margin attached.
  *
  * Lines are aggregated by matchKey, because pos_item_sales holds a row per
  * (day, item) and the question here is about the item over the period.
+ *
+ * Size variants collapse onto the item they are a size OF: "SGL TITO'S",
+ * "DBL TITO'S" and "RDB TITO'S" become one Tito's row whose `sizes` says how
+ * the night actually split. Revenue is untouched by that — it is summed from
+ * the lines that really rang up — but cost is weighted by the pour, because two
+ * ounces cost twice what one does.
  */
 export function computeItemMargins(
   lines: SoldLine[],
@@ -128,31 +217,67 @@ export function computeItemMargins(
   recipes?: Map<string, RecipeRef>,
 ): ItemMargin[] {
   const byKey = new Map<string, ItemMargin>();
+  // Size splits are accumulated separately so a token seen on several days
+  // folds into one entry rather than one per line.
+  const splits = new Map<string, Map<string, SizeSplit>>();
 
   for (const line of lines) {
-    const existing = byKey.get(line.matchKey);
-    if (existing) {
-      existing.unitsSold += Number(line.qtySold) || 0;
-      existing.revenue += Number(line.netSales) || 0;
-      continue;
+    const { key, multiplier, rolledUp } = resolveLineKey(line, costs, recipes);
+    const qty = Number(line.qtySold) || 0;
+    const revenue = Number(line.netSales) || 0;
+
+    const row = byKey.get(key);
+    if (row) {
+      row.unitsSold += qty;
+      row.pourUnitsSold += qty * multiplier;
+      row.revenue += revenue;
+    } else {
+      byKey.set(key, {
+        matchKey: key,
+        // A rolled-up row is named for the item, not for whichever variant of
+        // it happened to be read first.
+        itemName: rolledUp ? (costs.get(key)?.itemName ?? line.itemName) : line.itemName,
+        // The category travels on the sale, so it is what the POS called it that
+        // night — not what inventory calls it now.
+        categoryName: line.categoryName,
+        unitsSold: qty,
+        pourUnitsSold: qty * multiplier,
+        revenue,
+        sizes: [],
+        costPerDrink: null,
+        cost: 0,
+        margin: null,
+        marginPct: null,
+        costKnown: false,
+      });
     }
-    byKey.set(line.matchKey, {
-      matchKey: line.matchKey,
-      itemName: line.itemName,
-      // The category travels on the sale, so it is what the POS called it that
-      // night — not what inventory calls it now.
-      categoryName: line.categoryName,
-      unitsSold: Number(line.qtySold) || 0,
-      revenue: Number(line.netSales) || 0,
-      costPerDrink: null,
-      cost: 0,
-      margin: null,
-      marginPct: null,
-      costKnown: false,
-    });
+
+    let bySize = splits.get(key);
+    if (!bySize) {
+      bySize = new Map<string, SizeSplit>();
+      splits.set(key, bySize);
+    }
+    const token = rolledUp ? (line.sizeToken ?? null) : null;
+    const sizeKey = token ?? '';
+    const split = bySize.get(sizeKey);
+    if (split) {
+      split.unitsSold += qty;
+      split.revenue += revenue;
+    } else {
+      bySize.set(sizeKey, {
+        token,
+        label: token ? (line.sizeLabel || token.toUpperCase()) : 'Standard',
+        multiplier,
+        unitsSold: qty,
+        revenue,
+      });
+    }
   }
 
   for (const row of byKey.values()) {
+    row.sizes = [...(splits.get(row.matchKey)?.values() ?? [])]
+      .sort((a, b) => b.revenue - a.revenue);
+
     // A recipe wins over the item's own cost price. If a drink has a recipe,
     // the recipe IS what it is made of, and any cost_price sitting on the
     // phantom stock row predates it.
@@ -165,7 +290,8 @@ export function computeItemMargins(
     if (per === null) continue; // stays costKnown: false
 
     row.costPerDrink = per;
-    row.cost = round2(per * row.unitsSold);
+    // Weighted by pour, not by drink count: 10 doubles cost what 20 singles do.
+    row.cost = round2(per * row.pourUnitsSold);
     row.margin = round2(row.revenue - row.cost);
     row.marginPct = row.revenue > 0 ? (row.margin / row.revenue) * 100 : null;
     row.costKnown = true;
@@ -391,20 +517,25 @@ export function revenueTrend(
   const perDrink = new Map<string, number | null>();
 
   for (const line of lines) {
-    if (!perDrink.has(line.matchKey)) {
-      // Same precedence as computeItemMargins, or the chart and the table would
-      // disagree about the same night.
-      const recipe = recipes?.get(line.matchKey);
-      const ref = costs.get(line.matchKey);
+    // Same resolution as computeItemMargins — including the size rollup — or
+    // the chart and the table would disagree about the same night.
+    const { key, multiplier } = resolveLineKey(line, costs, recipes);
+
+    if (!perDrink.has(key)) {
+      const recipe = recipes?.get(key);
+      const ref = costs.get(key);
       perDrink.set(
-        line.matchKey,
+        key,
         recipe ? recipeCostPerDrink(recipe) : ref ? costPerDrink(ref, defaults) : null,
       );
     }
     const point = byDate.get(line.saleDate) ?? { date: line.saleDate, revenue: 0, cost: 0, margin: 0 };
     point.revenue += Number(line.netSales) || 0;
-    const per = perDrink.get(line.matchKey);
-    if (per !== null && per !== undefined) point.cost += per * (Number(line.qtySold) || 0);
+    const per = perDrink.get(key);
+    // Weighted by pour: a double costs twice a single on the same night.
+    if (per !== null && per !== undefined) {
+      point.cost += per * (Number(line.qtySold) || 0) * multiplier;
+    }
     byDate.set(line.saleDate, point);
   }
 

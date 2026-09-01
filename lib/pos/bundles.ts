@@ -14,6 +14,7 @@
 
 import { posItemMatchKey } from './excluded-items';
 import { componentUnits, unitsPerSale, type PourItem } from './pour';
+import { parseVariant, buildTokenTable, type TokenTable } from './variants';
 
 /** One line of the POS item audit, as the agent sends it. */
 export type AuditRow = {
@@ -49,6 +50,14 @@ export type SalesFact = {
   qty_sold: number;
   net_sales: number;
   is_bundle: boolean;
+  /**
+   * The item this line is really about, with any size token stripped — "DBL
+   * TITO'S" reports "tito's". Equal to `match_key` when the name carries no
+   * token, so a read can group by it unconditionally.
+   */
+  base_match_key: string;
+  /** The size token found on the name, or null. */
+  size_token: string | null;
 };
 
 export type ResolvedSales = {
@@ -97,6 +106,7 @@ export function resolveSales(
   bundles: BundleRecipe[],
   inventoryByMatchKey: Map<string, InventoryRef>,
   orgPourOz: number | null = null,
+  tokens: TokenTable = buildTokenTable(),
 ): ResolvedSales {
   // Components reference items by id, direct sales by name.
   const byId = new Map<string, InventoryRef>();
@@ -117,6 +127,11 @@ export function resolveSales(
     const qty = Number(row.qty_sold) || 0;
     const net = Number(row.net_sales) || 0;
 
+    // "DBL TITO'S" is two ounces of the item inventory calls "Tito's". The
+    // parse travels with the fact so the sales report can roll the sizes up
+    // without re-deriving it, and so it cannot disagree with what was deducted.
+    const variant = parseVariant(name, tokens);
+
     // The agent already groups by (day, item), but a POS that spells the same
     // item two ways collapses to one key here — so sum rather than overwrite.
     const factKey = `${row.sale_date}|${matchKey}`;
@@ -133,6 +148,8 @@ export function resolveSales(
         qty_sold: qty,
         net_sales: net,
         is_bundle: recipeByKey.has(matchKey),
+        base_match_key: variant.baseMatchKey,
+        size_token: variant.sizeToken,
       });
     }
 
@@ -170,15 +187,31 @@ export function resolveSales(
       continue;
     }
 
-    const item = inventoryByMatchKey.get(matchKey);
+    // A size variant resolves to its BASE item, and the base wins over an exact
+    // match on the variant name. That order matters: every install that has been
+    // syncing already has an auto-created phantom "DBL TITO'S" inventory row
+    // sitting on the exact key, so preferring the exact match would make this
+    // whole feature a no-op precisely where it is needed.
+    //
+    // The exact key is still the fallback, so a bar that genuinely stocks the
+    // variant as its own item — and any name that does not parse — behaves
+    // exactly as it did before.
+    const baseItem = variant.sizeToken
+      ? inventoryByMatchKey.get(variant.baseMatchKey)
+      : undefined;
+    const item = baseItem ?? inventoryByMatchKey.get(matchKey);
     if (!item) {
       unresolved.add(name);
       continue;
     }
 
+    // Only when we actually resolved through the base. Applying it to an exact
+    // match would double-count: that item's own pour size already describes it.
+    const sizeMultiplier = baseItem ? variant.multiplier : 1;
+
     // The conversion that stops 185 shots removing 185 bottles. Items not sold
     // by the pour return a factor of 1 and behave exactly as before.
-    const units = qty * unitsPerSale(item, {
+    const units = qty * sizeMultiplier * unitsPerSale(item, {
       categoryPourOz: item.categoryPourOz,
       orgPourOz,
     });

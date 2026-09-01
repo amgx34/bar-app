@@ -18,6 +18,7 @@ import { createHmac }                from 'crypto';
 import { createAdminClient }         from '@/lib/supabase/admin';
 import { buildExclusionSet, isExcluded, posItemMatchKey } from '@/lib/pos/excluded-items';
 import { resolveSales, toRpcComponents, type BundleRecipe, type InventoryRef } from '@/lib/pos/bundles';
+import { buildTokenTable, parseVariant } from '@/lib/pos/variants';
 import { partitionShifts, shiftKey } from '@/lib/payroll/manual-hours';
 import type { SyncSummary } from '@/lib/pos/sync-health';
 import { normaliseHourlyRows, groupByNight } from '@/lib/pos/hourly-sales';
@@ -508,6 +509,30 @@ export async function POST(req: NextRequest) {
     }));
     const bundleKeySet = new Set(bundles.map((b) => b.match_key));
 
+    // ── Size tokens ─────────────────────────────────────────────────────────
+    //
+    // "DBL TITO'S" is two ounces of the item inventory calls "Tito's". Loaded
+    // before item creation for the same reason bundles are: a variant name must
+    // not become an inventory item of its own.
+    //
+    // An org with no rows falls back to the four built-in tokens — an error
+    // here would silently revert that, so it is reported rather than swallowed.
+    const { data: tokenRows, error: tokenErr } = await supabase
+      .from('pos_size_tokens')
+      .select('token, multiplier, label, mixer')
+      .eq('organization_id', resolvedOrgId);
+
+    if (tokenErr) result.errors.push(`pos_size_tokens: ${tokenErr.message}`);
+
+    const sizeTokens = buildTokenTable(
+      (tokenRows ?? []).map((t) => ({
+        token: String(t.token),
+        multiplier: Number(t.multiplier),
+        label: String(t.label ?? ''),
+        mixer: (t.mixer as string | null) ?? null,
+      })),
+    );
+
     // Rows that are genuinely stock. Bundles are excluded from category and
     // item creation but stay in `data.itemAudit` for the sales facts below,
     // because their revenue belongs to the deal, not to its components.
@@ -534,8 +559,13 @@ export async function POST(req: NextRequest) {
     // constraint this upsert targets.
     const items = new Map<string, InventoryItemInsert>();
     for (const row of stockRows) {
-      const name = row.item_name?.trim();
-      if (!name) continue;
+      const raw = row.item_name?.trim();
+      if (!raw) continue;
+      // Create the BASE item, never the variant. This is where the phantom
+      // "DBL TITO'S" rows came from: four tokens times every spirit, each one
+      // uncosted and undepleting, sitting next to the real item. When the base
+      // already exists the upsert is a no-op, which is the point.
+      const name = parseVariant(raw, sizeTokens).baseName || raw;
       items.set(name, {
         organization_id: resolvedOrgId,
         name,
@@ -595,7 +625,9 @@ export async function POST(req: NextRequest) {
       (barSettings as { default_pour_oz?: number }).default_pour_oz,
     ) || null;
 
-    const resolved = resolveSales(data.itemAudit, bundles, itemsByMatchKey, orgPourOz);
+    const resolved = resolveSales(
+      data.itemAudit, bundles, itemsByMatchKey, orgPourOz, sizeTokens,
+    );
     result.bundlesExpanded = resolved.bundleKeys.size;
     result.unresolvedItems = resolved.unresolvedNames.length;
 
@@ -611,8 +643,10 @@ export async function POST(req: NextRequest) {
             category_name: f.category_name,
             qty_sold:      f.qty_sold,
             net_sales:     Math.round(f.net_sales * 100) / 100,
-            is_bundle:     f.is_bundle,
-            updated_at:    new Date().toISOString(),
+            is_bundle:      f.is_bundle,
+            base_match_key: f.base_match_key,
+            size_token:     f.size_token,
+            updated_at:     new Date().toISOString(),
           })),
           { onConflict: 'organization_id,sale_date,match_key' },
         );

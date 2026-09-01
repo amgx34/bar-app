@@ -38,6 +38,7 @@ import {
   type SlowMover,
   type StockedItem,
 } from '@/lib/pos/sales-analytics';
+import { buildTokenTable, parseVariant } from '@/lib/pos/variants';
 
 export type SalesData = {
   range: DateRange;
@@ -79,7 +80,7 @@ export async function getSalesData(
   const [{ data: sales }, { data: items }, { data: cats }] = await Promise.all([
     supabase
       .from('pos_item_sales')
-      .select('match_key, item_name, category_name, qty_sold, net_sales, sale_date')
+      .select('match_key, base_match_key, size_token, item_name, category_name, qty_sold, net_sales, sale_date')
       .eq('organization_id', orgId)
       .gte('sale_date', range.from)
       .lte('sale_date', range.to),
@@ -102,6 +103,22 @@ export async function getSalesData(
     .eq('organization_id', orgId)
     .eq('is_active', true);
 
+  // Size tokens. An org with no rows falls back to the four built-in ones, so
+  // "DBL TITO'S" reports under Tito's at twice the pour without any setup.
+  const { data: tokenRows } = await supabase
+    .from('pos_size_tokens')
+    .select('token, multiplier, label, mixer')
+    .eq('organization_id', orgId);
+
+  const sizeTokens = buildTokenTable(
+    (tokenRows ?? []).map((t) => ({
+      token: String(t.token),
+      multiplier: Number(t.multiplier),
+      label: String(t.label ?? ''),
+      mixer: (t.mixer as string | null) ?? null,
+    })),
+  );
+
   const catPour = new Map(
     (cats ?? []).map((c) => [c.id as string, c.default_pour_oz as number | null]),
   );
@@ -114,6 +131,7 @@ export async function getSalesData(
     if (!key) continue;
     costs.set(key, {
       matchKey: key,
+      itemName: String(i.name ?? ''),
       costPrice: i.cost_price === null || i.cost_price === undefined ? null : Number(i.cost_price),
       bottleSizeMl: i.bottle_size_ml as number | null,
       pourSizeOz: i.pour_size_oz as number | null,
@@ -168,14 +186,34 @@ export async function getSalesData(
     });
   }
 
-  const lines: SoldLine[] = (sales ?? []).map((s) => ({
-    matchKey: String(s.match_key),
-    itemName: String(s.item_name ?? s.match_key),
-    categoryName: (s.category_name as string | null) ?? null,
-    qtySold: Number(s.qty_sold) || 0,
-    netSales: Number(s.net_sales) || 0,
-    saleDate: String(s.sale_date),
-  }));
+  const lines: SoldLine[] = (sales ?? []).map((s) => {
+    const matchKey = String(s.match_key);
+    // Rows written before the size-variant migration have no stored parse, and
+    // the backfill only covered the four built-in tokens. Parsing here as a
+    // fallback means a bar's custom token works on history too, without a
+    // second backfill every time it adds one.
+    const stored = (s.size_token as string | null) ?? null;
+    const parsed = stored ? null : parseVariant(String(s.item_name ?? ''), sizeTokens);
+    const token = stored ?? parsed?.sizeToken ?? null;
+    const def = token ? sizeTokens.get(token) : undefined;
+
+    return {
+      matchKey,
+      itemName: String(s.item_name ?? s.match_key),
+      categoryName: (s.category_name as string | null) ?? null,
+      qtySold: Number(s.qty_sold) || 0,
+      netSales: Number(s.net_sales) || 0,
+      saleDate: String(s.sale_date),
+      baseMatchKey: (s.base_match_key as string | null)
+        ?? parsed?.baseMatchKey
+        ?? matchKey,
+      sizeToken: token,
+      // Resolved from the token table, never stored on the row: a bar that
+      // corrects a multiplier must not have to rewrite its sales history.
+      sizeMultiplier: def?.multiplier ?? 1,
+      sizeLabel: def?.label ?? null,
+    };
+  });
 
   // The pour chain is item -> category -> org, so the category default has to
   // travel with each item rather than being applied globally.
