@@ -62,7 +62,7 @@ Tasks 1–2 are pure and independent. Task 3 is the data layer. Tasks 4–7 buil
   export const CAPABILITY_HELP: Record<keyof SalesCapabilities, string>;
   ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 // lib/pos/sales-capabilities.test.ts
@@ -114,12 +114,12 @@ describe('assessCapabilities', () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npx vitest run lib/pos/sales-capabilities.test.ts`
 Expected: FAIL — "Failed to resolve import ./sales-capabilities".
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```ts
 // lib/pos/sales-capabilities.ts
@@ -184,12 +184,12 @@ export function assessCapabilities(input: CapabilityInput): SalesCapabilities {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run lib/pos/sales-capabilities.test.ts`
 Expected: PASS, 6 tests.
 
-- [ ] **Step 5: Typecheck, lint, commit**
+- [x] **Step 5: Typecheck, lint, commit**
 
 ```bash
 npx tsc --noEmit
@@ -221,7 +221,7 @@ by zero dressed up as a figure."
   export function shiftSalesPeriod(view: SalesView, start: string, end: string, dir: 'prev' | 'next'): { start: string; end: string };
   ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `lib/date-range.test.ts`, and add the four names to its existing import from `'./date-range'`:
 
@@ -278,12 +278,12 @@ describe('shiftSalesPeriod', () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npx vitest run lib/date-range.test.ts`
 Expected: FAIL — the four new names are not exported.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Append to `lib/date-range.ts`:
 
@@ -331,12 +331,12 @@ export function shiftSalesPeriod(
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run lib/date-range.test.ts`
 Expected: PASS — the whole file, including its existing cases.
 
-- [ ] **Step 5: Typecheck, lint, commit**
+- [x] **Step 5: Typecheck, lint, commit**
 
 ```bash
 npx tsc --noEmit
@@ -374,7 +374,7 @@ past night cannot start polling."
   ): Promise<PeriodSalesData>;
   ```
 
-- [ ] **Step 1: Add the imports**
+- [x] **Step 1: Add the imports**
 
 ```ts
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -390,7 +390,7 @@ import { classifyMenu, type MenuBoard } from '@/lib/pos/menu-engineering';
 import type { SalesView } from '@/lib/date-range';
 ```
 
-- [ ] **Step 2: Write the loader**
+- [x] **Step 2: Write the loader**
 
 Append to `app/(app)/app/sales/actions.ts`:
 
@@ -533,7 +533,7 @@ export async function getPeriodSalesData(
 }
 ```
 
-- [ ] **Step 3: Verify tenancy and types**
+- [x] **Step 3: Verify tenancy and types**
 
 ```bash
 npx tsc --noEmit
@@ -542,7 +542,7 @@ npm run audit:scope
 ```
 Expected: tsc silent, eslint silent, audit reports **0 unscoped and unjustified**. All three new queries filter `organization_id` directly, so no `admin-scope-ok` comment should be needed — if the audit disagrees, read its output rather than adding a comment to silence it.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add "app/(app)/app/sales/actions.ts"
@@ -574,7 +574,7 @@ anecdote."
   ): JSX.Element;
   ```
 
-- [ ] **Step 1: Move and generalise**
+- [x] **Step 1: Move and generalise**
 
 Payroll already has a Day/Week/Month toggle at `app/(app)/app/payroll/_components/period-toggle.tsx`. Sales needs the same control with a fourth option. Copying it would give two components that drift; this task moves it up to the shared `_components` directory and makes the item list a prop.
 
@@ -639,7 +639,7 @@ export function PeriodToggle<T extends string>({
 }
 ```
 
-- [ ] **Step 2: Update Payroll's two call sites**
+- [x] **Step 2: Update Payroll's two call sites**
 
 In both `payroll-tab.tsx` and `day-split-tab.tsx`, change the import to
 `import { PeriodToggle } from '../../_components/period-toggle';`
@@ -659,13 +659,13 @@ and pass the item list explicitly:
 
 In `day-split-tab.tsx` the view is the literal `"day"`; keep it, and give the array the same three entries.
 
-- [ ] **Step 3: Delete the old component**
+- [x] **Step 3: Delete the old component**
 
 ```bash
 rm "app/(app)/app/payroll/_components/period-toggle.tsx"
 ```
 
-- [ ] **Step 4: Verify Payroll still works**
+- [x] **Step 4: Verify Payroll still works**
 
 ```bash
 npx tsc --noEmit
@@ -675,7 +675,7 @@ npm run build
 ```
 Expected: all clean. This task changes no behaviour — Payroll must look and act exactly as before. If anything about Payroll's toggle changes visually, something was lost in the move.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A "app/(app)/app/_components/period-toggle.tsx" "app/(app)/app/payroll/_components"
@@ -705,7 +705,7 @@ components that drift."
   }): JSX.Element;
   ```
 
-- [ ] **Step 1: Write the missing-panel card**
+- [x] **Step 1: Write the missing-panel card**
 
 ```tsx
 // app/(app)/app/sales/_components/missing-panel.tsx
@@ -741,7 +741,7 @@ export function MissingPanel({
 }
 ```
 
-- [ ] **Step 2: Write the live band**
+- [x] **Step 2: Write the live band**
 
 ```tsx
 // app/(app)/app/sales/_components/live-band.tsx
@@ -852,7 +852,7 @@ export function LiveBand({
 }
 ```
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 ```bash
 npx tsc --noEmit
@@ -860,7 +860,7 @@ npx eslint "app/(app)/app/sales/_components/missing-panel.tsx" "app/(app)/app/sa
 ```
 Expected: silent.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add "app/(app)/app/sales/_components/missing-panel.tsx" "app/(app)/app/sales/_components/live-band.tsx"
@@ -883,7 +883,7 @@ labels a thin baseline as thin rather than presenting one night as a trend."
 **Interfaces:**
 - Consumes: `Daypart` (Stage B), `ServerPerformance` (Stage B), `MenuBoard` + `MENU_CLASS_LABEL` (Stage B)
 
-- [ ] **Step 1: Write the hourly curve**
+- [x] **Step 1: Write the hourly curve**
 
 Follow `app/(app)/app/sales/_components/trend-chart.tsx` for the Recharts import style and the `'use client'` boundary. The load-bearing rule: an hour with `traded === false` must render as a GAP, not a zero-height bar.
 
@@ -948,7 +948,7 @@ export function HourlyCurve({ daypart }: { daypart: Daypart }) {
 }
 ```
 
-- [ ] **Step 2: Write the server table**
+- [x] **Step 2: Write the server table**
 
 ```tsx
 // app/(app)/app/sales/_components/server-table.tsx
@@ -1025,7 +1025,7 @@ export function ServerTable({ servers }: { servers: ServerPerformance[] }) {
 }
 ```
 
-- [ ] **Step 3: Write the menu quadrant**
+- [x] **Step 3: Write the menu quadrant**
 
 ```tsx
 // app/(app)/app/sales/_components/menu-quadrant.tsx
@@ -1110,7 +1110,7 @@ export function MenuQuadrant({ board }: { board: MenuBoard }) {
 }
 ```
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 ```bash
 npx tsc --noEmit
@@ -1118,7 +1118,7 @@ npx eslint "app/(app)/app/sales/_components/hourly-curve.tsx" "app/(app)/app/sal
 ```
 Expected: silent.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add "app/(app)/app/sales/_components"
@@ -1140,7 +1140,7 @@ comparable."
 - Replace: `app/(app)/app/sales/categories/page.tsx`, `app/(app)/app/sales/margins/page.tsx`
 - Modify: `app/(app)/app/_components/nav-config.ts`
 
-- [ ] **Step 1: Rewrite the Sales page**
+- [x] **Step 1: Rewrite the Sales page**
 
 ```tsx
 // app/(app)/app/sales/page.tsx
@@ -1313,7 +1313,7 @@ export default async function SalesPage({
 }
 ```
 
-- [ ] **Step 2: Replace the two absorbed pages with redirects**
+- [x] **Step 2: Replace the two absorbed pages with redirects**
 
 ```tsx
 // app/(app)/app/sales/categories/page.tsx
@@ -1344,15 +1344,15 @@ export default function MarginsRedirect() {
 }
 ```
 
-- [ ] **Step 3: Drop the two tabs from the nav**
+- [x] **Step 3: Drop the two tabs from the nav**
 
 In `app/(app)/app/_components/nav-config.ts`, remove the Categories and Margins entries from the Sales section's `tabs` array, leaving the Sales root. Remove any lucide icon import that becomes unused — `npx eslint` will name it.
 
-- [ ] **Step 4: Update the loading skeleton**
+- [x] **Step 4: Update the loading skeleton**
 
 Rewrite `app/(app)/app/sales/loading.tsx` to match the new shape: a header row, a band, one tall card, one table card. Follow the existing file's `Skeleton` usage.
 
-- [ ] **Step 5: Full verification**
+- [x] **Step 5: Full verification**
 
 ```bash
 npx tsc --noEmit
@@ -1363,7 +1363,7 @@ npm run audit:scope
 ```
 Expected: all clean, audit 0 unscoped.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A "app/(app)/app/sales" "app/(app)/app/_components/nav-config.ts"
