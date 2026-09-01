@@ -16,6 +16,7 @@
 import { ImapFlow } from 'imapflow';
 import Groq from 'groq-sdk';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { GROQ_PARSER_MODEL } from '@/lib/ai-parsers/model';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -54,7 +55,7 @@ async function parseWithGroq(subject: string, body: string): Promise<ParsedRepor
 
   try {
     const result = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: GROQ_PARSER_MODEL,
       messages: [
         {
           role: 'system',

@@ -1,4 +1,5 @@
 import Groq from 'groq-sdk';
+import { GROQ_PARSER_MODEL } from './model';
 
 const client = new Groq();
 
@@ -44,7 +45,7 @@ export async function parseInventoryWithAI(text: string): Promise<AIParsedInvent
   }
 
   const completion = await client.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
+    model: GROQ_PARSER_MODEL,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: `Extract all inventory items from this data:\n\n${text.slice(0, 12000)}` },

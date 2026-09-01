@@ -1,6 +1,7 @@
 import Groq from 'groq-sdk';
 import type { AIParsedInventoryItem } from './parse-inventory-with-ai';
 import { boundModelInput, callModel, enforceAiQuota, wrapUntrustedContent } from './guardrails';
+import { GROQ_PARSER_MODEL } from './model';
 
 const client = new Groq();
 
@@ -99,7 +100,7 @@ export async function parseShipmentWithAI(text: string): Promise<AIParsedShipmen
   const bounded = boundModelInput(text);
 
   const completion = await callModel(() => client.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
+    model: GROQ_PARSER_MODEL,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       {
