@@ -83,13 +83,13 @@ export function LiveBand({
       </div>
 
       <div className="mt-4 border-t pt-3 text-xs">
-        {baseline === null || baseline.average === null ? (
+        {baseline === null || baseline.average === null || delta === null ? (
           <span className="text-muted-foreground">
             No comparable nights recorded yet, so there is nothing to measure this against.
           </span>
         ) : (
           <span className={up ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>
-            {up ? '▲' : '▼'} {Math.abs(delta as number).toFixed(0)}% on the last{' '}
+            {up ? '▲' : '▼'} {Math.abs(delta).toFixed(0)}% on the last{' '}
             {baseline.sampleSize} {baseline.sampleSize === 1 ? 'night' : 'nights'} like this
             {/* Said out loud: one night is an anecdote, not a baseline. */}
             {baseline.thin && (
