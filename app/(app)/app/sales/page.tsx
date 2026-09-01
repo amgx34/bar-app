@@ -10,8 +10,10 @@ import { MissingPanel } from './_components/missing-panel';
 import { HourlyCurve } from './_components/hourly-curve';
 import { ServerTable } from './_components/server-table';
 import { MenuQuadrant } from './_components/menu-quadrant';
+import { TrendChart } from './_components/trend-chart';
 import { Stat, CostCoverageNotice, TaxInclusiveNotice, SizeSplit, money, pct } from './_components/sales-bits';
 import { rankByMargin } from '@/lib/pos/sales-analytics';
+import { assessSyncHealth, describeAge } from '@/lib/pos/sync-health';
 import { cn } from '@/lib/utils';
 import {
   resolveSalesView, defaultSalesPeriod, shiftSalesPeriod,
@@ -85,6 +87,19 @@ export default async function SalesPage({
   const itemSortHref = (s: ItemSort) =>
     `/app/sales?view=${view}&start=${period.start}&end=${period.end}&sort=${s}`;
 
+  // Whether the POS agent is still feeding this bar, so a stale agent is
+  // visible on the night's own number rather than silently reporting an old
+  // night as current. Same idiom as the dashboard's sync strip.
+  const syncHealth = assessSyncHealth(
+    org.pos_config as Record<string, unknown> | null,
+    org.pos_provider as string | null,
+  );
+  const asOf = syncHealth.lastSyncAt ? describeAge(syncHealth.minutesAgo) : null;
+
+  // Top movers: the period's items ranked by revenue, not a new query or a
+  // re-derivation of margin — legacy.items already carries revenue per item.
+  const topMovers = [...legacy.items].sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -123,7 +138,7 @@ export default async function SalesPage({
               tickets={data.tickets}
               baseline={data.baseline?.netSales ?? null}
               hasTickets={data.capabilities.hasTickets}
-              asOf={data.daypart.peak ? null : null}
+              asOf={asOf}
               live={view === 'tonight'}
             />
             <Card>
@@ -136,6 +151,33 @@ export default async function SalesPage({
                 )}
               </CardHeader>
               <CardContent><HourlyCurve daypart={data.daypart} /></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Top movers</CardTitle>
+                <p className="text-xs text-muted-foreground">By revenue.</p>
+              </CardHeader>
+              <CardContent>
+                {topMovers.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    No sales in this window.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {topMovers.map((i) => (
+                      <div key={i.matchKey} className="flex items-center justify-between gap-3 text-sm">
+                        <div className="min-w-0">
+                          <span className="truncate">{i.itemName}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {Math.round(i.unitsSold).toLocaleString()} sold
+                          </span>
+                        </div>
+                        <span className="shrink-0 tabular-nums font-medium">{money(i.revenue)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
             </Card>
           </>
         ) : (
@@ -155,6 +197,63 @@ export default async function SalesPage({
             revenueMissingCost={legacy.summary.revenueMissingCost}
             revenue={legacy.summary.revenue}
           />
+          {/*
+            The category table from the old /app/sales/categories screen,
+            ported faithfully rather than reinvented.
+          */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Category mix</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {legacy.categories.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No sales in this window.
+                </p>
+              ) : (
+                <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="py-2 pr-3 font-medium">Category</th>
+                        <th className="px-3 py-2 text-right font-medium">Sold</th>
+                        <th className="px-3 py-2 text-right font-medium">Revenue</th>
+                        <th className="hidden px-3 py-2 text-right font-medium sm:table-cell">Cost</th>
+                        <th className="px-3 py-2 text-right font-medium">Margin</th>
+                        <th className="px-3 py-2 text-right font-medium">Margin %</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {legacy.categories.map((c) => (
+                        <tr key={c.category}>
+                          <td className="py-2.5 pr-3 font-medium whitespace-normal">
+                            {c.category}
+                            {c.itemsMissingCost > 0 && (
+                              <span className="block text-xs font-normal text-amber-600 dark:text-amber-400">
+                                {c.itemsMissingCost}/{c.itemCount} uncosted
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 text-right tabular-nums">
+                            {Math.round(c.unitsSold).toLocaleString()}
+                          </td>
+                          <td className="px-3 py-2.5 text-right tabular-nums">{money(c.revenue)}</td>
+                          <td className="hidden px-3 py-2.5 text-right tabular-nums text-muted-foreground sm:table-cell">
+                            {money(c.cost)}
+                          </td>
+                          <td className="px-3 py-2.5 text-right tabular-nums font-medium">
+                            {money(c.margin)}
+                          </td>
+                          <td className="px-3 py-2.5 text-right tabular-nums">{pct(c.marginPct)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {data.menu && (
             <Card>
               <CardHeader className="pb-2">
@@ -255,6 +354,56 @@ export default async function SalesPage({
                 </div>
               )}
             </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Slow movers</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                What to stop ordering — dead stock first, then the slowest sellers.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {legacy.slowMovers.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Nothing stands out — every stocked item is moving.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {legacy.slowMovers.map((s) => (
+                    <div key={s.matchKey} className="flex items-center justify-between gap-3 text-sm">
+                      <div className="min-w-0">
+                        <span className="truncate">{s.itemName}</span>
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          {s.categoryName ?? 'Uncategorised'}
+                        </span>
+                      </div>
+                      <span className="shrink-0 text-right text-xs">
+                        {s.neverSold ? (
+                          <span className="font-medium text-amber-600 dark:text-amber-400">Never sold</span>
+                        ) : (
+                          <span className="tabular-nums text-muted-foreground">
+                            {Math.round(s.unitsSold).toLocaleString()} sold
+                          </span>
+                        )}
+                        {s.stockValue !== null && (
+                          <span className="ml-2 tabular-nums text-muted-foreground">
+                            {money(s.stockValue)} on shelf
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Revenue trend</CardTitle>
+            </CardHeader>
+            <CardContent><TrendChart data={legacy.trend} /></CardContent>
           </Card>
         </>
       )}
