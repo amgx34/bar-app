@@ -70,7 +70,7 @@ Tasks 1–5 are independent of each other. Only Task 3 (`baselines`) consumes an
   export function hourLabel(hour: number): string;
   ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 // lib/pos/daypart.test.ts
@@ -175,12 +175,12 @@ describe('buildDaypart', () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npx vitest run lib/pos/daypart.test.ts`
 Expected: FAIL — "Failed to resolve import ./daypart".
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```ts
 // lib/pos/daypart.ts
@@ -306,12 +306,12 @@ export function buildDaypart(
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run lib/pos/daypart.test.ts`
 Expected: PASS, 13 tests.
 
-- [ ] **Step 5: Typecheck, lint, commit**
+- [x] **Step 5: Typecheck, lint, commit**
 
 ```bash
 npx tsc --noEmit
@@ -345,7 +345,7 @@ marked, not zeroed: an hour that has not happened yet is not a dead hour."
   export function summariseTickets(rows: (TicketRow & { hour?: number })[]): TicketMetrics;
   ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 // lib/pos/tickets.test.ts
@@ -420,12 +420,12 @@ describe('summariseTickets', () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npx vitest run lib/pos/tickets.test.ts`
 Expected: FAIL — "Failed to resolve import ./tickets".
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```ts
 // lib/pos/tickets.ts
@@ -505,12 +505,12 @@ export function summariseTickets(
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run lib/pos/tickets.test.ts`
 Expected: PASS, 9 tests.
 
-- [ ] **Step 5: Typecheck, lint, commit**
+- [x] **Step 5: Typecheck, lint, commit**
 
 ```bash
 npx tsc --noEmit
@@ -550,7 +550,7 @@ ticket is null rather than zero when nobody rang up."
   export function compareToBaseline(actual: number, comparables: number[], minSample?: number): Baseline;
   ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 // lib/pos/baselines.test.ts
@@ -666,12 +666,12 @@ describe('compareToBaseline', () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npx vitest run lib/pos/baselines.test.ts`
 Expected: FAIL — "Failed to resolve import ./baselines".
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```ts
 // lib/pos/baselines.ts
@@ -804,12 +804,12 @@ export function compareToBaseline(
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run lib/pos/baselines.test.ts`
 Expected: PASS, 15 tests.
 
-- [ ] **Step 5: Typecheck, lint, commit**
+- [x] **Step 5: Typecheck, lint, commit**
 
 ```bash
 npx tsc --noEmit
@@ -845,7 +845,7 @@ sample is flagged rather than hidden."
   export function buildServerPerformance(rows: ServerRow[], shifts?: ShiftHours[]): ServerPerformance[];
   ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 // lib/pos/server-performance.test.ts
@@ -940,12 +940,12 @@ describe('buildServerPerformance', () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npx vitest run lib/pos/server-performance.test.ts`
 Expected: FAIL — "Failed to resolve import ./server-performance".
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```ts
 // lib/pos/server-performance.ts
@@ -1086,12 +1086,12 @@ export function buildServerPerformance(
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run lib/pos/server-performance.test.ts`
 Expected: PASS, 11 tests.
 
-- [ ] **Step 5: Typecheck, lint, commit**
+- [x] **Step 5: Typecheck, lint, commit**
 
 ```bash
 npx tsc --noEmit
@@ -1123,7 +1123,7 @@ payroll has never heard of is kept with nulls; they sold the drinks."
   export const MENU_CLASS_LABEL: Record<MenuClass, string>;
   ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 // lib/pos/menu-engineering.test.ts
@@ -1232,12 +1232,12 @@ describe('classifyMenu', () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npx vitest run lib/pos/menu-engineering.test.ts`
 Expected: FAIL — "Failed to resolve import ./menu-engineering".
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```ts
 // lib/pos/menu-engineering.ts
@@ -1362,12 +1362,12 @@ export function classifyMenu(items: ItemMargin[]): MenuBoard {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run lib/pos/menu-engineering.test.ts`
 Expected: PASS, 10 tests.
 
-- [ ] **Step 5: Typecheck, lint, run the whole suite, commit**
+- [x] **Step 5: Typecheck, lint, run the whole suite, commit**
 
 ```bash
 npx tsc --noEmit
