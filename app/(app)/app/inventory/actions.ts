@@ -72,6 +72,7 @@ export async function createItem(raw: unknown) {
     current_stock:  input.current_stock ?? 0,
     bottle_size_ml: input.bottle_size_ml ?? null,
     pour_size_oz:   input.pour_size_oz   ?? null,
+    units_per_pack: input.units_per_pack ?? null,
   });
 
   if (error) throw new Error(error.message);
@@ -101,6 +102,7 @@ export async function updateItem(itemId: string, raw: unknown) {
       sale_price:     input.sale_price   ?? null,
       bottle_size_ml: input.bottle_size_ml ?? null,
       pour_size_oz:   input.pour_size_oz   ?? null,
+      units_per_pack: input.units_per_pack ?? null,
     })
     .eq('id', itemId)
     .eq('organization_id', org.id);

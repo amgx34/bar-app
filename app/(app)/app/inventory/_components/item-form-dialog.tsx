@@ -19,6 +19,7 @@ import { isMixedDrinkCategory } from '@/lib/pos/setup-gaps';
 import { inventoryItemSchema, type InventoryItemInput } from '@/lib/schemas/inventory';
 import { createItem, updateItem } from '../actions';
 import type { ItemRow } from './inventory-table';
+import { hasPack, toSingles } from '@/lib/inventory/packs';
 
 const UNITS = ['bottle', 'can', 'keg', 'oz', 'liter', 'case', 'each'];
 
@@ -66,6 +67,7 @@ export function ItemFormDialog({
       current_stock:  item?.current_stock ?? 0,
       bottle_size_ml: item?.bottle_size_ml ?? null,
       pour_size_oz:   item?.pour_size_oz   ?? defaultPourOz,
+      units_per_pack: item?.units_per_pack ?? null,
     },
   });
 
@@ -74,6 +76,7 @@ export function ItemFormDialog({
   const currentRep       = watch('rep_id');
   const bottleSizeMl     = watch('bottle_size_ml');
   const pourSizeOz       = watch('pour_size_oz') ?? defaultPourOz;
+  const unitsPerPack     = watch('units_per_pack');
   const costPrice        = watch('cost_price');
   const salePrice        = watch('sale_price');
 
@@ -320,6 +323,30 @@ export function ItemFormDialog({
             </div>
           </div>
 
+          {/* ── Pack size ─────────────────────────────────────────────
+              Only for goods sold as sealed units. A liquid item counts by
+              volume, where a "pack" has no meaning. */}
+          {!isBottle && (
+            <div className="space-y-1">
+              <Label htmlFor="units_per_pack">
+                Singles per {currentUnit === 'each' ? 'pack' : currentUnit}{' '}
+                <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Input
+                id="units_per_pack" type="number" step="1" min="2"
+                placeholder="e.g. 24 for a case of cans"
+                {...register('units_per_pack', {
+                  setValueAs: (v) => v === '' || v === null ? null : parseInt(v, 10),
+                })}
+              />
+              <p className="text-xs text-muted-foreground">
+                {hasPack(unitsPerPack)
+                  ? `Lets you receive and count in ${currentUnit}s — "2 + 9 loose" is stored as ${toSingles({ packs: 2, loose: 9 }, unitsPerPack)} singles.`
+                  : 'Set this to enter deliveries and counts by the case. Stock is always stored in singles, and each sale still removes one.'}
+              </p>
+            </div>
+          )}
+
           {/* ── Liquor / bottle toggle ───────────────────────────────── */}
           <div className="border rounded-xl overflow-hidden">
             <button
@@ -328,6 +355,7 @@ export function ItemFormDialog({
                 const next = !isBottle;
                 setIsBottle(next);
                 if (next && !watch('pour_size_oz')) setValue('pour_size_oz', defaultPourOz);
+                if (next) setValue('units_per_pack', null);
                 if (!next) { setValue('bottle_size_ml', null); setValue('pour_size_oz', null); }
               }}
               className="w-full flex items-center gap-3 px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors text-left"

@@ -13,6 +13,11 @@ import type { SetupGap, GapSummary, GapKind } from '@/lib/pos/setup-gaps';
  */
 
 const STYLES: Record<GapKind, { label: string; badge: string; icon: typeof AlertTriangle }> = {
+  'needs-keg-size': {
+    label: 'Needs keg size',
+    badge: 'border-destructive/40 bg-destructive/10 text-destructive',
+    icon: AlertTriangle,
+  },
   'needs-pour-size': {
     label: 'Needs pour size',
     badge: 'border-destructive/40 bg-destructive/10 text-destructive',

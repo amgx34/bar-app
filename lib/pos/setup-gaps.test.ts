@@ -79,8 +79,11 @@ describe('classifyGap', () => {
     expect(classifyGap(sold('Lemon Drop', 'Shots'), new Map([inv('lemon drop')]), recipes).kind).toBe('ok');
   });
 
-  it('passes beer and seltzers, which are correctly sold whole', () => {
-    for (const cat of ['Draft Beer', 'Bottle Beer', 'Seltzers & Cans']) {
+  it('passes packaged beer and seltzers, which are correctly sold whole', () => {
+    // Draft is deliberately NOT in this list: a keg is poured by the glass, so
+    // it belongs with the spirits, not with the sealed units. See the draft
+    // block below.
+    for (const cat of ['Bottle Beer', 'Seltzers & Cans', 'Canned Beer']) {
       expect(classifyGap(sold('Michelob Ultra', cat), new Map([inv('michelob ultra')]), NO_RECIPES).kind)
         .toBe('ok');
     }
@@ -110,7 +113,7 @@ describe('findSetupGaps', () => {
   ]);
 
   const items = [
-    sold('Michelob Ultra', 'Draft Beer', 31),
+    sold('Michelob Ultra', 'Bottle Beer', 31),
     sold('Lemon Drop', 'Shots', 32),
     sold('Trashcan', 'Cocktails', 2),
     sold('Well Vodka', 'Vodka', 140),
@@ -121,6 +124,19 @@ describe('findSetupGaps', () => {
     const gaps = findSetupGaps(items, inventory, NO_RECIPES);
     expect(gaps[0].itemName).toBe('Well Vodka');
     expect(gaps[0].kind).toBe('needs-pour-size');
+  });
+
+  it('puts an unsized keg above an unsized spirit', () => {
+    // Same mistake, different magnitude: a whole bottle is ~17 servings lost,
+    // a whole keg is ~124. The keg is the one to fix first even when it sells
+    // less.
+    const gaps = findSetupGaps(
+      [sold('Well Vodka', 'Vodka', 500), sold('Bud Light', 'Draft Beer', 20)],
+      new Map([inv('well vodka'), inv('bud light')]),
+      NO_RECIPES,
+    );
+    expect(gaps[0].itemName).toBe('Bud Light');
+    expect(gaps[0].kind).toBe('needs-keg-size');
   });
 
   it('ranks by volume within a severity band', () => {
@@ -156,7 +172,7 @@ describe('summariseGaps', () => {
         sold('Well Vodka', 'Vodka', 140),
         sold('Lemon Drop', 'Shots', 32),
         sold('Trashcan', 'Cocktails', 2),
-        sold('Michelob Ultra', 'Draft Beer', 31),
+        sold('Michelob Ultra', 'Bottle Beer', 31),
       ],
       inventory,
       NO_RECIPES,
@@ -222,6 +238,49 @@ describe('category classification', () => {
     // or the item form and the report would give contradictory advice.
     for (const c of ['Cocktails', 'Shots', 'Vodka', 'Whiskey/Bourbon']) {
       expect(isMixedDrinkCategory(c) && isPouredCategory(c)).toBe(false);
+    }
+  });
+});
+
+// ── Draft / keg sizing ───────────────────────────────────────────────────────
+// Kegs were previously classified 'ok' — "sold whole, one sale removes one
+// unit" — which is right for a canned beer and catastrophically wrong for a
+// keg, where one sale is one pint of roughly 124.
+describe('draft categories', () => {
+  const sold = (categoryName: string | null) => ({
+    itemName: 'Bud Light', matchKey: 'bud light', categoryName, qtySold: 400, revenue: 2400,
+  });
+
+  it('flags a keg with no size', () => {
+    const inv = new Map([['bud light', { matchKey: 'bud light', bottleSizeMl: null, resolvedPourOz: null }]]);
+    const { kind, detail } = classifyGap(sold('Draft Beer'), inv, new Set());
+    expect(kind).toBe('needs-keg-size');
+    expect(detail).toContain('WHOLE keg');
+  });
+
+  it('flags a keg that has a size but no pour', () => {
+    const inv = new Map([['bud light', { matchKey: 'bud light', bottleSizeMl: 58670, resolvedPourOz: null }]]);
+    expect(classifyGap(sold('Draft Beer'), inv, new Set()).kind).toBe('needs-keg-size');
+  });
+
+  it('passes a fully configured keg', () => {
+    const inv = new Map([['bud light', { matchKey: 'bud light', bottleSizeMl: 58670, resolvedPourOz: 16 }]]);
+    expect(classifyGap(sold('Draft Beer'), inv, new Set()).kind).toBe('ok');
+  });
+
+  it('matches the words a bar actually uses for a tap list', () => {
+    const inv = new Map([['bud light', { matchKey: 'bud light', bottleSizeMl: null, resolvedPourOz: null }]]);
+    for (const cat of ['Draft', 'Draught Beer', 'On Tap', 'Keg Beer']) {
+      expect(classifyGap(sold(cat), inv, new Set()).kind).toBe('needs-keg-size');
+    }
+  });
+
+  it('leaves canned and bottled beer alone', () => {
+    // The line this whole design turns on: a sealed unit sold 1:1 is CORRECT,
+    // and adding a conversion here would break what already works.
+    const inv = new Map([['bud light', { matchKey: 'bud light', bottleSizeMl: null, resolvedPourOz: null }]]);
+    for (const cat of ['Bottle Beer', 'Canned Seltzer', 'Beer', null]) {
+      expect(classifyGap(sold(cat), inv, new Set()).kind).toBe('ok');
     }
   });
 });

@@ -20,6 +20,7 @@ import {
 } from '@/lib/schemas/inventory';
 import { adjustStock } from '../actions';
 import type { ItemRow } from './inventory-table';
+import { hasPack, toSingles, describePackCount } from '@/lib/inventory/packs';
 
 type Props = {
   open: boolean;
@@ -45,6 +46,12 @@ const REASONS = [
 export function StockAdjustDialog({ open, onOpenChange, item, onOptimisticStock }: Props) {
   const [isPending, startTransition] = useTransition();
   const [mode, setMode] = useState<'set' | 'delta'>('delta');
+  // Pack calculator. Local, not form state: it FILLS the quantity field
+  // rather than replacing it, so the number actually submitted is always
+  // the one on screen and a removal still reads as a plain negative.
+  const [packs, setPacks] = useState('');
+  const [loose, setLoose] = useState('');
+  const perPack = item.units_per_pack;
 
   const {
     register, handleSubmit, setValue, reset, formState: { errors },
@@ -99,7 +106,11 @@ export function StockAdjustDialog({ open, onOpenChange, item, onOptimisticStock 
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="text-sm bg-muted rounded-md p-3">
-            Current stock: <span className="font-medium">{item.current_stock} {item.unit}</span>
+            Current stock:{' '}
+            <span className="font-medium">
+              {describePackCount(item.current_stock, perPack, item.unit)}
+              {!hasPack(perPack) && ` ${item.unit}`}
+            </span>
           </div>
 
           <Tabs value={mode} onValueChange={handleModeChange}>
@@ -108,6 +119,45 @@ export function StockAdjustDialog({ open, onOpenChange, item, onOptimisticStock 
               <TabsTrigger value="set">Set exact count</TabsTrigger>
             </TabsList>
           </Tabs>
+
+          {hasPack(perPack) && (
+            <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+              <p className="text-xs font-medium">
+                Count by the {item.unit}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label htmlFor="packs" className="text-xs font-normal text-muted-foreground">
+                    {item.unit}s of {perPack}
+                  </Label>
+                  <Input id="packs" type="number" step="1" min="0" placeholder="0"
+                    value={packs} onChange={(e) => setPacks(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="loose" className="text-xs font-normal text-muted-foreground">
+                    Loose singles
+                  </Label>
+                  <Input id="loose" type="number" step="1" min="0" placeholder="0"
+                    value={loose} onChange={(e) => setLoose(e.target.value)} />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setValue('quantity', toSingles(
+                    { packs: Number(packs) || 0, loose: Number(loose) || 0 },
+                    perPack,
+                  ));
+                }}
+                className="w-full rounded-md border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+              >
+                Use {toSingles({ packs: Number(packs) || 0, loose: Number(loose) || 0 }, perPack)} singles
+              </button>
+              <p className="text-[11px] text-muted-foreground">
+                Stock is stored in singles. Each sale still removes one.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-1">
             <Label htmlFor="quantity">

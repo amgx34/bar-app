@@ -22,6 +22,7 @@ import {
 import { ItemFormDialog } from './item-form-dialog';
 import { StockAdjustDialog } from './stock-adjust-dialog';
 import { DeactivateDialog } from './deactivate-dialog';
+import { hasPack, describePackCount } from '@/lib/inventory/packs';
 
 export type ItemRow = {
   id: string;
@@ -37,6 +38,8 @@ export type ItemRow = {
   rep_id: string | null;
   bottle_size_ml: number | null;
   pour_size_oz: number | null;
+  /** Singles per purchase pack. Entry-time only — never used in depletion. */
+  units_per_pack: number | null;
   inventory_categories: { id: string; name: string } | null;
   reps: { id: string; name: string } | null;
 };
@@ -176,7 +179,9 @@ export function InventoryTable({ items, categories, reps, role, defaultPourOz, b
                   <dt className="text-muted-foreground">In stock</dt>
                   <dd className="flex items-center gap-1.5 tabular-nums font-medium">
                     {belowPar && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
-                    {item.current_stock} {item.unit}
+                    {hasPack(item.units_per_pack)
+                      ? describePackCount(item.current_stock, item.units_per_pack, item.unit)
+                      : `${item.current_stock} ${item.unit}`}
                   </dd>
                 </div>
                 <div className="flex justify-between">
@@ -240,7 +245,11 @@ export function InventoryTable({ items, categories, reps, role, defaultPourOz, b
                       {belowPar && (
                         <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
                       )}
-                      {item.current_stock}
+                      <span title={hasPack(item.units_per_pack)
+                        ? describePackCount(item.current_stock, item.units_per_pack, item.unit)
+                        : undefined}>
+                        {item.current_stock}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">

@@ -35,6 +35,8 @@ export type GapKind =
   | 'needs-pour-size'
   /** A mixed drink held as a stock item. Should be a recipe over real bottles. */
   | 'needs-recipe'
+  /** Draft sold by the glass but held as a keg with no size — a whole keg per pint. */
+  | 'needs-keg-size'
   /** Correctly configured, or correctly sold whole. Nothing to do. */
   | 'ok';
 
@@ -78,6 +80,20 @@ const POURED = [
 /** Categories whose items are MIXED from several bottles, so need a recipe. */
 const MIXED = ['cocktail', 'shot', 'martini', 'margarita', 'punch', 'bomb'];
 
+/**
+ * Categories poured from a keg.
+ *
+ * Kept separate from POURED because the consequence and the fix are different
+ * enough that one message would serve neither: a spirit needs a bottle size in
+ * millilitres, a keg needs a keg size, and an operator reading "whole bottle"
+ * about a half-barrel will not connect it to the keg in their cellar.
+ *
+ * These were previously classified `ok` — "sold whole, one sale removes one
+ * unit" — which is exactly right for a canned beer and catastrophically wrong
+ * for a keg, where one sale is one pint of about 124.
+ */
+const DRAFT = ['draft', 'draught', 'keg', 'tap'];
+
 function matchesAny(category: string | null, needles: string[]): boolean {
   if (!category) return false;
   const c = category.toLowerCase();
@@ -93,6 +109,11 @@ function matchesAny(category: string | null, needles: string[]): boolean {
  */
 export function isPouredCategory(category: string | null): boolean {
   return matchesAny(category, POURED);
+}
+
+/** Is this category poured from a keg, so the item needs a keg size? */
+export function isDraftCategory(category: string | null): boolean {
+  return matchesAny(category, DRAFT);
 }
 
 /**
@@ -152,16 +173,35 @@ export function classifyGap(
     return { kind: 'ok', detail: 'Pour tracking configured.' };
   }
 
-  // Beer, seltzers, cans, anything else: one sale, one unit is correct.
+  if (matchesAny(sold.categoryName, DRAFT)) {
+    if (!item.bottleSizeMl) {
+      return {
+        kind: 'needs-keg-size',
+        detail: 'Sold by the glass but held as a keg with no size — every pour removes a WHOLE keg.',
+      };
+    }
+    if (!item.resolvedPourOz) {
+      return {
+        kind: 'needs-keg-size',
+        detail: 'Has a keg size but no pour, so it still removes a whole keg per pour.',
+      };
+    }
+    return { kind: 'ok', detail: 'Keg pour tracking configured.' };
+  }
+
+  // Beer in bottles and cans, seltzers, anything else sold as a sealed unit:
+  // one sale, one unit is correct, and adding a conversion would BREAK it.
   return { kind: 'ok', detail: 'Sold whole — one sale removes one unit, which is correct.' };
 }
 
 /** Worst first, then by how much it sold — the order to actually work through. */
 const SEVERITY: Record<GapKind, number> = {
-  'needs-pour-size': 0,
-  'unmapped': 1,
-  'needs-recipe': 2,
-  'ok': 3,
+  // A keg outranks a bottle: the same mistake costs ~124 servings instead of ~17.
+  'needs-keg-size': 0,
+  'needs-pour-size': 1,
+  'unmapped': 2,
+  'needs-recipe': 3,
+  'ok': 4,
 };
 
 export function findSetupGaps(

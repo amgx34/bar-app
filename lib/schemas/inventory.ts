@@ -13,6 +13,11 @@ export const inventoryItemSchema = z.object({
   // Liquor / bottle tracking
   bottle_size_ml: z.number().int().positive().nullable().optional(),
   pour_size_oz:   z.number().positive().nullable().optional(),
+  /**
+   * Singles in one purchase pack. Entry-time only — see the column comment
+   * in 20260901000003. Minimum 2, because a pack of one is not a pack.
+   */
+  units_per_pack: z.number().int().min(2).nullable().optional(),
 });
 export type InventoryItemInput = z.infer<typeof inventoryItemSchema>;
 

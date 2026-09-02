@@ -43,7 +43,7 @@ export default async function InventoryPage({
     .select(`
       id, name, sku, unit, par_level, cost_price, sale_price,
       current_stock, is_active, category_id, rep_id,
-      bottle_size_ml, pour_size_oz,
+      bottle_size_ml, pour_size_oz, units_per_pack,
       inventory_categories ( id, name ),
       reps ( id, name )
     `)
