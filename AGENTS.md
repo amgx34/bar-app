@@ -44,6 +44,27 @@ Tables that inherit tenancy through a parent (`weigh_report_items` →
 `weigh_reports`) have no `organization_id` of their own. Verify the parent before
 mutating; see `assertItemInOrg` in `app/(app)/app/inventory/weigh/actions.ts`.
 
+**A delivery's cost is recorded, not inferred.** `usage_logs.unit_cost` is what the
+invoice charged, in stock units; `shipment_id` links the movement to its
+`inventory_shipments` document. Both are NULL for every delivery recorded before
+shipments existed, and the books fall back to `inventory_items.cost_price` for
+those — which is why editing an item's cost used to restate past months. Anything
+valuing a purchase must read `unit_cost ?? cost_price`, never `cost_price` alone.
+Invoice-level freight and tax are allocated across a shipment's own lines by
+share of value (`lib/inventory/shipments.ts`); deposits are recorded but are not
+a cost of sale.
+
+`usage_logs.logged_at` and `inventory_shipments.invoice_date` are **different
+clocks**, and nothing copies one into the other: `logged_at` is when the row was
+inserted, `invoice_date` is the date printed on the paper, typed in by a person
+or read by the AI. Confusing them has produced a real bug three times on this
+branch — the books once counted a shipment's freight in a month its lines never
+appeared in, landing the charge in no month at all; the inventory dashboard once
+matched a shipment to a delivery day and so almost never matched, because entry
+is rarely same-day. The fix both times, and the general rule: two tables related
+by a foreign key are joined on the key, never on a date that happens to look
+similar.
+
 - `lib/supabase/server.ts` → `createClient()`: cookie-scoped, RLS applies. Prefer this.
 - `lib/supabase/admin.ts` → `createAdminClient()`: service role, RLS off. Scope manually.
 - `lib/supabase/browser.ts`: client components.

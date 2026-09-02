@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "ihXDPerr5iM=",
+  "dgSpecHash": "bG1OCN18T8I=",
   "success": true,
-  "projectFilePath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\apps\\RailUninstall\\RailUninstall.csproj",
+  "projectFilePath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\apps\\RailUninstall\\RailUninstall.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\notug\\.nuget\\packages\\azure.core\\1.38.0\\azure.core.1.38.0.nupkg.sha512",
     "C:\\Users\\notug\\.nuget\\packages\\azure.identity\\1.11.4\\azure.identity.1.11.4.nupkg.sha512",

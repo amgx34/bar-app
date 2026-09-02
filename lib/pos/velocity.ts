@@ -40,6 +40,21 @@
 const NON_CONSUMPTION = new Set(['delivery', 'pos_reversal']);
 
 /**
+ * NON_CONSUMPTION matches on `reason` alone, which is not enough once a
+ * voided shipment can write a reversal row: voidShipment() logs it with
+ * reason: 'other' (deliberately NOT 'recount' or anything in the shrinkage
+ * set — see shipment-actions.ts), so by reason alone a 40-case void reads as
+ * 40 cases of consumption and inflates both "top movers" and reorder
+ * suggestions the moment voiding is reachable from the UI. What distinguishes
+ * a reversal from a genuine loss is not its reason, it is that it carries a
+ * shipment_id — shipment bookkeeping, not something that happened on the
+ * floor. Any row with one is skipped here regardless of reason.
+ */
+function isShipmentBookkeeping(log: UsageLogFact): boolean {
+  return log.shipmentId != null;
+}
+
+/**
  * Movements already accounted for by the sales feed. Counting a `pos_sale`
  * usage log alongside the `pos_item_sales` row it came from would report every
  * sold unit twice.
@@ -57,6 +72,13 @@ export type UsageLogFact = {
   itemId: string;
   quantity: number;
   reason: string;
+  /**
+   * Set when this row is a shipment delivery line OR a void's reversal of
+   * one — usage_logs.shipment_id. Optional because most callers' queries
+   * predate shipments and most rows (POS sales, hand-logged spillage) never
+   * had one; absent/null means "not shipment bookkeeping".
+   */
+  shipmentId?: string | null;
 };
 
 export type ItemRef = {
@@ -123,6 +145,7 @@ export function computeVelocity(
 
   const lostById = new Map<string, number>();
   for (const log of usageLogs) {
+    if (isShipmentBookkeeping(log)) continue;
     if (NON_CONSUMPTION.has(log.reason)) continue;
     if (ALREADY_IN_SALES.has(log.reason)) continue;
     lostById.set(log.itemId, (lostById.get(log.itemId) ?? 0) + log.quantity);

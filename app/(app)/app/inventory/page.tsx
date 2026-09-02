@@ -5,6 +5,7 @@ import { InventoryTable, type ItemRow } from './_components/inventory-table';
 import { InventoryHeader } from './_components/inventory-header';
 import dynamicImport from 'next/dynamic';
 import type { DashboardUsageLog, DashboardItem } from './_components/inventory-dashboard';
+import { listShipments } from './shipment-actions';
 
 // The only chart component in the app still imported statically, which pulled
 // the whole of recharts (~330KB) into the Items route — the most-visited
@@ -54,16 +55,23 @@ export default async function InventoryPage({
   if (q) query = query.ilike('name', `%${q}%`);
   if (category && category !== 'all') query = query.eq('category_id', category);
 
-  const [{ data: items, error }, { data: categories }, { data: reps }, { data: usageLogs }] = await Promise.all([
+  const [{ data: items, error }, { data: categories }, { data: reps }, { data: usageLogs }, shipments] = await Promise.all([
     query,
     supabase.from('inventory_categories').select('id, name, cost_type, default_pour_oz').eq('organization_id', org.id).order('name'),
     supabase.from('reps').select('id, name').eq('organization_id', org.id).eq('is_active', true).order('name'),
     supabase
       .from('usage_logs')
-      .select('item_id, quantity, reason, note, logged_at, inventory_items(name)')
+      .select('item_id, quantity, reason, note, logged_at, shipment_id, inventory_items(name)')
       .eq('organization_id', org.id)
       .order('logged_at', { ascending: false })
       .limit(500),
+    // Feeds the dashboard's "Latest Shipment" panel. This is a server
+    // component, so the real document (vendor, invoice total) can be
+    // awaited here and passed straight down as a prop instead of the
+    // dashboard reaching for it itself — it stays a plain client component
+    // with no server action call hiding in an effect. listShipments is
+    // already role-gated and org-scoped internally (see shipment-actions.ts).
+    listShipments(),
   ]);
 
   if (error) {
@@ -78,6 +86,7 @@ export default async function InventoryPage({
       <InventoryDashboard
         usageLogs={(usageLogs ?? []) as unknown as DashboardUsageLog[]}
         items={(items ?? []) as unknown as DashboardItem[]}
+        shipments={shipments}
       />
       <InventoryHeader
         role={role}

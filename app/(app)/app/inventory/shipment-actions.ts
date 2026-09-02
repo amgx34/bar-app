@@ -26,7 +26,20 @@ import { parseShipmentWithAI } from '@/lib/ai-parsers/parse-shipment-with-ai';
  * shipment in by hand.
  */
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
+// The regex alone admits a rollover date like 2026-02-31 — syntactically
+// YYYY-MM-DD but not a real day — which would otherwise reach the DATE
+// column as a raw Postgres error instead of a field-level validation
+// message. Same rollover check as isoDate() in
+// lib/ai-parsers/parse-shipment-with-ai.ts: round-trip through Date.UTC and
+// confirm the parts survived unchanged.
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
+  .refine((raw) => {
+    const [y, m, d] = raw.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+  }, 'Not a real date');
 
 const lineSchema = z.object({
   existingId: z.string().uuid().nullable(),
@@ -95,6 +108,19 @@ export type ShipmentReview = {
 /** A DB numeric column comes back as `any` from the untyped admin client. */
 function toNumberOrNull(value: unknown): number | null {
   return value === null || value === undefined ? null : Number(value);
+}
+
+/**
+ * Reads a joined inventory_items.cost_price, tolerating either shape the
+ * untyped admin client can hand back for a to-one relation (a bare object or
+ * a one-element array). Same helper as getCostPrice in books/actions.ts —
+ * used here so listShipments values a null unit_cost line the same way the
+ * books do, instead of the two screens disagreeing about one shipment's total.
+ */
+function getCostPrice(raw: unknown): number {
+  if (!raw) return 0;
+  const obj = Array.isArray(raw) ? raw[0] : raw;
+  return (obj as { cost_price?: number | null })?.cost_price ?? 0;
 }
 
 /**
@@ -184,6 +210,26 @@ export async function postShipment(raw: unknown): Promise<{ shipmentId: string; 
   const input = shipmentSchema.parse(raw);
   const user = await getAuthUser();
   const supabase = createAdminClient();
+
+  // repId is a suggestion echoed back from the client (the review screen
+  // today always sends null, but the schema only requires a well-formed
+  // UUID) — never resolved by a query THIS function ran. Every other id
+  // this file writes gets a scoped re-lookup before use (see the existingId
+  // handling in the lines loop below); this insert was the one exception,
+  // and npm run audit:scope cannot flag it because it is an INSERT value,
+  // not a `.eq()` filter. Confirm it names a rep in this org before it is
+  // allowed onto this org's shipment — otherwise a hand-crafted call could
+  // link another org's rep row here.
+  if (input.repId) {
+    const { data: repRow } = await supabase
+      .from('reps')
+      .select('id')
+      .eq('id', input.repId)
+      .eq('organization_id', org.id)
+      .maybeSingle();
+
+    if (!repRow) throw new Error('That rep does not belong to this organization');
+  }
 
   const { data: shipment, error: shipmentError } = await supabase
     .from('inventory_shipments')
@@ -674,7 +720,14 @@ export async function listShipments(limit = 50): Promise<ShipmentSummary[]> {
     shipments.map(async (s) => {
       const { data: lines, error: linesError } = await supabase
         .from('usage_logs')
-        .select('quantity, unit_cost')
+        // unit_cost is what the invoice actually charged, NULL only for
+        // deliveries recorded before shipments existed (there is no such
+        // thing as a shipment-linked row with a null unit_cost going
+        // forward, postShipment always writes one). The item's cost_price
+        // is joined so a null can still be valued: books/actions.ts values
+        // every purchase at `unit_cost ?? cost_price`, and this screen must
+        // agree with it rather than quietly reporting $0 for the same row.
+        .select('quantity, unit_cost, inventory_items(cost_price)')
         .eq('shipment_id', s.id)
         .eq('organization_id', org.id)
         .eq('reason', 'delivery');
@@ -687,9 +740,10 @@ export async function listShipments(limit = 50): Promise<ShipmentSummary[]> {
       let lineTotal = 0;
       for (const line of lines ?? []) {
         count += 1;
-        // A null unit_cost means no price was recorded on this line — it
-        // still counts toward lineCount, just not toward the dollar total.
-        if (line.unit_cost !== null) lineTotal += Number(line.quantity) * Number(line.unit_cost);
+        const unitValue = line.unit_cost !== null
+          ? Number(line.unit_cost)
+          : getCostPrice(line.inventory_items);
+        lineTotal += Number(line.quantity) * unitValue;
       }
       return { id: s.id as string, count, lineTotal };
     }),

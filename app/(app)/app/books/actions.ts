@@ -8,6 +8,7 @@ import {
   summariseCosts, buildProfitAndLoss, expandRecurring,
   type CostedUsage, type CostType, type OperatingExpense, type ExpenseCategory,
 } from '@/lib/books/cost-structure';
+import { allocateShipmentCharges } from '@/lib/inventory/shipments';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -72,6 +73,7 @@ export async function getBooksData(startDate: string, endDate: string): Promise<
     { data: usageLogs },
     { data: operatingExpenses },
     { data: losses },
+    { data: voidedShipments },
     payrollEntries,
   ] = await Promise.all([
     supabase
@@ -85,7 +87,9 @@ export async function getBooksData(startDate: string, endDate: string): Promise<
       .from('usage_logs')
       // cost_type comes through the item's category: it decides whether this
       // purchase is cost of goods, an operating supply, or ignored entirely.
-      .select('quantity, reason, logged_at, inventory_items(cost_price, inventory_categories(cost_type))')
+      // unit_cost is what the invoice actually charged; NULL for every delivery
+      // recorded before shipments existed, which is why the fallback stays.
+      .select('quantity, reason, logged_at, unit_cost, shipment_id, inventory_items(cost_price, inventory_categories(cost_type))')
       .eq('organization_id', orgId)
       .eq('reason', 'delivery')
       .gte('logged_at', startDate + 'T00:00:00Z')
@@ -104,12 +108,29 @@ export async function getBooksData(startDate: string, endDate: string): Promise<
       .eq('organization_id', orgId)
       .gte('report_date', startDate)
       .lte('report_date', endDate),
+    // Shipment ids voided at any time, not just within [startDate, endDate].
+    // voidShipment() reverses stock but deliberately leaves the original
+    // `delivery` usage_logs rows in place (so the paper trail of what was
+    // received still exists), so those rows must be kept out of costedUsage
+    // by hand here. A shipment received in August and voided in September
+    // still has to disappear from August's P&L, so this query is
+    // deliberately NOT filtered by invoice_date — filtering it to the
+    // reporting window would let a late void keep the voided invoice's value
+    // in a month that has already closed.
+    supabase
+      .from('inventory_shipments')
+      .select('id')
+      .eq('organization_id', orgId)
+      .not('voided_at', 'is', null),
     computePayroll(startDate, endDate),
   ]);
 
   const days = zDays ?? [];
   const logs = usageLogs ?? [];
   const lossRows = losses ?? [];
+  // Rows with no shipment_id (every historical delivery, and manual stock
+  // adjustments) are never voided by this check and still count in full.
+  const voidedShipmentIds = new Set((voidedShipments ?? []).map((s) => s.id));
 
   // What the POS reported. Whether this already contains sales tax is a
   // configured fact, not something the figure itself reveals.
@@ -139,9 +160,30 @@ export async function getBooksData(startDate: string, endDate: string): Promise<
 
   // Every purchase carries its category's classification, so napkins land in
   // supplies rather than inflating pour cost. See lib/books/cost-structure.ts.
-  const costedUsage: CostedUsage[] = logs.map((l) => ({
+  //
+  // unit_cost is what the invoice charged. Falling back to the item's current
+  // cost_price is what every delivery did before shipments existed — and is
+  // also why editing an item used to restate history: with no record of what a
+  // delivery cost, last month's purchases were re-priced at today's price.
+  //
+  // A row whose shipment was voided is dropped here: voidShipment() reverses
+  // the stock but leaves the row itself in place as a record, so without this
+  // filter a voided invoice would still count at full value even though the
+  // stock it bought is gone. Rows with no shipment_id (all history predating
+  // shipments, plus manual adjustments) never match a voided id and pass
+  // through untouched.
+  // Kept as its own array, not folded straight into costedUsage's .map, so the
+  // monthly bucket loop further down can reuse the EXACT same filtered rows
+  // instead of re-deriving them with a second copy of this predicate. Two
+  // independent copies of "drop rows whose shipment was voided" is how the
+  // headline and the monthly chart drifted apart before: the headline picked
+  // this filter up and the month loop did not, so voiding an invoice zeroed
+  // the headline but left its stock reading as consumed forever in the trend.
+  const nonVoidedLogs = logs.filter((l) => !l.shipment_id || !voidedShipmentIds.has(l.shipment_id));
+
+  const costedUsage: CostedUsage[] = nonVoidedLogs.map((l) => ({
     costType: getCostType(l.inventory_items),
-    value: (l.quantity ?? 0) * getCostPrice(l.inventory_items),
+    value: (l.quantity ?? 0) * (l.unit_cost ?? getCostPrice(l.inventory_items)),
   }));
 
   const rawExpenses: OperatingExpense[] = (operatingExpenses ?? []).map((e) => ({
@@ -152,8 +194,65 @@ export async function getBooksData(startDate: string, endDate: string): Promise<
     recurringUntil: e.recurring_until,
   }));
 
+  // Freight and tax are invoice-level but pour cost is per category, so each
+  // shipment's charges are spread across its own lines by share of value. A
+  // case of napkins on a liquor invoice must not carry the same freight as ten
+  // cases of spirits. Deposits are excluded — they come back.
+  //
+  // Charge-bearing shipments are found from the shipment_id values already
+  // present on `logs`, NOT by filtering inventory_shipments on invoice_date.
+  // usage_logs.logged_at (the window `logs` was already fetched by) and
+  // inventory_shipments.invoice_date are different clocks — logged_at is
+  // effectively insert time, invoice_date is user/AI-entered and can fall in
+  // an earlier or later month. An invoice dated Jul 31 but keyed in Aug 2 would
+  // have its lines in the August window and, if charges were queried by
+  // invoice_date, its charges in July — a month with none of its lines, so
+  // allocateShipmentCharges would return the whole charge as `unallocated` and
+  // it would land in neither month. Deriving the shipment set from `logs`
+  // instead means charges always travel with their own lines, so this straddle
+  // cannot happen in either direction. Do NOT change this back to an
+  // invoice_date range — it looks like the more obvious filter but it reintroduces
+  // the bug.
+  //
+  // .is('voided_at', null) here means a voided shipment's charges are simply
+  // never fetched, which is enough for the charges themselves — but it does
+  // NOT touch the underlying usage_logs lines, which is why costedUsage above
+  // needs its own voidedShipmentIds filter.
+  const shipmentIdsInWindow = [...new Set(
+    logs.map((l) => l.shipment_id).filter((id): id is string => !!id),
+  )];
+
+  const { data: shipmentCharges } = shipmentIdsInWindow.length > 0
+    ? await supabase
+        .from('inventory_shipments')
+        .select('id, freight, tax, other_charges')
+        .eq('organization_id', orgId)
+        .is('voided_at', null)
+        .in('id', shipmentIdsInWindow)
+    : { data: [] as { id: string; freight: number | null; tax: number | null; other_charges: number | null }[] };
+
+  const chargedUsage: CostedUsage[] = [];
+  for (const shipment of shipmentCharges ?? []) {
+    const shipmentLines = logs
+      .filter((l) => l.shipment_id === shipment.id)
+      .map((l) => ({
+        costType: getCostType(l.inventory_items),
+        lineTotal: (l.quantity ?? 0) * (l.unit_cost ?? getCostPrice(l.inventory_items)),
+      }));
+
+    const { byLine } = allocateShipmentCharges(shipmentLines, {
+      freight: Number(shipment.freight) || 0,
+      tax: Number(shipment.tax) || 0,
+      otherCharges: Number(shipment.other_charges) || 0,
+    });
+
+    byLine.forEach((value, i) => {
+      if (value > 0) chargedUsage.push({ costType: shipmentLines[i].costType, value });
+    });
+  }
+
   const costs = summariseCosts(
-    costedUsage,
+    [...costedUsage, ...chargedUsage],
     expandRecurring(rawExpenses, startDate, endDate),
   );
   const cogs = costs.totalCogs;
@@ -194,11 +293,18 @@ export async function getBooksData(startDate: string, endDate: string): Promise<
     monthMap.get(key)!.revenue += splitRevenue(d.total_sales ?? 0, taxConfig).net;
   }
 
-  for (const l of logs) {
+  // Same source array and the same unit_cost ?? cost_price valuation the
+  // headline (costedUsage, above) uses — see the comment on nonVoidedLogs.
+  // Freight/tax allocation (chargedUsage, above) is deliberately NOT added
+  // per month here: it would need each shipment's charges re-split across
+  // whichever month(s) its own lines land in, which this loop does not do.
+  // That is a pre-existing gap between this chart and the headline total,
+  // not something this fix introduces or was asked to close.
+  for (const l of nonVoidedLogs) {
     const dt  = new Date(l.logged_at as string);
     const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
     if (!monthMap.has(key)) monthMap.set(key, { revenue: 0, cogs: 0, labor: 0 });
-    monthMap.get(key)!.cogs += (l.quantity ?? 0) * getCostPrice(l.inventory_items);
+    monthMap.get(key)!.cogs += (l.quantity ?? 0) * (l.unit_cost ?? getCostPrice(l.inventory_items));
   }
 
   // Distribute labor evenly across months

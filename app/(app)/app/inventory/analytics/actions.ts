@@ -65,7 +65,12 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
 
   const [{ data: rawItems }, { data: logs30 }, { data: logs90 }, { data: posSales30 }] = await Promise.all([
     supabase.from('inventory_items').select('id, name, unit, current_stock, par_level, cost_price, bottle_size_ml, pour_size_oz, inventory_categories(name, default_pour_oz)').eq('organization_id', orgId).eq('is_active', true).order('name'),
-    supabase.from('usage_logs').select('item_id, quantity, reason, logged_at').eq('organization_id', orgId).gte('logged_at', d30.toISOString()),
+    // shipment_id lets computeVelocity tell a void's reversal row (reason:
+    // 'other', but linked to a shipment) apart from a genuine floor loss —
+    // see isShipmentBookkeeping in lib/pos/velocity.ts. logs90 does not need
+    // it: it only feeds shrinkage, which already keys off SHRINKAGE_REASONS
+    // and 'other' is not in that set.
+    supabase.from('usage_logs').select('item_id, quantity, reason, logged_at, shipment_id').eq('organization_id', orgId).gte('logged_at', d30.toISOString()),
     supabase.from('usage_logs').select('item_id, quantity, reason, logged_at').eq('organization_id', orgId).gte('logged_at', d90.toISOString()),
     // What actually SOLD. Velocity used to read usage_logs alone, so a bar that
     // syncs its POS but does not hand-log spillage had no movers at all — the
@@ -131,6 +136,7 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
       itemId: l.item_id,
       quantity: Number(l.quantity) || 0,
       reason: l.reason,
+      shipmentId: l.shipment_id,
     })),
     30,
   );
