@@ -14,6 +14,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { PayrollEntry } from '../actions';
+import { PayoutCell } from './payout-controls';
+import type { Payout } from '@/lib/payroll/payouts';
 
 interface PayrollTableProps {
   entries: PayrollEntry[];
@@ -22,6 +24,11 @@ interface PayrollTableProps {
   endDate?: string;
   /** Hidden for roles that may not change pay. */
   canAdjust?: boolean;
+  /**
+   * Who has already been handed their money, by employee id. A missing entry
+   * is the unpaid state — see lib/payroll/payouts.ts.
+   */
+  payouts: ReadonlyMap<string, Payout>;
   totals: {
     totalHours: number;
     regularPay: number;
@@ -119,6 +126,7 @@ export default function PayrollTable({
   totals,
   startDate,
   endDate,
+  payouts,
   canAdjust = false,
 }: PayrollTableProps) {
   const [adjusting, setAdjusting] = useState<PayrollEntry | null>(null);
@@ -147,8 +155,9 @@ export default function PayrollTable({
   const tipsPerHour = (t: Subtotal) => (t.totalHours > 0 ? t.tips / t.totalHours : 0);
 
   // The Role column is gone — every group is a single role, so repeating it on
-  // each row was noise. That leaves ten columns.
-  const COLUMNS = canAdjust ? 11 : 10;
+  // each row was noise. That leaves ten columns, plus Paid — which everyone
+  // sees, because whether somebody has been paid is not an edit.
+  const COLUMNS = canAdjust ? 12 : 11;
 
   return (
     <>
@@ -267,6 +276,23 @@ export default function PayrollTable({
                   </div>
                 </dl>
 
+                {/* Full width and 44px tall rather than squeezed beside the
+                    adjust icon: this is the one thing an owner taps per person
+                    while walking the floor with a cash box. */}
+                <div className="mt-3">
+                  <PayoutCell
+                    layout="block"
+                    employeeId={entry.employeeId}
+                    employeeName={entry.employeeName}
+                    amount={entry.totalCompensation}
+                    payout={payouts.get(entry.employeeId)}
+                    periodStart={startDate ?? ''}
+                    periodEnd={endDate ?? ''}
+                    canAdjust={canAdjust}
+                    onChanged={() => router.refresh()}
+                  />
+                </div>
+
                 {openDays === entry.employeeId && startDate && endDate && (
                   <div className="mt-3 border-t pt-3">
                     <EmployeeDaysPanel
@@ -335,6 +361,7 @@ export default function PayrollTable({
               Eff. /hr
             </TableHead>
             <TableHead className="pr-4 text-right font-semibold">Total Pay</TableHead>
+            <TableHead className="text-center">Paid</TableHead>
             {canAdjust && <TableHead className="w-10"><span className="sr-only">Adjust</span></TableHead>}
           </TableRow>
         </TableHeader>
@@ -438,6 +465,19 @@ export default function PayrollTable({
                   <TableCell className="pr-4 text-right tabular-nums font-semibold text-primary">
                     {fmt(entry.totalCompensation)}
                   </TableCell>
+                  <TableCell className="text-center">
+                    <PayoutCell
+                      layout="row"
+                      employeeId={entry.employeeId}
+                      employeeName={entry.employeeName}
+                      amount={entry.totalCompensation}
+                      payout={payouts.get(entry.employeeId)}
+                      periodStart={startDate ?? ''}
+                      periodEnd={endDate ?? ''}
+                      canAdjust={canAdjust}
+                      onChanged={() => router.refresh()}
+                    />
+                  </TableCell>
                   {canAdjust && (
                     <TableCell className="pr-2">
                       <button
@@ -507,6 +547,7 @@ export default function PayrollTable({
                 <TableCell className="pr-4 text-right tabular-nums text-sm font-medium">
                   {fmt(group.subtotal.totalCompensation)}
                 </TableCell>
+                <TableCell />
                 {canAdjust && <TableCell />}
               </TableRow>
             </RoleBlock>
@@ -547,6 +588,7 @@ export default function PayrollTable({
             <TableCell className="pr-4 text-right tabular-nums text-primary">
               {fmt(totals.totalCompensation)}
             </TableCell>
+            <TableCell />
             {canAdjust && <TableCell />}
           </TableRow>
         </TableBody>

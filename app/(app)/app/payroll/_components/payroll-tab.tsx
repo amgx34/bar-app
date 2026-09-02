@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { PayrollEntry, Employee } from '../actions';
 import PayrollTable from './payroll-table';
 import { AddToShiftDialog } from './add-to-shift-dialog';
@@ -12,6 +12,8 @@ import { Clock, DollarSign, TrendingUp, Banknote, Wallet, ChevronLeft, ChevronRi
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { WeeklyPoint } from './weekly-trend-chart';
+import { PayoutProgress } from './payout-controls';
+import { summarizePayouts, type Payout } from '@/lib/payroll/payouts';
 import ZReportTextUpload from './z-report-text-upload';
 import EmployeeShiftsUpload from './employee-shifts-upload';
 import { PeriodToggle } from '../../_components/period-toggle';
@@ -29,6 +31,8 @@ interface PayrollTabProps {
   payrollEntries: PayrollEntry[];
   employees: Employee[];
   weeklyTrend: WeeklyPoint[];
+  /** Who has already been handed their money for this period. */
+  payouts: Payout[];
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -63,6 +67,7 @@ export default function PayrollTab({
   payrollEntries,
   employees,
   weeklyTrend,
+  payouts,
   canAdjust = false,
 }: PayrollTabProps) {
   const router = useRouter();
@@ -70,6 +75,14 @@ export default function PayrollTab({
   const [addShiftOpen, setAddShiftOpen] = useState(false);
 
   const unconfiguredEmployees = employees.filter((e) => !e.role || e.hourly_rate === null);
+
+  // Keyed once here rather than scanning the array per row: the table renders
+  // this lookup for every employee in both the desktop and the phone layout.
+  const payoutsById = useMemo(
+    () => new Map(payouts.map((p) => [p.employeeId, p])),
+    [payouts],
+  );
+  const payoutSummary = summarizePayouts(payrollEntries, payoutsById);
 
   const totals = payrollEntries.reduce(
     (acc, entry) => ({
@@ -285,11 +298,18 @@ export default function PayrollTab({
         </div>
       )}
 
+      {/* Above the table, not among the summary cards: that grid is
+          lg:grid-cols-5 and a sixth card would orphan onto its own row. This
+          also puts the question — how much of this is done — immediately
+          before the rows that answer it person by person. */}
+      {payrollEntries.length > 0 && <PayoutProgress summary={payoutSummary} />}
+
       <PayrollTable
         entries={payrollEntries}
         totals={totals}
         startDate={startDate}
         endDate={endDate}
+        payouts={payoutsById}
         canAdjust={canAdjust}
       />
 

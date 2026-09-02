@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { computePayroll } from './actions';
+import { loadPayouts } from './payout-actions';
 import { getCurrentOrg } from '@/lib/org';
 import { canManagePayroll } from '@/lib/permissions';
 import PayrollTab from './_components/payroll-tab';
@@ -77,10 +78,11 @@ export default async function PayrollPage({
   const { start: startDate, end: endDate } =
     payPeriodFromParams(params.startDate, params.endDate) ?? defaultPeriod(view, todayIso());
 
-  const [employees, weeklyTrend, payrollEntries] = await Promise.all([
+  const [employees, weeklyTrend, payrollEntries, payouts] = await Promise.all([
     loadEmployees(),
     loadWeeklyTrend(),
     computePayroll(startDate, endDate),
+    loadPayouts(startDate, endDate),
   ]);
 
   return (
@@ -93,6 +95,7 @@ export default async function PayrollPage({
           payrollEntries={payrollEntries}
           employees={employees as never}
           weeklyTrend={weeklyTrend}
+          payouts={payouts}
           canAdjust={canAdjust}
         />
       </Suspense>
