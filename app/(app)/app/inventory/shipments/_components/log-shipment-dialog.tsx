@@ -17,6 +17,8 @@ import {
   type ShipmentReviewHeader, type ShipmentReviewLine,
 } from '../../shipment-actions';
 import { flagPriceChanges, reconcileTotal, type PriceChange } from '@/lib/inventory/shipments';
+import { hasPack } from '@/lib/inventory/packs';
+import { togglePackLine } from '@/lib/inventory/pack-line';
 
 const UNITS = ['bottle', 'can', 'keg', 'case', 'each', 'oz', 'liter', 'bag', 'box', 'gallon', 'jar'];
 
@@ -53,6 +55,13 @@ type HeaderState = {
  */
 interface EditableLine extends ShipmentReviewLine {
   approvedCost: number | null;
+  /**
+   * Whether the operator has expanded this line's quantity from packs into
+   * singles. Tracked so the control is a TOGGLE: a plain "convert" button
+   * tapped twice would turn 5 cases into 2,880 cans, and the delivery would
+   * post before anyone noticed.
+   */
+  packApplied: boolean;
 }
 
 interface Props {
@@ -132,7 +141,7 @@ function linesFromReview(lines: ShipmentReviewLine[]): EditableLine[] {
   // No line starts approved — a fresh parse has had no human look at it yet,
   // flagged or not. Unflagged lines apply anyway (see effectiveApplyCost);
   // flagged lines wait for a tick.
-  return lines.map((l) => ({ ...l, approvedCost: null }));
+  return lines.map((l) => ({ ...l, approvedCost: null, packApplied: false }));
 }
 
 /**
@@ -201,6 +210,19 @@ export function LogShipmentDialog({ open, onOpenChange }: Props) {
 
   function updateLine<K extends keyof EditableLine>(index: number, field: K, value: EditableLine[K]) {
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, [field]: value } : l)));
+  }
+
+  /**
+   * Expand a line from packs into singles, or fold it back.
+   *
+   * Never automatic. An invoice quantity of "5" against an item with a pack
+   * size of 24 is genuinely ambiguous — five cases or five loose cans — and
+   * inventory_items.current_stock is in singles, so guessing wrong is a 24x
+   * error in the stock a bar thinks it has. The operator reads the invoice and
+   * decides; the resulting figure is shown before anything posts.
+   */
+  function togglePack(index: number) {
+    setLines((prev) => prev.map((l, i) => (i === index ? togglePackLine(l) : l)));
   }
 
   /**
@@ -488,6 +510,22 @@ export function LogShipmentDialog({ open, onOpenChange }: Props) {
                               value={line.quantity}
                               onChange={(e) => updateLine(index, 'quantity', parseFloat(e.target.value) || 0)}
                             />
+                            {hasPack(line.unitsPerPack) && (
+                              <button
+                                type="button"
+                                onClick={() => togglePack(index)}
+                                title={line.packApplied
+                                  ? `Fold back to ${line.unitsPerPack}-unit packs — the line total stays the same`
+                                  : `This invoice line is in packs — expand to singles (×${line.unitsPerPack}), splitting the unit cost so the line total is unchanged`}
+                                className={`ml-1 rounded px-1 py-0.5 text-[10px] font-semibold tabular-nums border transition-colors ${
+                                  line.packApplied
+                                    ? 'border-primary/40 bg-primary/10 text-primary'
+                                    : 'border-border text-muted-foreground hover:bg-muted'
+                                }`}
+                              >
+                                {line.packApplied ? `÷${line.unitsPerPack}` : `×${line.unitsPerPack}`}
+                              </button>
+                            )}
                           </td>
                           <td className="px-3 py-2">
                             <select

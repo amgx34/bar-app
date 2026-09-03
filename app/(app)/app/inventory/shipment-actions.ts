@@ -98,6 +98,16 @@ export type ShipmentReviewLine = {
   sku: string | null;
   existingId: string | null;
   currentCost: number | null;
+  /**
+   * The matched item's pack size, so the review step can offer to convert an
+   * invoice line into singles. Null for a new item or one bought as itself.
+   *
+   * Carried for DISPLAY and an explicit one-tap conversion only. Nothing here
+   * converts automatically: an invoice quantity of "5" is unknowable — it may
+   * be five cases or five cans — and guessing would silently multiply a
+   * delivery by 24. The operator decides, and sees the result before posting.
+   */
+  unitsPerPack: number | null;
 };
 
 export type ShipmentReview = {
@@ -140,7 +150,7 @@ export async function parseShipmentText(text: string): Promise<ShipmentReview> {
 
   const { data: existing, error: existingError } = await supabase
     .from('inventory_items')
-    .select('id, name, sku, cost_price')
+    .select('id, name, sku, cost_price, units_per_pack')
     .eq('organization_id', org.id);
 
   // An error here must not be swallowed: silently treating it as "no
@@ -153,13 +163,17 @@ export async function parseShipmentText(text: string): Promise<ShipmentReview> {
 
   // Matched by exact lowercased name first, SKU second — a distributor's SKU
   // is stable across relabels but plenty of invoice lines don't carry one.
-  const byName = new Map<string, { id: string; cost_price: number | null }>();
-  const bySku = new Map<string, { id: string; cost_price: number | null }>();
+  type MatchRow = { id: string; cost_price: number | null; units_per_pack: number | null };
+  const byName = new Map<string, MatchRow>();
+  const bySku = new Map<string, MatchRow>();
   for (const item of existing ?? []) {
-    byName.set(String(item.name).trim().toLowerCase(), { id: item.id, cost_price: item.cost_price });
-    if (item.sku) {
-      bySku.set(String(item.sku).trim().toLowerCase(), { id: item.id, cost_price: item.cost_price });
-    }
+    const row: MatchRow = {
+      id: item.id,
+      cost_price: item.cost_price,
+      units_per_pack: item.units_per_pack ?? null,
+    };
+    byName.set(String(item.name).trim().toLowerCase(), row);
+    if (item.sku) bySku.set(String(item.sku).trim().toLowerCase(), row);
   }
 
   const lines: ShipmentReviewLine[] = parsed.items.map((item) => {
@@ -176,6 +190,7 @@ export async function parseShipmentText(text: string): Promise<ShipmentReview> {
       sku: item.sku,
       existingId: match?.id ?? null,
       currentCost: match ? toNumberOrNull(match.cost_price) : null,
+      unitsPerPack: match?.units_per_pack ?? null,
     };
   });
 
