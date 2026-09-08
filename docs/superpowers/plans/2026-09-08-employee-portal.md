@@ -1028,23 +1028,384 @@ export async function claimEmployeeAccount(
 
 - [ ] **Step 3: Write the form**
 
-`app/(auth)/join/join-form.tsx` — a client component with four fields (email, password, bar code, "your name as your manager writes it"), calling `claimEmployeeAccount` and rendering the returned message. Follow the structure of `app/(auth)/login/login-form.tsx` exactly: same `useState` pattern for pending and message, same Base UI inputs, no `asChild`.
+`app/(auth)/join/join-form.tsx`:
 
-`app/(auth)/join/page.tsx` — server component rendering `<JoinForm />` inside the same shell `app/(auth)/login/page.tsx` uses, with `export const metadata = { title: 'Staff sign-up' }`.
+```tsx
+'use client';
 
-- [ ] **Step 4: Add join-code controls to the Team tab**
+import { useState } from 'react';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { claimEmployeeAccount } from './actions';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
+import { FormStatus } from '@/components/ui/form-status';
+import {
+  Card, CardContent, CardDescription, CardHeader, CardTitle,
+} from '@/components/ui/card';
 
-In `app/(app)/app/settings/_components/team-tab.tsx`, add a "Staff logins" section: shows the current code or "off", a button to generate one (`crypto.randomUUID().slice(0, 8).toUpperCase()` written through a server action gated on `canManagePayroll`), a rotate button, and a disable button that sets the column to NULL. Copy states from the existing sections in that file rather than inventing new ones.
+const FIELD =
+  'bg-white/10 border-white/20 text-white placeholder:text-white/30 focus-visible:ring-white/30';
 
-- [ ] **Step 5: Verify**
+/**
+ * Staff sign-up.
+ *
+ * The name is TYPED, never picked from a list. A roster here would turn the
+ * join code — which ends up on a whiteboard — into a staff directory. The
+ * server returns the same message whatever happens, so this form has no
+ * success/failure branch to leak one either.
+ */
+export function JoinForm() {
+  const [email, setEmail]       = useState('');
+  const [password, setPassword] = useState('');
+  const [code, setCode]         = useState('');
+  const [name, setName]         = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [status, setStatus]     = useState<'idle' | 'error' | 'success'>('idle');
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setStatus('idle');
+    setStatusMessage(null);
+
+    const result = await claimEmployeeAccount(email, password, code, name);
+    setLoading(false);
+
+    if (!result.ok) {
+      setStatus('error');
+      setStatusMessage(result.message);
+      toast.error(result.message);
+      return;
+    }
+
+    // Replaces the form entirely. Leaving the fields up invites a second
+    // submission, and the only thing that achieves is a duplicate no-op.
+    setDone(true);
+    setStatus('success');
+    setStatusMessage(result.message);
+    toast.success(result.message);
+  }
+
+  if (done) {
+    return (
+      <Card className="w-full max-w-sm bg-white/10 backdrop-blur-xl border-white/15 shadow-2xl">
+        <CardHeader>
+          <CardTitle className="text-white">Request sent</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-white/70">
+            {statusMessage} You&rsquo;ll be able to log in once they approve it.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="w-full max-w-sm bg-white/10 backdrop-blur-xl border-white/15 shadow-2xl">
+      <CardHeader>
+        <CardTitle className="text-white">Staff sign-up</CardTitle>
+        <CardDescription className="text-white/60">
+          See your hours and what you earned
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="join-code" className="text-white/80">Bar code</Label>
+            <Input
+              id="join-code" required autoComplete="off"
+              value={code} onChange={(e) => setCode(e.target.value)}
+              className={FIELD}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="join-name" className="text-white/80">
+              Your name, as your manager writes it
+            </Label>
+            <Input
+              id="join-name" required autoComplete="name"
+              value={name} onChange={(e) => setName(e.target.value)}
+              className={FIELD}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="join-email" className="text-white/80">Email</Label>
+            <Input
+              id="join-email" type="email" required autoComplete="email"
+              value={email} onChange={(e) => setEmail(e.target.value)}
+              className={FIELD}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="join-password" className="text-white/80">Password</Label>
+            <PasswordInput
+              id="join-password" required autoComplete="new-password"
+              value={password} onChange={(e) => setPassword(e.target.value)}
+              className={FIELD}
+              toggleClassName="text-white/50 hover:text-white"
+            />
+          </div>
+
+          <FormStatus status={status} message={statusMessage} />
+
+          <Button
+            type="submit"
+            className="w-full bg-white text-gray-900 hover:bg-white/90"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                Sending…
+              </>
+            ) : 'Request access'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+`app/(auth)/join/page.tsx`:
+
+```tsx
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+import { JoinForm } from './join-form';
+
+export const metadata: Metadata = {
+  title: 'Staff sign-up',
+  robots: { index: false, follow: true },
+};
+
+export default function JoinPage() {
+  return (
+    <main className="relative min-h-dvh grid place-items-center p-6 overflow-hidden bg-sidebar text-sidebar-foreground">
+      <div aria-hidden className="absolute inset-0 grid-texture text-sidebar-foreground opacity-40" />
+      <div
+        aria-hidden
+        className="absolute -top-32 left-1/2 -translate-x-1/2 h-[26rem] w-[26rem] rounded-full opacity-20 blur-3xl"
+        style={{ background: 'radial-gradient(circle, var(--primary), transparent 70%)' }}
+      />
+      <div className="relative z-10 w-full flex flex-col items-center gap-6">
+        <h1 className="sr-only">Staff sign-up</h1>
+        <p aria-hidden="true" className="font-heading text-sidebar-foreground/60 text-xs font-bold tracking-[0.3em] uppercase select-none">
+          Rail
+        </p>
+
+        <JoinForm />
+
+        <Link
+          href="/login"
+          className="flex items-center gap-1.5 text-xs text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors duration-200"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+          Already have a login?
+        </Link>
+      </div>
+    </main>
+  );
+}
+```
+
+- [ ] **Step 4: Write the staff-access server action**
+
+Create `app/(app)/app/settings/staff-access-actions.ts`:
+
+```typescript
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getCurrentOrg } from '@/lib/org';
+import { canManagePayroll } from '@/lib/permissions';
+
+/**
+ * The bar's staff join code.
+ *
+ * NULL means staff sign-up is off, which is what every existing bar gets. The
+ * code is not a credential — it gets a claim into a queue a manager must
+ * approve — but it is still rotatable, because a code written on a whiteboard
+ * outlives the people who read it.
+ *
+ * Unambiguous alphabet: no O/0, no I/1/l. This gets read aloud across a bar.
+ */
+const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function generateCode(len = 8): string {
+  const bytes = new Uint32Array(len);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join('');
+}
+
+/** Generates a fresh code, or replaces the existing one. Returns the new code. */
+export async function rotateStaffJoinCode(): Promise<string> {
+  const { org, role } = await getCurrentOrg();
+  if (!canManagePayroll(role)) throw new Error('Not permitted');
+
+  const supabase = createAdminClient();
+
+  // The column carries a unique index, so a collision is a failed write rather
+  // than two bars sharing a code. Retry a few times before giving up.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = generateCode();
+    const { error } = await supabase
+      .from('organizations')
+      .update({ staff_join_code: code })
+      .eq('id', org.id);
+
+    if (!error) {
+      revalidatePath('/app/settings');
+      return code;
+    }
+  }
+
+  throw new Error('Could not generate a unique code. Please try again.');
+}
+
+/**
+ * Turns staff sign-up off.
+ *
+ * Existing accounts are untouched — this closes the door to new claims, it does
+ * not evict the people already through it. Revoking an individual is a separate
+ * action on the employees screen.
+ */
+export async function disableStaffJoinCode(): Promise<void> {
+  const { org, role } = await getCurrentOrg();
+  if (!canManagePayroll(role)) throw new Error('Not permitted');
+
+  const supabase = createAdminClient();
+  await supabase
+    .from('organizations')
+    .update({ staff_join_code: null })
+    .eq('id', org.id);
+
+  revalidatePath('/app/settings');
+}
+```
+
+- [ ] **Step 5: Add the Staff logins section to the Team tab**
+
+In `app/(app)/app/settings/_components/team-tab.tsx`, add to the imports:
+
+```typescript
+import { KeyRound, Copy } from 'lucide-react';
+import { rotateStaffJoinCode, disableStaffJoinCode } from '../staff-access-actions';
+```
+
+Add `staffJoinCode` to the component's props (`staffJoinCode: string | null`), pass it from the settings page's existing org read, and render this section above the member list:
+
+```tsx
+      {/*
+        Staff logins are off until somebody turns them on: staffJoinCode is NULL
+        for every bar that existed before this feature, and NULL never matches
+        the equality test the claim action does, so a bar that has not opted in
+        cannot be joined at all.
+      */}
+      <section className="space-y-3 rounded-xl border p-4">
+        <div className="flex items-center gap-2">
+          <KeyRound className="h-4 w-4 text-muted-foreground" aria-hidden />
+          <h3 className="text-sm font-semibold">Staff logins</h3>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Staff use this code to request access to their own hours and pay. It is
+          not a password — every request still needs your approval on the
+          Employees screen.
+        </p>
+
+        {joinCode ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="rounded-md border bg-muted px-3 py-2 font-mono text-lg tracking-[0.2em]">
+              {joinCode}
+            </code>
+            <Button
+              variant="outline" size="sm"
+              onClick={() => {
+                navigator.clipboard.writeText(joinCode);
+                toast.success('Code copied');
+              }}
+            >
+              <Copy className="h-3.5 w-3.5" aria-hidden />
+              Copy
+            </Button>
+            {canManage && (
+              <>
+                <Button variant="outline" size="sm" disabled={codeBusy} onClick={handleRotate}>
+                  <Shuffle className="h-3.5 w-3.5" aria-hidden />
+                  New code
+                </Button>
+                <Button variant="ghost" size="sm" disabled={codeBusy} onClick={handleDisable}>
+                  Turn off
+                </Button>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground">Staff sign-up is off.</span>
+            {canManage && (
+              <Button size="sm" disabled={codeBusy} onClick={handleRotate}>
+                Turn on
+              </Button>
+            )}
+          </div>
+        )}
+      </section>
+```
+
+and the state plus handlers alongside the component's existing ones:
+
+```typescript
+  const [joinCode, setJoinCode] = useState<string | null>(staffJoinCode);
+  const [codeBusy, setCodeBusy] = useState(false);
+
+  async function handleRotate() {
+    setCodeBusy(true);
+    try {
+      const code = await rotateStaffJoinCode();
+      setJoinCode(code);
+      toast.success('Staff sign-up is on. Share the code with your team.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not update the code');
+    } finally {
+      setCodeBusy(false);
+    }
+  }
+
+  async function handleDisable() {
+    setCodeBusy(true);
+    try {
+      await disableStaffJoinCode();
+      setJoinCode(null);
+      // Said plainly: turning the code off is not the same as removing people.
+      toast.success('Staff sign-up is off. Existing staff logins still work.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not turn it off');
+    } finally {
+      setCodeBusy(false);
+    }
+  }
+```
+
+- [ ] **Step 6: Verify**
 
 Run: `npx tsc --noEmit && npm run audit:scope && npm test`
 Expected: all clean.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add "app/(auth)/join" "app/(app)/app/settings/_components/team-tab.tsx" lib/notifications/types.ts
+git add "app/(auth)/join" "app/(app)/app/settings/_components/team-tab.tsx" \
+        "app/(app)/app/settings/staff-access-actions.ts" \
+        "app/(app)/app/settings/page.tsx" lib/notifications/types.ts
 git commit -m "feat(portal): staff sign-up by join code with manager approval"
 ```
 
@@ -1171,7 +1532,153 @@ export async function revokeAccount(claimId: string): Promise<void> {
 
 - [ ] **Step 2: Write the queue component**
 
-`app/(app)/app/employees/_components/pending-claims.tsx` — a card listing each pending claim: the typed name, the matched employee (or a `<select>` of the roster when `employeeId` is null, labelled "two people share this name — pick one"), when it was requested, and Approve / Decline buttons. Render nothing at all when the list is empty. Use the Base UI patterns already in `employee-roster.tsx`.
+```tsx
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { UserCheck, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger,
+} from '@/components/ui/select';
+import { approveClaim, rejectClaim, type PendingClaim } from '../claim-actions';
+import type { Employee } from '../../payroll/actions';
+
+/**
+ * Staff waiting to be let in.
+ *
+ * The manager is the verification step — the join code only gets somebody into
+ * this queue. So the screen shows what the person TYPED, not a tidied-up match:
+ * the question being answered is "do I know this person", and the typed string
+ * is the evidence for it.
+ *
+ * A claim whose name matched two employees arrives unresolved, and the manager
+ * picks. Approving cannot proceed without that choice — an active account with
+ * no employee is the one state that would build a session pointing at nobody.
+ */
+export function PendingClaims({
+  claims,
+  roster,
+}: {
+  claims: PendingClaim[];
+  roster: Employee[];
+}) {
+  const router = useRouter();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  // Only for the ambiguous ones; a resolved claim already knows its employee.
+  const [picked, setPicked] = useState<Record<string, string>>({});
+
+  // Nothing pending is not an empty state worth drawing. It is the normal case.
+  if (claims.length === 0) return null;
+
+  async function handleApprove(claim: PendingClaim) {
+    const employeeId = claim.employeeId ?? picked[claim.id];
+    if (!employeeId) {
+      toast.error('Pick which employee this is first.');
+      return;
+    }
+    setBusyId(claim.id);
+    try {
+      await approveClaim(claim.id, employeeId);
+      toast.success(`${claim.claimedName} can now see their own hours and pay.`);
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not approve');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleReject(claim: PendingClaim) {
+    setBusyId(claim.id);
+    try {
+      await rejectClaim(claim.id);
+      toast.success('Request declined.');
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not decline');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <section className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+      <div>
+        <h2 className="text-sm font-semibold">
+          {claims.length === 1
+            ? '1 person is waiting for a login'
+            : `${claims.length} people are waiting for a login`}
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          They will only ever see their own hours and pay. Approve only people
+          you recognise.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        {claims.map((claim) => (
+          <div
+            key={claim.id}
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3"
+          >
+            <div className="min-w-0">
+              <p className="font-medium">{claim.claimedName}</p>
+              <p className="text-xs text-muted-foreground">
+                {/* Said plainly when we could not resolve it. */}
+                {claim.employeeName
+                  ? `Matches ${claim.employeeName}`
+                  : 'Two people share this name — pick which one'}
+                {' · '}
+                {new Date(claim.requestedAt).toLocaleDateString()}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {!claim.employeeId && (
+                <Select
+                  value={picked[claim.id] ?? ''}
+                  onValueChange={(v) =>
+                    setPicked((p) => ({ ...p, [claim.id]: String(v) }))
+                  }
+                >
+                  <SelectTrigger className="w-44 text-sm">
+                    {roster.find((e) => e.id === picked[claim.id])?.name ?? 'Choose employee'}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roster.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              <Button
+                size="sm"
+                disabled={busyId === claim.id}
+                onClick={() => handleApprove(claim)}
+              >
+                <UserCheck className="h-3.5 w-3.5" aria-hidden />
+                Approve
+              </Button>
+              <Button
+                size="sm" variant="ghost"
+                disabled={busyId === claim.id}
+                onClick={() => handleReject(claim)}
+              >
+                <X className="h-3.5 w-3.5" aria-hidden />
+                Decline
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+```
 
 - [ ] **Step 3: Mount it on the employees page**
 
