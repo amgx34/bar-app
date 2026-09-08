@@ -1,6 +1,24 @@
 import { Radio } from 'lucide-react';
 import type { TicketMetrics } from '@/lib/pos/tickets';
 import type { Baseline } from '@/lib/pos/baselines';
+import type { NightLedger } from '../actions';
+
+/**
+ * One figure in the band's grid.
+ *
+ * A dash, never a zero, when the figure is unknown — the same distinction the
+ * average ticket already draws. Two columns on a phone, four across at `sm`.
+ */
+function BandStat({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="min-w-0">
+      <p className="truncate text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-0.5 text-xl font-bold tabular-nums sm:text-2xl">{value ?? '—'}</p>
+    </div>
+  );
+}
 
 const money = (n: number) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
@@ -24,6 +42,7 @@ export function LiveBand({
   hasTickets,
   asOf,
   live,
+  night,
 }: {
   title: string;
   netSales: number;
@@ -33,54 +52,76 @@ export function LiveBand({
   /** "11:47pm" — when the POS last reported. Null when unknown. */
   asOf: string | null;
   live: boolean;
+  /** The Z close-out, for the tips and tax stats. Null when there is no row. */
+  night: NightLedger | null;
 }) {
   const delta = baseline?.deltaPct ?? null;
   const up = delta !== null && delta >= 0;
+
+  /*
+    Only figures this night actually has. A stat rendered as a dash is honest
+    when the number is genuinely unknown but the panel exists — an average
+    ticket on a night nobody rang up — whereas a bar whose POS sends no ticket
+    feed at all should not be shown an empty Tickets box every night of its
+    life. Hence: absent capability drops the stat, absent value shows a dash.
+  */
+  const stats: { label: string; value: string | null }[] = [];
+  if (hasTickets && tickets) {
+    stats.push({ label: 'Tickets', value: tickets.ticketCount.toLocaleString() });
+    // Null, not $0. Nobody ringing up is not a $0 average.
+    stats.push({ label: 'Avg ticket', value: tickets.averageTicket === null ? null : money(tickets.averageTicket) });
+  }
+  if (night?.tips !== null && night?.tips !== undefined) {
+    stats.push({ label: 'Tips', value: money(night.tips) });
+    stats.push({
+      label: 'Tips/hr',
+      // Null when no hours were recorded — see lib/pos/tip-rate.ts.
+      value: night.tipsPerHour === null ? null : money(night.tipsPerHour),
+    });
+  }
+  // Tax is only ever shown when the split is a real calculation. An unset rate
+  // produces no stat rather than a dash: there is nothing missing, the bar
+  // simply has not told us how it is taxed.
+  if (night?.taxHeld != null) {
+    stats.push({ label: 'Tax held', value: money(night.taxHeld) });
+  }
 
   return (
     <section
       aria-labelledby="sales-live-heading"
       className="rounded-xl border border-primary/30 bg-primary/5 p-5 sm:p-6"
     >
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p
-            id="sales-live-heading"
-            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground"
-          >
-            {live && <Radio className="h-3.5 w-3.5 text-primary" aria-hidden />}
-            {title}
+      {/*
+        Headline above, stats below — stacked rather than side by side. The old
+        two-column arrangement wrapped on a phone into a headline and a ragged
+        stat row of whatever happened to fit, which put the least important
+        figure in the most prominent leftover space.
+      */}
+      <div className="min-w-0">
+        <p
+          id="sales-live-heading"
+          className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground"
+        >
+          {live && <Radio className="h-3.5 w-3.5 text-primary" aria-hidden />}
+          {title}
+        </p>
+        <p className="mt-1 text-4xl font-bold tabular-nums text-primary sm:text-5xl">
+          {money(netSales)}
+        </p>
+        {asOf && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {live ? `as of ${asOf} · still trading` : `last reported ${asOf}`}
           </p>
-          <p className="mt-1 text-3xl font-bold tabular-nums text-primary sm:text-4xl">
-            {money(netSales)}
-          </p>
-          {asOf && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {live ? `as of ${asOf} · still trading` : `last reported ${asOf}`}
-            </p>
-          )}
-        </div>
-
-        <div className="flex flex-wrap gap-6">
-          {hasTickets && tickets && (
-            <>
-              <div>
-                <p className="text-xs uppercase tracking-widest text-muted-foreground">Tickets</p>
-                <p className="text-2xl font-bold tabular-nums">
-                  {tickets.ticketCount.toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-widest text-muted-foreground">Avg ticket</p>
-                <p className="text-2xl font-bold tabular-nums">
-                  {/* Null, not $0. Nobody ringing up is not a $0 average. */}
-                  {tickets.averageTicket === null ? '—' : money(tickets.averageTicket)}
-                </p>
-              </div>
-            </>
-          )}
-        </div>
+        )}
       </div>
+
+      {stats.length > 0 && (
+        <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 border-t pt-4 sm:grid-cols-4">
+          {stats.map((s) => (
+            <BandStat key={s.label} label={s.label} value={s.value} />
+          ))}
+        </div>
+      )}
 
       <div className="mt-4 border-t pt-3 text-xs">
         {baseline === null || baseline.average === null || delta === null ? (

@@ -2,6 +2,7 @@ import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getEmployeeAccountState } from '@/lib/employee-portal/session';
 
 export const CURRENT_ORG_COOKIE = 'current_org_id';
 
@@ -143,7 +144,14 @@ export const getCurrentOrg = cache(async (): Promise<CurrentOrgResult> => {
   const memberships = raw as OrgMembership[] | null;
 
   if (error) throw error;
-  if (!memberships || memberships.length === 0) redirect('/setup');
+  if (!memberships || memberships.length === 0) {
+    // Someone with an employee account but no membership is staff, not an owner
+    // who has not finished setup. Sending them to /setup would drop a bartender
+    // into the org-creation wizard.
+    const state = await getEmployeeAccountState();
+    if (state.kind !== 'none') redirect('/me');
+    redirect('/setup');
+  }
 
   const cookieStore = await cookies();
   const cookieOrgId = cookieStore.get(CURRENT_ORG_COOKIE)?.value;

@@ -61,14 +61,24 @@ public class ProfileMigrationTests
         Assert.DoesNotContain("SUM(0)", sql);
     }
 
-    [Fact]
-    public void LineEndingsDoNotDefeatTheMatch()
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void LineEndingsDoNotDefeatTheMatch(string newline)
     {
         // The wizard writes this through JSON, and what comes back depends on
-        // the machine that wrote it. CRLF must still be recognised as the same
-        // query, or the migration silently never fires on Windows — which is
-        // every machine this ships to.
-        var cfg = WithZSource(ProfileMigration.ZReportV1.Replace("\n", "\r\n"));
+        // the machine that wrote it. Either ending must be recognised as the
+        // same query, or the migration silently never fires on Windows — which
+        // is every machine this ships to.
+        //
+        // Both cases are built by normalising to LF FIRST. Replacing "\n" with
+        // "\r\n" directly produced "\r\r\n" whenever the constant itself came
+        // from a CRLF checkout — a string no config can contain, which failed
+        // this test on exactly the platform it is about. Whichever ending the
+        // checkout gave the constant, one of these two cases differs from it
+        // and so genuinely exercises the normalisation.
+        var lf  = ProfileMigration.ZReportV1.Replace("\r\n", "\n");
+        var cfg = WithZSource(lf.Replace("\n", newline));
 
         ProfileMigration.Apply(cfg);
 

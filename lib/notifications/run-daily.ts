@@ -3,8 +3,10 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { dispatch, getOrgRecipients, getLastNotificationPayload } from './deliver';
 import {
   detectLowStock, detectZReportClosed, detectSalesAnomaly,
+  detectSalesTax, detectHourlyTips,
   type StockItem, type ZDay,
 } from './detect';
+import { salesTaxFromSettings } from '@/lib/books/sales-tax';
 
 /**
  * The nightly notification pass, driven by the Vercel cron.
@@ -18,6 +20,9 @@ import {
  * other bar its notifications, which is the same reason the cron route wraps
  * each of its housekeeping blocks separately.
  */
+
+/** A Z day plus the tip columns, which only the hourly-tips alert reads. */
+type TipsZDay = ZDay & { cash_tips: number | null; cc_tips: number | null };
 
 export type DailyRunResult = {
   orgsScanned:   number;
@@ -57,7 +62,9 @@ export async function runDailyNotifications(): Promise<DailyRunResult> {
 
   // admin-scope-ok: this is the cron's org fan-out — it routes across every
   // organization by design. Each query inside the loop is scoped to one org.
-  const { data: orgs, error } = await supabase.from('organizations').select('id, name');
+  const { data: orgs, error } = await supabase
+    .from('organizations')
+    .select('id, name, bar_settings');
   if (error) {
     result.errors.push(`org list failed: ${error.message}`);
     return result;
@@ -101,11 +108,11 @@ export async function runDailyNotifications(): Promise<DailyRunResult> {
       const window = sameWeekdayWindow(businessDate);
       const { data: days } = await supabase
         .from('z_report_days')
-        .select('report_date, total_sales, cash_sales, card_sales')
+        .select('report_date, total_sales, cash_sales, card_sales, cash_tips, cc_tips')
         .eq('organization_id', orgId)
         .in('report_date', [businessDate, ...window]);
 
-      const rows      = (days ?? []) as ZDay[];
+      const rows      = (days ?? []) as TipsZDay[];
       const yesterday = rows.find((d) => d.report_date === businessDate);
 
       // No Z report for last night is not an error — the bar may have been
@@ -119,6 +126,49 @@ export async function runDailyNotifications(): Promise<DailyRunResult> {
           rows.filter((d) => d.report_date !== businessDate),
         );
         if (anomaly) result.notified += await dispatch(orgId, anomaly, opts);
+
+        // ── Sales tax held ───────────────────────────────────────────────────
+        // Silent unless this bar has actually configured a rate and said how
+        // its POS prices treat tax; the detector refuses to guess at either.
+        const tax = detectSalesTax(
+          yesterday,
+          salesTaxFromSettings((org.bar_settings ?? {}) as {
+            sales_tax_rate?: number | null;
+            pos_prices_include_tax?: boolean | null;
+          }),
+        );
+        if (tax) result.notified += await dispatch(orgId, tax, opts);
+      }
+
+      // ── Tips per hour ────────────────────────────────────────────────────
+      // Its own query rather than a join: the hours live on employee_shifts,
+      // keyed by shift_date, and the two tables are related by the night they
+      // describe and nothing else. Runs whether or not a Z report landed —
+      // z_report_days carries the tips, so an absent row simply means no tips
+      // to divide and the detector returns null.
+      if (yesterday) {
+        const { data: shifts } = await supabase
+          .from('employee_shifts')
+          .select('regular_hours, overtime_hours')
+          .eq('organization_id', orgId)
+          .eq('shift_date', businessDate);
+
+        const hoursWorked = (shifts ?? []).reduce((sum, s) => {
+          // Junk and negatives are not hours — same reading as lib/payroll.
+          const num = (raw: unknown) => {
+            const n = Number(raw);
+            return Number.isFinite(n) && n > 0 ? n : 0;
+          };
+          return sum + num(s.regular_hours) + num(s.overtime_hours);
+        }, 0);
+
+        const tips = detectHourlyTips({
+          report_date: businessDate,
+          cash_tips:   yesterday.cash_tips,
+          cc_tips:     yesterday.cc_tips,
+          hoursWorked,
+        });
+        if (tips) result.notified += await dispatch(orgId, tips, opts);
       }
     } catch (e) {
       result.errors.push(`${org.name ?? orgId}: ${String(e)}`);

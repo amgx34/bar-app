@@ -18,8 +18,58 @@ const money = (n: number) =>
 export function ServerTable({ servers }: { servers: ServerPerformance[] }) {
   const anyHours = servers.some((s) => s.hoursWorked !== null);
 
+  const caveat = anyHours && (
+    <p className="border-t px-3 py-2 text-xs text-muted-foreground sm:px-4">
+      Sales per hour uses recorded shift hours. It is not a ranking — a well
+      and a front bar are not comparable, and the busier station is not the
+      better bartender.
+    </p>
+  );
+
   return (
-    <div className="overflow-x-auto rounded-xl border">
+    <>
+      {/*
+        Below `sm` the table becomes stacked cards. Five columns in a horizontal
+        scroller means the per-hour figure — the one with the caveat attached —
+        sits off-screen by default, which is the worst possible place for a
+        number that is easy to misread as a league position.
+      */}
+      <div className="space-y-2 sm:hidden">
+        {servers.map((s) => (
+          <div key={s.serverName} className="rounded-xl border p-3">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="min-w-0 truncate font-medium">{s.serverName}</span>
+              <span className="shrink-0 tabular-nums font-semibold">{money(s.netSales)}</span>
+            </div>
+            {!s.matchedEmployee && (
+              <p className="mt-0.5 text-xs text-muted-foreground">not on payroll</p>
+            )}
+            <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
+              <div className="flex gap-1.5">
+                <dt>Tickets</dt>
+                <dd className="tabular-nums text-foreground">{s.ticketCount.toLocaleString()}</dd>
+              </div>
+              <div className="flex gap-1.5">
+                <dt>Avg</dt>
+                <dd className="tabular-nums text-foreground">
+                  {s.averageTicket === null ? '—' : money(s.averageTicket)}
+                </dd>
+              </div>
+              {anyHours && (
+                <div className="flex gap-1.5">
+                  <dt>Per hour</dt>
+                  <dd className="tabular-nums text-foreground">
+                    {s.salesPerHour === null ? '—' : money(s.salesPerHour)}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </div>
+        ))}
+        {caveat && <div className="rounded-xl border">{caveat}</div>}
+      </div>
+
+    <div className="hidden overflow-x-auto rounded-xl border sm:block">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b bg-muted/40 text-left">
@@ -59,13 +109,8 @@ export function ServerTable({ servers }: { servers: ServerPerformance[] }) {
           ))}
         </tbody>
       </table>
-      {anyHours && (
-        <p className="border-t px-3 py-2 text-xs text-muted-foreground sm:px-4">
-          Sales per hour uses recorded shift hours. It is not a ranking — a well
-          and a front bar are not comparable, and the busier station is not the
-          better bartender.
-        </p>
-      )}
+      {caveat}
     </div>
+    </>
   );
 }

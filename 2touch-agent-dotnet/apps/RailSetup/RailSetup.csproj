@@ -9,7 +9,7 @@
     <AssemblyName>rail-setup</AssemblyName>
     <Product>Rail 2Touch Agent Installer</Product>
     <Company>Rail</Company>
-    <Version>1.1.0</Version>
+    <Version>1.3.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

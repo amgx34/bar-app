@@ -28,8 +28,11 @@ export async function proxy(request: NextRequest) {
   // routes to the login page purely because of a shared prefix.
   const { pathname } = request.nextUrl;
   const isAppRoute = pathname === '/app' || pathname.startsWith('/app/');
+  // The staff portal needs the same gate and the same boundary care: a bare
+  // startsWith('/me') would also catch /menu or /members.
+  const isStaffRoute = pathname === '/me' || pathname.startsWith('/me/');
 
-  if (!user && isAppRoute) {
+  if (!user && (isAppRoute || isStaffRoute)) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
     loginUrl.searchParams.set('next', request.nextUrl.pathname);

@@ -5,10 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getSalesData, getPeriodSalesData } from './actions';
 import { getCurrentOrg } from '@/lib/org';
 import { PeriodToggle } from '../_components/period-toggle';
-import { LiveBand } from './_components/live-band';
 import { MissingPanel } from './_components/missing-panel';
-import { HourlyCurve } from './_components/hourly-curve';
 import { ServerTable } from './_components/server-table';
+import { NightView } from './_components/night-view';
 import { MenuQuadrant } from './_components/menu-quadrant';
 import { TrendChart } from './_components/trend-chart';
 import { TonightClock } from './_components/tonight-clock';
@@ -127,10 +126,6 @@ export default async function SalesPage({
   );
   const asOf = syncHealth.lastSyncAt ? describeAge(syncHealth.minutesAgo) : null;
 
-  // Top movers: the period's items ranked by revenue, not a new query or a
-  // re-derivation of margin — legacy.items already carries revenue per item.
-  const topMovers = [...legacy.items].sort((a, b) => b.revenue - a.revenue).slice(0, 5);
-
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -148,14 +143,25 @@ export default async function SalesPage({
         />
       </div>
 
-      <div className="flex items-center gap-2 text-sm">
-        <a className="rounded-md border px-2 py-1 hover:bg-muted"
-           href={`/app/sales?view=${view}&start=${prev.start}&end=${prev.end}`}>←</a>
-        <span className="min-w-[180px] text-center font-medium">
+      {/*
+        One full-width row rather than a `min-w-[180px]` label between two small
+        links: on a phone the arrows were ~28px targets, under the 44px a thumb
+        needs, and the date sat wherever the fixed width left it.
+      */}
+      <div className="flex items-stretch justify-between gap-2 text-sm">
+        <a
+          aria-label="Previous period"
+          className="flex min-h-11 w-11 items-center justify-center rounded-md border hover:bg-muted"
+          href={`/app/sales?view=${view}&start=${prev.start}&end=${prev.end}`}
+        >←</a>
+        <span className="flex min-w-0 flex-1 items-center justify-center px-2 text-center font-medium">
           {period.start === period.end ? period.start : `${period.start} – ${period.end}`}
         </span>
-        <a className="rounded-md border px-2 py-1 hover:bg-muted"
-           href={`/app/sales?view=${view}&start=${next.start}&end=${next.end}`}>→</a>
+        <a
+          aria-label="Next period"
+          className="flex min-h-11 w-11 items-center justify-center rounded-md border hover:bg-muted"
+          href={`/app/sales?view=${view}&start=${next.start}&end=${next.end}`}
+        >→</a>
       </div>
 
       {/* Keeps `hour` (and, on a bare landing, `start`/`end`) synced from the
@@ -168,63 +174,15 @@ export default async function SalesPage({
       {legacy.revenueIncludesTax && <TaxInclusiveNotice rate={legacy.salesTaxRate} />}
 
       {singleNight ? (
-        data.capabilities.hasHourly && data.daypart ? (
-          <>
-            <LiveBand
-              title={view === 'tonight' ? 'Tonight' : period.start}
-              netSales={data.daypart.totalNet}
-              tickets={data.tickets}
-              // A baseline computed against the SERVER's hour would be a
-              // confidently wrong percentage rendered on a financial screen —
-              // worse than none. On day/week/month there is no partial night
-              // to protect against, so those pass the real baseline through.
-              baseline={view === 'tonight' && !hourKnown ? null : (data.baseline?.netSales ?? null)}
-              hasTickets={data.capabilities.hasTickets}
-              asOf={asOf}
-              live={view === 'tonight'}
-            />
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">When the money came in</CardTitle>
-                {data.daypart.peak && (
-                  <p className="text-xs text-muted-foreground">
-                    Busiest hour {data.daypart.peak.label} — {money(data.daypart.peak.netSales)}
-                  </p>
-                )}
-              </CardHeader>
-              <CardContent><HourlyCurve daypart={data.daypart} /></CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Top movers</CardTitle>
-                <p className="text-xs text-muted-foreground">By revenue.</p>
-              </CardHeader>
-              <CardContent>
-                {topMovers.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    No sales in this window.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {topMovers.map((i) => (
-                      <div key={i.matchKey} className="flex items-center justify-between gap-3 text-sm">
-                        <div className="min-w-0">
-                          <span className="truncate">{i.itemName}</span>
-                          <span className="ml-2 text-xs text-muted-foreground">
-                            {Math.round(i.unitsSold).toLocaleString()} sold
-                          </span>
-                        </div>
-                        <span className="shrink-0 tabular-nums font-medium">{money(i.revenue)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </>
-        ) : (
-          <MissingPanel title="When the money came in" capability="hasHourly" />
-        )
+        <NightView
+          data={data}
+          title={view === 'tonight' ? 'Tonight' : period.start}
+          live={view === 'tonight'}
+          hourKnown={hourKnown}
+          asOf={asOf}
+          items={legacy.items}
+          categories={legacy.categories}
+        />
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

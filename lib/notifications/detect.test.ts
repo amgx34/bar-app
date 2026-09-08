@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   detectLowStock, detectZReportClosed, detectSalesAnomaly,
+  detectSalesTax, detectHourlyTips,
   ANOMALY_THRESHOLD, MIN_SAMPLES, type ZDay,
 } from './detect';
 
@@ -158,5 +159,78 @@ describe('detectSalesAnomaly', () => {
     const at = 1000 * (1 + ANOMALY_THRESHOLD);
     expect(detectSalesAnomaly(on('2026-08-31', at), h)).not.toBeNull();
     expect(detectSalesAnomaly(on('2026-08-31', at - 1), h)).toBeNull();
+  });
+});
+
+describe('detectSalesTax', () => {
+  const configured = { ratePct: 8.25, pricesIncludeTax: true };
+  const day = (total: number | null): ZDay =>
+    ({ report_date: '2026-09-01', total_sales: total, cash_sales: null, card_sales: null });
+
+  it('names the amount held for the state', () => {
+    // 1082.50 tax-inclusive at 8.25% → 1000.00 net, 82.50 tax.
+    const d = detectSalesTax(day(1082.5), configured);
+    expect(d?.title).toContain('$83');
+    expect(d?.eventType).toBe('sales.tax_daily');
+  });
+
+  it('stays silent when no rate is configured, rather than guessing one', () => {
+    expect(detectSalesTax(day(1082.5), { ratePct: null, pricesIncludeTax: true })).toBeNull();
+  });
+
+  it('stays silent when the tax treatment of POS prices is unknown', () => {
+    // The two treatments differ by the whole tax amount in opposite directions,
+    // so an unset flag cannot be defaulted to either one.
+    expect(detectSalesTax(day(1082.5), { ratePct: 8.25, pricesIncludeTax: null })).toBeNull();
+  });
+
+  it('stays silent on a night the POS never reported', () => {
+    expect(detectSalesTax(day(null), configured)).toBeNull();
+  });
+
+  it('stays silent on a night that took nothing, having no tax to remit', () => {
+    expect(detectSalesTax(day(0), configured)).toBeNull();
+  });
+
+  it('keys on the business date so the cron can re-run without repeating itself', () => {
+    expect(detectSalesTax(day(1082.5), configured)?.dedupeKey).toBe('sales.tax_daily:2026-09-01');
+  });
+});
+
+describe('detectHourlyTips', () => {
+  it('reports tips per recorded labour hour', () => {
+    const d = detectHourlyTips({
+      report_date: '2026-09-01', cash_tips: 200, cc_tips: 400, hoursWorked: 20,
+    });
+    expect(d?.title).toContain('$30');
+    expect(d?.eventType).toBe('tips.hourly');
+  });
+
+  it('stays silent when no hours were recorded, rather than dividing by zero', () => {
+    expect(detectHourlyTips({
+      report_date: '2026-09-01', cash_tips: 200, cc_tips: 400, hoursWorked: 0,
+    })).toBeNull();
+  });
+
+  it('stays silent when the night recorded no tips at all', () => {
+    // Nothing to report, and "$0/hr in tips" reads as an accusation.
+    expect(detectHourlyTips({
+      report_date: '2026-09-01', cash_tips: 0, cc_tips: 0, hoursWorked: 20,
+    })).toBeNull();
+  });
+
+  it('counts a null tip column as nothing rather than abandoning the figure', () => {
+    // cash_tips defaults to 0 in the schema but an older row may carry NULL.
+    // Half a figure is still worth reporting; NaN is not.
+    const d = detectHourlyTips({
+      report_date: '2026-09-01', cash_tips: null, cc_tips: 400, hoursWorked: 20,
+    });
+    expect(d?.title).toContain('$20');
+  });
+
+  it('keys on the business date so the cron can re-run without repeating itself', () => {
+    expect(detectHourlyTips({
+      report_date: '2026-09-01', cash_tips: 200, cc_tips: 400, hoursWorked: 20,
+    })?.dedupeKey).toBe('tips.hourly:2026-09-01');
   });
 });

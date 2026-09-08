@@ -1232,7 +1232,7 @@
           "lib/netcoreapp2.1/_._": {}
         }
       },
-      "rail-2touch-agent/1.1.0": {
+      "rail-2touch-agent/1.2.0": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v9.0",
         "dependencies": {
@@ -3265,7 +3265,7 @@
         "version.txt"
       ]
     },
-    "rail-2touch-agent/1.1.0": {
+    "rail-2touch-agent/1.2.0": {
       "type": "project",
       "path": "../../RailAgent.csproj",
       "msbuildProject": "../../RailAgent.csproj"
@@ -3273,7 +3273,7 @@
   },
   "projectFileDependencyGroups": {
     "net9.0-windows7.0": [
-      "rail-2touch-agent >= 1.1.0"
+      "rail-2touch-agent >= 1.2.0"
     ]
   },
   "packageFolders": {
@@ -3282,11 +3282,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\tools\\RailDiagnose\\RailDiagnose.csproj",
+      "projectUniqueName": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\tools\\RailDiagnose\\RailDiagnose.csproj",
       "projectName": "rail-diagnose",
-      "projectPath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\tools\\RailDiagnose\\RailDiagnose.csproj",
+      "projectPath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\tools\\RailDiagnose\\RailDiagnose.csproj",
       "packagesPath": "C:\\Users\\notug\\.nuget\\packages\\",
-      "outputPath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\tools\\RailDiagnose\\obj\\",
+      "outputPath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\tools\\RailDiagnose\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\notug\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -3303,8 +3303,8 @@
         "net9.0-windows7.0": {
           "targetAlias": "net9.0-windows",
           "projectReferences": {
-            "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\RailAgent.csproj": {
-              "projectPath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\RailAgent.csproj"
+            "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\RailAgent.csproj": {
+              "projectPath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\RailAgent.csproj"
             }
           }
         }

@@ -527,7 +527,7 @@ public sealed class SetupWizard(string[] args, Unattended? unattended = null)
         if (available.Count == 0) return taken;
 
         ConsoleUi.Blank();
-        ConsoleUi.Ok($"This looks like a standard TwoTouch schema — a built-in mapping covers {available.Count} of 3 feeds:");
+        ConsoleUi.Ok($"This looks like a standard TwoTouch schema — a built-in mapping covers {available.Count} of {TwoTouchProfile.All.Length} feeds:");
         foreach (var feed in available)
             ConsoleUi.Info($"  • {FeedLabel(feed.FeedKey)} — {feed.Explanation}");
 
@@ -544,7 +544,7 @@ public sealed class SetupWizard(string[] args, Unattended? unattended = null)
         }
         else if (!ConsoleUi.Confirm("Use the built-in mapping for those feeds?"))
         {
-            ConsoleUi.Info("Falling back to schema discovery for all three feeds.");
+            ConsoleUi.Info("Falling back to schema discovery for the feeds it can map.");
             return taken;
         }
 
@@ -559,26 +559,45 @@ public sealed class SetupWizard(string[] args, Unattended? unattended = null)
             else if (feed.FeedKey == FeedSpecs.EwReportKey) { _ewDateType = "datetime"; _cfg.Columns.EwReport.DateHasTime  = true; }
             else if (feed.FeedKey == FeedSpecs.ItemAuditKey){ _iaDateType = "datetime"; _cfg.Columns.ItemAudit.DateHasTime = true; }
 
-            var spec = FeedSpecs.All.Single(f => f.Key == feed.FeedKey);
-            var error = await ProveAsync(spec, conn, ct);
+            // FirstOrDefault, not Single: the hourly and per-server feeds are
+            // supplied by the profile but have no discovery spec, so there is
+            // nothing here to find and nothing to fall back TO if they fail.
+            var spec  = FeedSpecs.All.FirstOrDefault(f => f.Key == feed.FeedKey);
+            var label = FeedSpecs.LabelFor(feed.FeedKey);
+
+            // Proven with the query the service will actually run, whichever
+            // path built the mapping.
+            var error = await ProveProfileFeedAsync(feed.FeedKey, conn, ct);
             if (error is null)
             {
-                ConsoleUi.Ok($"{spec.Label} — built-in mapping runs clean");
+                ConsoleUi.Ok($"{label} — built-in mapping runs clean");
                 taken.Add(feed.FeedKey);
+            }
+            else if (spec is not null)
+            {
+                ConsoleUi.Fail($"{label} built-in mapping failed: {error}");
+                ConsoleUi.Info("Falling back to schema discovery for this feed.");
+                SetFeedSkipped(spec);
             }
             else
             {
-                ConsoleUi.Fail($"{spec.Label} built-in mapping failed: {error}");
-                ConsoleUi.Info("Falling back to schema discovery for this feed.");
-                SetFeedSkipped(spec);
+                // No discovery path exists for this one. Say so plainly and
+                // turn it off, rather than implying a fallback that is not
+                // coming.
+                ConsoleUi.Fail($"{label} built-in mapping failed: {error}");
+                ConsoleUi.Info($"{label} can only come from the built-in mapping, so it is switched off.");
+                DisableProfileFeed(feed.FeedKey);
             }
         }
 
         return taken;
     }
 
-    private static string FeedLabel(string feedKey)
-        => FeedSpecs.All.Single(f => f.Key == feedKey).Label;
+    // Delegates to FeedSpecs.LabelFor, which covers the profile-only feeds too.
+    // This used to be FeedSpecs.All.Single(...), which threw on HourlySales and
+    // ServerSales — feeds TwoTouchProfile.All has supplied since they were
+    // added, but which have no discovery spec and never will.
+    private static string FeedLabel(string feedKey) => FeedSpecs.LabelFor(feedKey);
 
     /// <summary>
     /// SQL type of the mapped Z-report date column, recorded during mapping.
@@ -832,12 +851,56 @@ public sealed class SetupWizard(string[] args, Unattended? unattended = null)
 
     // Preview must run the EXACT query the service will, cutoff included —
     // otherwise setup shows dates the running agent would never produce.
-    private string FeedSql(FeedSpec feed, int days, int? top) => feed.Key switch
+    private string FeedSql(FeedSpec feed, int days, int? top) => FeedSqlFor(feed.Key, days, top);
+
+    /// <summary>
+    /// The query the service will really run for a feed.
+    ///
+    /// Every key is named explicitly. This used to end in a `_ =>` arm falling
+    /// through to the Item Audit query, so a feed key it had never heard of was
+    /// silently proven against the wrong table and reported as running clean.
+    /// </summary>
+    private string FeedSqlFor(string feedKey, int days, int? top) => feedKey switch
     {
-        FeedSpecs.ZReportKey   => SqlReader.ZReportSql(_cfg.Tables.ZReport, _cfg.Columns.ZReport, days, _cfg.Sync.ResolvedCutoffHour, top),
-        FeedSpecs.EwReportKey  => SqlReader.EwReportSql(_cfg.Tables.EwReport, _cfg.Columns.EwReport, days, _cfg.Sync.ResolvedCutoffHour, top),
-        _                      => SqlReader.ItemAuditSql(_cfg.Tables.ItemAudit, _cfg.Columns.ItemAudit, days, _cfg.Sync.ResolvedCutoffHour, top),
+        FeedSpecs.ZReportKey     => SqlReader.ZReportSql(_cfg.Tables.ZReport, _cfg.Columns.ZReport, days, _cfg.Sync.ResolvedCutoffHour, top),
+        FeedSpecs.EwReportKey    => SqlReader.EwReportSql(_cfg.Tables.EwReport, _cfg.Columns.EwReport, days, _cfg.Sync.ResolvedCutoffHour, top),
+        FeedSpecs.ItemAuditKey   => SqlReader.ItemAuditSql(_cfg.Tables.ItemAudit, _cfg.Columns.ItemAudit, days, _cfg.Sync.ResolvedCutoffHour, top),
+        FeedSpecs.HourlySalesKey => SqlReader.HourlySalesSql(_cfg.Tables.HourlySales, _cfg.Columns.HourlySales, days, _cfg.Sync.ResolvedCutoffHour, top),
+        FeedSpecs.ServerSalesKey => SqlReader.ServerSalesSql(_cfg.Tables.ServerSales, _cfg.Columns.ServerSales, days, _cfg.Sync.ResolvedCutoffHour, top),
+        _ => throw new ArgumentOutOfRangeException(nameof(feedKey), feedKey, "No query is defined for this feed."),
     };
+
+    /// <summary>
+    /// Runs a profile-mapped feed's real query and returns the SQL error, or
+    /// null when it came back clean.
+    /// </summary>
+    private async Task<string?> ProveProfileFeedAsync(string feedKey, SqlConnection conn, CancellationToken ct)
+    {
+        var sql = FeedSqlFor(feedKey, PreviewDays, top: 5);
+        try
+        {
+            await using var cmd = new SqlCommand(sql, conn) { CommandTimeout = 60 };
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct)) { }
+            return null;
+        }
+        catch (SqlException ex)
+        {
+            ConsoleUi.Blank();
+            ConsoleUi.Info(Indent(sql));
+            return ex.Message;
+        }
+    }
+
+    /// <summary>
+    /// Switches off a feed that only the built-in mapping can supply. Blanking
+    /// the table is how SyncService.Enabled reads "off" — see SetFeedSkipped.
+    /// </summary>
+    private void DisableProfileFeed(string feedKey)
+    {
+        if (feedKey == FeedSpecs.HourlySalesKey)      _cfg.Tables.HourlySales = "";
+        else if (feedKey == FeedSpecs.ServerSalesKey) _cfg.Tables.ServerSales = "";
+    }
 
     // ── 8. Preview ────────────────────────────────────────────────────────────
 

@@ -85,5 +85,36 @@ public static class FeedSpecs
                 ["netsale", "sale", "amount", "price", "revenue"]),
         ]);
 
+    /// <summary>
+    /// The feeds generic schema discovery can walk an operator through.
+    ///
+    /// Deliberately NOT every feed that exists. The hourly and per-server feeds
+    /// are assembled from four relations each (see TwoTouchProfile), which no
+    /// column-synonym search is going to reconstruct — putting them here would
+    /// buy two extra wizard stages that cannot succeed. They are supplied by the
+    /// built-in profile or not at all.
+    /// </summary>
     public static readonly FeedSpec[] All = [ZReport, EwReport, ItemAudit];
+
+    /// <summary>
+    /// A human name for any feed key, including the profile-only feeds that
+    /// have no discovery spec.
+    ///
+    /// Total by construction, and never throws. The wizard prints these while
+    /// listing which feeds the built-in mapping covers — before it has done
+    /// anything at all — so a key this does not recognise used to end the
+    /// install outright with "Sequence contains no matching element". A missing
+    /// label is a cosmetic problem and must never be more than that.
+    /// </summary>
+    public static string LabelFor(string feedKey) => feedKey switch
+    {
+        ZReportKey     => "Z Report",
+        EwReportKey    => "EW Report",
+        ItemAuditKey   => "Item Audit",
+        HourlySalesKey => "Hourly Sales",
+        ServerSalesKey => "Server Sales",
+        // The key itself reads better than "Unknown" in the one line an
+        // operator will see it on.
+        _              => feedKey,
+    };
 }

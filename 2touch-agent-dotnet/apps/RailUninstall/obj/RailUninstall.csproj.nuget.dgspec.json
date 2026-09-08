@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\apps\\RailUninstall\\RailUninstall.csproj": {}
+    "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\apps\\RailUninstall\\RailUninstall.csproj": {}
   },
   "projects": {
-    "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\apps\\RailUninstall\\RailUninstall.csproj": {
-      "version": "1.1.0",
+    "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\apps\\RailUninstall\\RailUninstall.csproj": {
+      "version": "1.3.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\apps\\RailUninstall\\RailUninstall.csproj",
+        "projectUniqueName": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\apps\\RailUninstall\\RailUninstall.csproj",
         "projectName": "rail-uninstall",
-        "projectPath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\apps\\RailUninstall\\RailUninstall.csproj",
+        "projectPath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\apps\\RailUninstall\\RailUninstall.csproj",
         "packagesPath": "C:\\Users\\notug\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\apps\\RailUninstall\\obj\\",
+        "outputPath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\apps\\RailUninstall\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\notug\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -28,8 +28,8 @@
           "net9.0-windows7.0": {
             "targetAlias": "net9.0-windows",
             "projectReferences": {
-              "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\RailAgent.csproj": {
-                "projectPath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\RailAgent.csproj"
+              "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\RailAgent.csproj": {
+                "projectPath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\RailAgent.csproj"
               }
             }
           }
@@ -49,6 +49,14 @@
       "frameworks": {
         "net9.0-windows7.0": {
           "targetAlias": "net9.0-windows",
+          "dependencies": {
+            "Microsoft.NET.ILLink.Tasks": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[9.0.10, )",
+              "autoReferenced": true
+            }
+          },
           "imports": [
             "net461",
             "net462",
@@ -60,6 +68,20 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Runtime.win-x64",
+              "version": "[9.0.10, 9.0.10]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Runtime.win-x64",
+              "version": "[9.0.10, 9.0.10]"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App.Runtime.win-x64",
+              "version": "[9.0.10, 9.0.10]"
+            }
+          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
@@ -67,16 +89,21 @@
           },
           "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.306/PortableRuntimeIdentifierGraph.json"
         }
+      },
+      "runtimes": {
+        "win-x64": {
+          "#import": []
+        }
       }
     },
-    "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\RailAgent.csproj": {
-      "version": "1.1.0",
+    "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\RailAgent.csproj": {
+      "version": "1.3.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\RailAgent.csproj",
+        "projectUniqueName": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\RailAgent.csproj",
         "projectName": "rail-2touch-agent",
-        "projectPath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\RailAgent.csproj",
+        "projectPath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\RailAgent.csproj",
         "packagesPath": "C:\\Users\\notug\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\notug\\bar-app\\.worktrees\\inventory-shipments\\2touch-agent-dotnet\\obj\\",
+        "outputPath": "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\notug\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -126,6 +153,12 @@
             "Microsoft.Extensions.Http": {
               "target": "Package",
               "version": "[9.0.0, )"
+            },
+            "Microsoft.NET.ILLink.Tasks": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[9.0.10, )",
+              "autoReferenced": true
             }
           },
           "imports": [
@@ -139,12 +172,31 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Runtime.win-x64",
+              "version": "[9.0.10, 9.0.10]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Runtime.win-x64",
+              "version": "[9.0.10, 9.0.10]"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App.Runtime.win-x64",
+              "version": "[9.0.10, 9.0.10]"
+            }
+          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
             }
           },
           "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.306/PortableRuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "win-x64": {
+          "#import": []
         }
       }
     }

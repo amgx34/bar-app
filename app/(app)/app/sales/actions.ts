@@ -39,6 +39,8 @@ import {
   type StockedItem,
 } from '@/lib/pos/sales-analytics';
 import { buildTokenTable, parseVariant } from '@/lib/pos/variants';
+import { tipsPerHour } from '@/lib/pos/tip-rate';
+import { splitRevenue, salesTaxFromSettings } from '@/lib/books/sales-tax';
 
 export type SalesData = {
   range: DateRange;
@@ -261,6 +263,28 @@ export async function getSalesData(
   };
 }
 
+/**
+ * The night's own ledger, off z_report_days rather than the item feed.
+ *
+ * Separate from the POS figures above because it answers different questions
+ * and can disagree with them: the drawer split and the tip jar are what the
+ * close-out recorded, not what the item audit adds up to. Every field is
+ * nullable and null means "not reported", never zero — the distinction the
+ * whole Z-report path is careful about (see AGENTS.md).
+ */
+export type NightLedger = {
+  cashSales: number | null;
+  cardSales: number | null;
+  /** Cash and card tips added together. Null when no Z row exists at all. */
+  tips: number | null;
+  /** Null when no hours were recorded, or no tips were. See lib/pos/tip-rate. */
+  tipsPerHour: number | null;
+  /** Held for the state. Null when the org has not configured a tax rate. */
+  taxHeld: number | null;
+  /** What is actually the bar's, once tax is out. Null for the same reason. */
+  netOfTax: number | null;
+};
+
 export type PeriodSalesData = {
   capabilities: SalesCapabilities;
   /** The bar's own day-rollover hour, so the client orders the night correctly. */
@@ -272,6 +296,8 @@ export type PeriodSalesData = {
   baseline: { netSales: Baseline; sampleDates: string[] } | null;
   /** Only computed for week and month, where a menu has enough sales to rank. */
   menu: MenuBoard | null;
+  /** The Z-report close-out for the night. Null for week and month. */
+  night: NightLedger | null;
 };
 
 /**
@@ -305,7 +331,7 @@ export async function getPeriodSalesData(
   // same-weekday nights, and four is what separates a baseline from an anecdote.
   const hourlyFrom = singleNight ? addDays(start, -35) : start;
 
-  const [{ data: hourly }, { data: servers }, { data: shifts }] = await Promise.all([
+  const [{ data: hourly }, { data: servers }, { data: shifts }, { data: zDays }] = await Promise.all([
     supabase
       .from('pos_hourly_sales')
       .select('business_date, hour, net_sales, ticket_count, tips')
@@ -324,6 +350,17 @@ export async function getPeriodSalesData(
       .eq('organization_id', orgId)
       .gte('shift_date', start)
       .lte('shift_date', end),
+    // The close-out for the night: the drawer split, the tip jar, and the
+    // figure the tax split is taken from. Only a single night has one worth
+    // showing — a week's worth of drawer counts is a different screen.
+    singleNight
+      ? supabase
+          .from('z_report_days')
+          .select('report_date, total_sales, cash_sales, card_sales, cash_tips, cc_tips')
+          .eq('organization_id', orgId)
+          .eq('report_date', start)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const allHourly = hourly ?? [];
@@ -393,6 +430,41 @@ export async function getPeriodSalesData(
     ? null
     : classifyMenu((await getSalesData('custom', start, end)).items);
 
+  // Tips are divided by the hours actually recorded for the night, which is the
+  // same set buildServerPerformance was handed — not a headcount and not the
+  // trading hours, both of which produce a rate nobody is paid at.
+  const hoursWorked = (shiftHours ?? []).reduce((sum, s) => sum + s.hours, 0);
+
+  const night: NightLedger | null = singleNight && zDays
+    ? (() => {
+        const z = zDays as {
+          total_sales: number | null; cash_sales: number | null; card_sales: number | null;
+          cash_tips: number | null; cc_tips: number | null;
+        };
+        const tips = z.cash_tips === null && z.cc_tips === null
+          ? null
+          : (Number(z.cash_tips) || 0) + (Number(z.cc_tips) || 0);
+        // The same refusal to guess the books make: an unset rate or an unknown
+        // tax treatment of POS prices yields no split at all, rather than one
+        // of the two answers that differ by the entire tax amount.
+        const split = splitRevenue(Number(z.total_sales) || 0, salesTaxFromSettings(
+          (org.bar_settings ?? {}) as {
+            sales_tax_rate?: number | null;
+            pos_prices_include_tax?: boolean | null;
+          },
+        ));
+
+        return {
+          cashSales:   z.cash_sales === null ? null : Number(z.cash_sales),
+          cardSales:   z.card_sales === null ? null : Number(z.card_sales),
+          tips,
+          tipsPerHour: tipsPerHour(z.cash_tips, z.cc_tips, hoursWorked),
+          taxHeld:     split.configured ? split.tax : null,
+          netOfTax:    split.configured ? split.net : null,
+        };
+      })()
+    : null;
+
   return {
     capabilities,
     cutoffHour,
@@ -401,5 +473,6 @@ export async function getPeriodSalesData(
     servers: capabilities.hasServer ? buildServerPerformance(serverRows, shiftHours) : null,
     baseline,
     menu,
+    night,
   };
 }

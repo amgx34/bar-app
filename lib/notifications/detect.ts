@@ -1,4 +1,6 @@
 import { isBelowPar, parRatio, type ParCheckable } from '@/lib/inventory/par';
+import { splitRevenue, type SalesTaxConfig } from '@/lib/books/sales-tax';
+import { tipsPerHour } from '@/lib/pos/tip-rate';
 import type { NotificationDraft } from './types';
 
 // ── Low stock ────────────────────────────────────────────────────────────────
@@ -164,5 +166,82 @@ export function detectSalesAnomaly(
     link:      '/app/sales',
     payload:   { reportDate: day.report_date, totalSales: day.total_sales, mean, delta },
     dedupeKey: `sales.anomaly:${day.report_date}`,
+  };
+}
+
+// ── Sales tax held ───────────────────────────────────────────────────────────
+
+/**
+ * How much of last night's take belongs to the state.
+ *
+ * Sales tax is a liability the bar collects and remits, never its money — the
+ * point of saying it out loud the morning after is that the figure is still in
+ * the drawer, and an owner who has already spent it finds out at filing time.
+ *
+ * Silent unless the split is a real calculation. `splitRevenue` refuses to
+ * guess at an unset rate or an unknown tax treatment of POS prices, and an
+ * alert is the worst possible place to start guessing: it names a dollar amount
+ * an operator will act on, out of context, on a phone. Nothing is better than
+ * a confident wrong number.
+ */
+export function detectSalesTax(
+  day: ZDay,
+  config: SalesTaxConfig,
+): NotificationDraft | null {
+  if (day.total_sales === null) return null;
+
+  const split = splitRevenue(day.total_sales, config);
+  // Not configured, or a night that took nothing — neither has tax to remit.
+  if (!split.configured || split.tax === null || split.tax <= 0) return null;
+
+  return {
+    eventType: 'sales.tax_daily',
+    title:     `Set aside ${money(split.tax)} in sales tax`,
+    body:      `From ${money(split.gross ?? day.total_sales)} taken last night — ${money(split.net)} of it is yours.`,
+    link:      '/app/books',
+    payload:   { reportDate: day.report_date, tax: split.tax, net: split.net, gross: split.gross },
+    dedupeKey: `sales.tax_daily:${day.report_date}`,
+  };
+}
+
+// ── Tips per hour ────────────────────────────────────────────────────────────
+
+export type TipNight = {
+  report_date: string;
+  /** Both nullable in practice: the column defaults to 0, older rows may not. */
+  cash_tips: number | null;
+  cc_tips:   number | null;
+  /** Total hours recorded across every shift on that night. */
+  hoursWorked: number;
+};
+
+/**
+ * What the night was worth to whoever worked it, per hour on the floor.
+ *
+ * Bar-wide, not per person. A rate is the figure that survives comparison
+ * between a four-hour Tuesday and a ten-hour Saturday, which a tip total never
+ * does — and it is the number an operator is actually holding in their head
+ * when they decide whether Tuesdays are worth staffing.
+ *
+ * Deliberately NOT a per-employee alert. Broadcasting one bartender's rate
+ * against another's is a different product decision entirely, and a worse one.
+ */
+export function detectHourlyTips(night: TipNight): NotificationDraft | null {
+  // The rate itself is lib/pos/tip-rate.ts, shared with the Sales screen so the
+  // two can never quote different figures for the same night. Null from it
+  // means the rate cannot honestly be stated — no hours, or no tips recorded —
+  // and an alert is exactly the wrong place to state one anyway.
+  const rate = tipsPerHour(night.cash_tips, night.cc_tips, night.hoursWorked);
+  if (rate === null) return null;
+
+  const tips = (night.cash_tips ?? 0) + (night.cc_tips ?? 0);
+
+  return {
+    eventType: 'tips.hourly',
+    title:     `${money(rate)}/hr in tips last night`,
+    body:      `${money(tips)} across ${night.hoursWorked.toLocaleString()} recorded hours.`,
+    link:      '/app/tips',
+    payload:   { reportDate: night.report_date, tips, hours: night.hoursWorked, rate },
+    dedupeKey: `tips.hourly:${night.report_date}`,
   };
 }

@@ -11,6 +11,8 @@ export const EVENT_TYPES = [
   'inventory.low_stock',
   'sales.z_report_closed',
   'sales.anomaly',
+  'sales.tax_daily',
+  'tips.hourly',
   'payroll.approval_needed',
   'payroll.approved',
   'payroll.changes_requested',
@@ -32,6 +34,14 @@ export const EVENT_LABELS: Record<EventType, { title: string; description: strin
     title:       'Unusual sales',
     description: 'When a night runs well above or below the same weekday over the last four weeks.',
   },
+  'sales.tax_daily': {
+    title:       'Sales tax to set aside',
+    description: "How much of last night's take belongs to the state. Silent until a tax rate is set.",
+  },
+  'tips.hourly': {
+    title:       'Tips per hour',
+    description: 'What last night paid per recorded hour on the floor, across the whole bar.',
+  },
   'payroll.approval_needed': {
     title:       'Payroll awaiting approval',
     description: 'A pay period has been submitted and needs an owner to sign off.',
@@ -51,15 +61,23 @@ export const EVENT_LABELS: Record<EventType, { title: string; description: strin
  *
  * Managers are absent from `payroll.approval_needed` because they are the ones
  * submitting — telling the submitter their own request arrived is noise.
- * Accountants get payroll only, mirroring canManagePayroll in lib/permissions:
- * an accountant reports on a pay run, they do not make the operational call
- * about a bottle of well vodka.
+ * Accountants get payroll and sales tax, and nothing else: they report on a pay
+ * run and on money held for the state, but do not make the operational call
+ * about a bottle of well vodka. `sales.tax_daily` is the one non-payroll alert
+ * they receive by default, because remitting that liability is squarely their
+ * job — not because the general sales feed became relevant to them.
+ *
+ * Managers get `tips.hourly` but not `sales.tax_daily`. What the night paid per
+ * hour is a staffing question, which is theirs; what is owed to the state is a
+ * filing question, which is not.
  */
 export const ROLE_DEFAULTS: Record<Role, readonly EventType[]> = {
   owner: [
     'inventory.low_stock',
     'sales.z_report_closed',
     'sales.anomaly',
+    'sales.tax_daily',
+    'tips.hourly',
     'payroll.approval_needed',
     'payroll.approved',
     'payroll.changes_requested',
@@ -68,10 +86,12 @@ export const ROLE_DEFAULTS: Record<Role, readonly EventType[]> = {
     'inventory.low_stock',
     'sales.z_report_closed',
     'sales.anomaly',
+    'tips.hourly',
     'payroll.approved',
     'payroll.changes_requested',
   ],
   accountant: [
+    'sales.tax_daily',
     'payroll.approval_needed',
     'payroll.approved',
     'payroll.changes_requested',
