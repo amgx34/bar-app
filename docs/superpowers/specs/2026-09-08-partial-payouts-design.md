@@ -32,9 +32,9 @@ place — only paid.
 | Model | Advance is a debit against the period total. Days are an input, not state. |
 | Storage | `payroll_payouts` becomes a payment ledger: many rows per employee per period. |
 | "Paid" | Derived: `sum(amount_paid) >= totalCompensation`. Still no status column. |
-| Cap | An advance cannot exceed what the selected days are currently worth. |
+| Cap | Total paid may never exceed total earned so far this period. Selected days propose the amount; they are not the ceiling. |
 | Overtime | Chronological within the workweek — hours after the 40th are the premium ones. |
-| Employee portal | Shows advances received and a clearly-labelled outstanding **estimate**. |
+| Employee portal | Shows advances received and what is still to come **for days already worked** — elapsed fact, never a forecast. |
 
 ## Architecture
 
@@ -136,36 +136,51 @@ a test pins that: if the two ever disagree, the dialog is proposing an advance
 from a different tip calculation than the run itself uses.
 
 Tip transfers between employees are applied **after** the per-day split and are
-not attributable to a night. They land on the period total only, so a day's
-value excludes them. Said plainly in the dialog rather than silently: an advance
-is computed from the nights, and a transfer is a period-level correction.
+capped at what the sender holds at that moment. They belong to no night, so a
+day's value excludes them, and the sum of a period's day values can therefore
+differ from the period total.
+
+Two figures that disagree must never do so silently — that rule is why
+`amount_paid` is frozen and why the run diffs before approval. So when a
+transfer touches this employee in this period, the dialog says the nights add up
+to a different figure than the run does, and names both. The cap is computed
+from the run's figure, never from the sum of nights, so a transfer that moved
+tips away from somebody lowers what they may be advanced even though no night
+changed.
 
 ### 4. The cap
 
-An advance is refused when it exceeds the selected days' current value, minus
-whatever has already been advanced for this period. The check is server-side in
-the action — a client-side cap is a hint, not a rule.
-
-The arithmetic lives in a pure function rather than inline in the action, so it
-can be exercised without a database:
+The cap exists to prevent one thing: a payday that comes out negative, on an app
+with no mechanism to claw money back. So the ceiling is the question that
+actually predicts it — **has this person been handed more than they have
+earned?**
 
 ```ts
 /** What may still be advanced. Never negative: an overpayment allows no more. */
 export function remainingAdvanceCapacity(
-  selectedDaysValue: number,
+  earnedSoFarThisPeriod: number,
   alreadyPaidThisPeriod: number,
 ): number;
 ```
 
-Note the ceiling is the **selected days'** value against **all** payments so far
-for the period, not against payments for those days. Days are not settled, so
-there is no per-day balance to draw against — there is one pot per period, and
-this asks whether the pot has room.
+`earnedSoFarThisPeriod` is `computePayroll`'s current total for that employee
+over the period — every day recorded so far, not the selected ones.
 
-Rationale: an over-advance creates a negative payday, and the app has no
-mechanism to claw money back. Refusing is the honest failure. The error names
-the ceiling so the owner can act ("Dana has earned $310 for those days and has
-already had $240").
+**The selected days propose an amount; they are not the ceiling.** An earlier
+draft capped at the selected days' value, and it was wrong. Dana takes $240 for
+Mon–Wed on Wednesday. On Friday she asks again and ticks Thu–Fri, worth $300.
+Capping against the ticked days would offer her $60, having decided that $240 of
+Thursday's work was already spent on Monday. She has earned $610 and been paid
+$240; $300 is plainly safe. The rule refused it because it was asking a
+per-day question in a model that deliberately has no per-day balances.
+
+One pot per period. The days decide what to propose, the pot decides whether
+there is room. The error names both figures so the owner can act ("Dana has
+earned $610 so far and has already had $240 — $370 available").
+
+This also closes the tip-transfer hole below without special-casing it:
+`earnedSoFarThisPeriod` is the real computed figure, so a transfer that moved
+tips away from Dana lowers her ceiling even though no day's value changed.
 
 ### 5. Reading the ledger
 
@@ -216,14 +231,20 @@ This adds the one deliberate exception, and it is bounded:
 
 - **Advances are shown as fact.** A payout row is money that actually moved, and
   `amount_paid` is frozen at mark time. Showing it is not a recompute.
-- **The remainder is shown as an estimate,** explicitly labelled, in muted type,
-  never with the visual weight of an approved period. It is a live figure and
-  says so: "estimated — your manager has not approved this period yet".
+- **The remainder is phrased as elapsed fact, not as a forecast.** The wording
+  is "earned so far" and "still to come for the days worked so far" — never
+  "you will be paid". Both are true statements about days that have already
+  happened, which is a figure the app can stand behind. "What you are owed for
+  this period" is not, mid-week: Thursday and Saturday have not happened, and
+  printing a number that will move is the confidently-wrong figure this codebase
+  refuses everywhere else.
 
-  The estimate is `computePayroll`'s current period total for that employee,
-  minus everything already paid to them for it. That is the only recompute the
-  portal performs, it is confined to the in-progress period, and it never
-  appears on an approved period's card — those still render `buildStub` output
+  Concretely: `earned so far $610 · advances received $240 · $370 still to come
+  for the days worked so far`, in muted type, under a line saying the period is
+  not approved yet. It never carries the visual weight of an approved card.
+
+  This is the only recompute the portal performs, it is confined to the
+  in-progress period, and approved periods still render `buildStub` output
   exclusively.
 
 This is a real loosening of the invariant, taken knowingly. The failure the rule
@@ -235,10 +256,11 @@ approved*; the mitigation is that the estimate can never be mistaken for one.
 
 | Case | Behaviour |
 |---|---|
-| Advance exceeds the days' value | Refused server-side, naming the ceiling and what was already advanced. |
+| Total paid would exceed total earned so far | Refused server-side, naming both figures and what is available. |
 | Same tap twice | Idempotency key collides; the second write is a no-op, not a second payment. |
 | No days selected | Confirm button disabled; there is no amount to record. |
 | A selected day has no shift | Worth nothing, ticked but priced at zero, and shown as zero rather than hidden. |
+| Nights sum to a different figure than the run | Both named in the dialog. Caused by a tip transfer, which belongs to no night. |
 | Employee already fully paid | Dialog opens with zero outstanding and says so; the cap refuses a further advance. |
 | Run recomputed below what was paid | Outstanding clamps to zero. The overpayment is visible in the payments list, not hidden. |
 | Employee from another bar | Existing `assertEmployeeInOrg` check, unchanged. |
