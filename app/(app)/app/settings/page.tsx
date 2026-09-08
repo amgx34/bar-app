@@ -111,7 +111,12 @@ export default async function SettingsPage({
         />
       )}
       {tab === 'team' && team && (
-        <TeamTab initialMembers={team.members} canManage={team.canManage} />
+        <TeamTab
+          initialMembers={team.members}
+          canManage={team.canManage}
+          staffJoinCode={team.staffJoinCode}
+          canManageStaffAccess={team.canManageStaffAccess}
+        />
       )}
       {tab === 'pos'         && (
         <div className="space-y-6">

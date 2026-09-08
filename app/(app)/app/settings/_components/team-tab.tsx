@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { UserPlus, Trash2, Shuffle } from 'lucide-react';
+import { UserPlus, Trash2, Shuffle, KeyRound, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,7 @@ import {
 import {
   addTeamMember, changeMemberRole, removeTeamMember, type TeamMember,
 } from '../team-actions';
+import { rotateStaffJoinCode, disableStaffJoinCode } from '../staff-access-actions';
 import type { Role } from '@/lib/permissions';
 
 const ROLES: { value: Role; label: string; hint: string }[] = [
@@ -39,9 +40,14 @@ function generatePassword(len = 14): string {
 export function TeamTab({
   initialMembers,
   canManage,
+  staffJoinCode,
+  canManageStaffAccess,
 }: {
   initialMembers: TeamMember[];
   canManage: boolean;
+  staffJoinCode: string | null;
+  /** Owner OR manager, unlike canManage — see listTeamMembers. */
+  canManageStaffAccess: boolean;
 }) {
   const router = useRouter();
   const [email, setEmail]       = useState('');
@@ -50,6 +56,35 @@ export function TeamTab({
   const [adding, setAdding]     = useState(false);
   const [busyId, setBusyId]     = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<TeamMember | null>(null);
+  const [joinCode, setJoinCode] = useState<string | null>(staffJoinCode);
+  const [codeBusy, setCodeBusy] = useState(false);
+
+  async function handleRotate() {
+    setCodeBusy(true);
+    try {
+      const code = await rotateStaffJoinCode();
+      setJoinCode(code);
+      toast.success('Staff sign-up is on. Share the code with your team.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not update the code');
+    } finally {
+      setCodeBusy(false);
+    }
+  }
+
+  async function handleDisable() {
+    setCodeBusy(true);
+    try {
+      await disableStaffJoinCode();
+      setJoinCode(null);
+      // Said plainly: turning the code off is not the same as removing people.
+      toast.success('Staff sign-up is off. Existing staff logins still work.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not turn it off');
+    } finally {
+      setCodeBusy(false);
+    }
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -101,6 +136,64 @@ export function TeamTab({
 
   return (
     <div className="space-y-6">
+      {/*
+        Staff logins are off until somebody turns them on: staff_join_code is
+        NULL for every bar that existed before this feature, and NULL never
+        matches the equality test the claim action does, so a bar that has not
+        opted in cannot be joined at all.
+      */}
+      <div className="rounded-xl border bg-card p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <KeyRound className="h-4 w-4 text-muted-foreground" aria-hidden />
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest">
+            Staff logins
+          </h3>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Staff use this code to request access to their own hours and pay. It is
+          not a password — every request still needs your approval on the
+          Employees screen.
+        </p>
+
+        {joinCode ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="rounded-md border bg-muted px-3 py-2 font-mono text-lg tracking-[0.2em]">
+              {joinCode}
+            </code>
+            <Button
+              variant="outline" size="sm"
+              onClick={() => {
+                navigator.clipboard.writeText(joinCode);
+                toast.success('Code copied');
+              }}
+            >
+              <Copy className="h-3.5 w-3.5" aria-hidden />
+              Copy
+            </Button>
+            {canManageStaffAccess && (
+              <>
+                <Button variant="outline" size="sm" disabled={codeBusy} onClick={handleRotate}>
+                  <Shuffle className="h-3.5 w-3.5" aria-hidden />
+                  New code
+                </Button>
+                <Button variant="ghost" size="sm" disabled={codeBusy} onClick={handleDisable}>
+                  Turn off
+                </Button>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground">Staff sign-up is off.</span>
+            {canManageStaffAccess && (
+              <Button size="sm" disabled={codeBusy} onClick={handleRotate}>
+                Turn on
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Members */}
       <div className="rounded-xl border bg-card p-5 space-y-2">
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest">Team Members</h3>

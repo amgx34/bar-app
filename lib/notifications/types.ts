@@ -13,6 +13,7 @@ export const EVENT_TYPES = [
   'sales.anomaly',
   'sales.tax_daily',
   'tips.hourly',
+  'staff.claim_pending',
   'payroll.approval_needed',
   'payroll.approved',
   'payroll.changes_requested',
@@ -41,6 +42,10 @@ export const EVENT_LABELS: Record<EventType, { title: string; description: strin
   'tips.hourly': {
     title:       'Tips per hour',
     description: 'What last night paid per recorded hour on the floor, across the whole bar.',
+  },
+  'staff.claim_pending': {
+    title:       'Staff account to approve',
+    description: 'Someone signed up with the bar’s join code and is waiting to be matched to their employee record.',
   },
   'payroll.approval_needed': {
     title:       'Payroll awaiting approval',
@@ -78,6 +83,7 @@ export const ROLE_DEFAULTS: Record<Role, readonly EventType[]> = {
     'sales.anomaly',
     'sales.tax_daily',
     'tips.hourly',
+    'staff.claim_pending',
     'payroll.approval_needed',
     'payroll.approved',
     'payroll.changes_requested',
@@ -87,6 +93,7 @@ export const ROLE_DEFAULTS: Record<Role, readonly EventType[]> = {
     'sales.z_report_closed',
     'sales.anomaly',
     'tips.hourly',
+    'staff.claim_pending',
     'payroll.approved',
     'payroll.changes_requested',
   ],

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
-import type { Role } from '@/lib/permissions';
+import { canManagePayroll, type Role } from '@/lib/permissions';
 
 export type TeamMember = {
   user_id:   string;
@@ -54,7 +54,18 @@ async function assertNotLastOwner(admin: Admin, orgId: string, userId: string) {
 }
 
 /** All members of the current org, with emails resolved from auth. */
-export async function listTeamMembers(): Promise<{ members: TeamMember[]; canManage: boolean }> {
+export async function listTeamMembers(): Promise<{
+  members: TeamMember[];
+  canManage: boolean;
+  /** NULL when staff sign-up has never been turned on for this bar. */
+  staffJoinCode: string | null;
+  /**
+   * Separate from `canManage`, which is owner-only. Staff access follows
+   * canManagePayroll instead: the people who approve these claims are the same
+   * ones who already correct hours and move tips.
+   */
+  canManageStaffAccess: boolean;
+}> {
   const { org, role } = await getCurrentOrg();
 
   const supabase = await createClient();
@@ -81,7 +92,18 @@ export async function listTeamMembers(): Promise<{ members: TeamMember[]; canMan
     }),
   );
 
-  return { members, canManage: role === 'owner' };
+  const { data: orgRow } = await admin
+    .from('organizations')
+    .select('staff_join_code')
+    .eq('id', org.id)
+    .maybeSingle();
+
+  return {
+    members,
+    canManage: role === 'owner',
+    staffJoinCode: (orgRow?.staff_join_code as string | null) ?? null,
+    canManageStaffAccess: canManagePayroll(role),
+  };
 }
 
 /**
