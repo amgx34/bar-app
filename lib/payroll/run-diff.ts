@@ -11,11 +11,55 @@
  * moved.
  */
 
+/** One night behind a period's hours. Frozen so a later correction cannot rewrite a stub. */
+export type ShiftNight = { date: string; hours: number; isOpener: boolean };
+
+/**
+ * The bar's whole tip pool on a night this person worked.
+ *
+ * Deliberately the pool TOTAL and not a per-night share. computePayroll works
+ * in period totals — a night-by-night share does not exist anywhere in the app
+ * and inventing one by dividing would produce a figure that disagrees with the
+ * tip total on the same screen. The employee's own share for the period is
+ * `breakdown.tipAmount`.
+ */
+export type TipNight = { date: string; poolTotal: number };
+
+export type PayBreakdown = {
+  role:                string | null;
+  regularHours:        number;
+  overtimeHours:       number;
+  hourlyRate:          number;
+  regularPay:          number;
+  overtimePay:         number;
+  tipAmount:           number;
+  tipsPerHour:         number;
+  effectiveHourlyRate: number;
+  payType:             string;
+};
+
 export type SnapshotEntry = {
   employeeId:        string;
   employeeName:      string;
   totalHours:        number;
   totalCompensation: number;
+
+  /*
+    Everything below is what the employee portal renders, frozen at submit so a
+    pay stub shows figures somebody actually approved.
+
+    All optional, and that is load-bearing: runs approved before the portal
+    existed carry only the four fields above, and must keep parsing. The portal
+    renders those as totals-only rather than reconstructing a breakdown by
+    recomputing — a recomputed figure is not the figure that was signed off.
+
+    diffPayrollRun ignores every one of these. Staleness means somebody's hours
+    or pay moved; it must not start firing because a derived rate rounded
+    differently. lib/payroll/run-diff.test.ts pins that down.
+  */
+  breakdown?:  PayBreakdown;
+  shifts?:     ShiftNight[];
+  tipContext?: TipNight[];
 };
 
 export type EntryChange = {

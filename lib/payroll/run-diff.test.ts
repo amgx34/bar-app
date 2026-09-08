@@ -63,4 +63,35 @@ describe('diffPayrollRun', () => {
     expect(d.isStale).toBe(false);
     expect(d.payDelta).toBe(0);
   });
+
+  it('ignores the portal fields entirely when deciding staleness', () => {
+    // The employee portal widened the snapshot with a breakdown, the nights
+    // worked, and the tip pool. Staleness must keep meaning "somebody's hours
+    // or pay moved" — so two entries agreeing on the four original fields are
+    // NOT stale even when every added field disagrees. If diffPayrollRun ever
+    // starts reading them, this fails and says why.
+    const before: SnapshotEntry[] = [{
+      employeeId: 'a', employeeName: 'Dana', totalHours: 10, totalCompensation: 200,
+      breakdown: {
+        role: 'bartender', regularHours: 10, overtimeHours: 0, hourlyRate: 12,
+        regularPay: 120, overtimePay: 0, tipAmount: 80, tipsPerHour: 8,
+        effectiveHourlyRate: 20, payType: 'pool',
+      },
+      shifts: [{ date: '2026-09-01', hours: 10, isOpener: false }],
+      tipContext: [{ date: '2026-09-01', poolTotal: 1200 }],
+    }];
+    const after: SnapshotEntry[] = [{
+      employeeId: 'a', employeeName: 'Dana', totalHours: 10, totalCompensation: 200,
+      breakdown: {
+        role: 'barback', regularHours: 4, overtimeHours: 6, hourlyRate: 30,
+        regularPay: 1, overtimePay: 999, tipAmount: 4242, tipsPerHour: 1,
+        effectiveHourlyRate: 3, payType: 'hourly',
+      },
+      shifts: [{ date: '2026-09-07', hours: 2, isOpener: true }],
+      tipContext: [{ date: '2026-09-07', poolTotal: 9 }],
+    }];
+
+    expect(diffPayrollRun(before, after).isStale).toBe(false);
+    expect(diffPayrollRun(before, after).changes).toHaveLength(0);
+  });
 });

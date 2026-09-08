@@ -4,9 +4,12 @@ import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentOrg, getAuthUser } from '@/lib/org';
 import { canSubmitPayroll, canApprovePayroll } from '@/lib/permissions';
-import { diffPayrollRun, type RunDiff, type SnapshotEntry } from '@/lib/payroll/run-diff';
+import {
+  diffPayrollRun,
+  type RunDiff, type SnapshotEntry, type ShiftNight, type TipNight,
+} from '@/lib/payroll/run-diff';
 import { dispatch } from '@/lib/notifications/deliver';
-import { computePayroll } from './actions';
+import { computePayroll, type PayrollEntry } from './actions';
 
 /**
  * Pay-run approval.
@@ -33,6 +36,13 @@ export type PayrollRun = {
   override_reason: string | null;
 };
 
+/**
+ * The four fields staleness is decided on.
+ *
+ * Used where a snapshot is only ever COMPARED. Freezing one for storage goes
+ * through freezeRun below, which also carries the detail the employee portal
+ * renders — see the SnapshotEntry comment in lib/payroll/run-diff.ts.
+ */
 function toSnapshot(entries: Array<{
   employeeId: string; employeeName: string; totalHours: number; totalCompensation: number;
 }>): SnapshotEntry[] {
@@ -42,6 +52,94 @@ function toSnapshot(entries: Array<{
     totalHours:        e.totalHours,
     totalCompensation: e.totalCompensation,
   }));
+}
+
+/**
+ * Freezes a run for storage: the totals, the full breakdown, the nights behind
+ * the hours, and the bar's tip pool on each of them.
+ *
+ * The employee portal renders this and never recomputes, so whatever is not
+ * frozen here is not something an employee can ever be shown for that period.
+ * Fetched rather than derived from `entries` because computePayroll returns
+ * period totals — the per-night rows live on employee_shifts.
+ *
+ * Every write of `payroll_runs.snapshot` goes through this. A path that stored
+ * `toSnapshot(...)` instead would silently approve a period whose stub has no
+ * detail, and nothing would fail until an employee opened it weeks later.
+ */
+async function freezeRun(
+  orgId: string,
+  periodStart: string,
+  periodEnd: string,
+  entries: PayrollEntry[],
+): Promise<SnapshotEntry[]> {
+  const supabase = createAdminClient();
+
+  const [{ data: shiftRows }, { data: tipDays }] = await Promise.all([
+    supabase
+      .from('employee_shifts')
+      .select('employee_id, shift_date, regular_hours, overtime_hours, is_opener')
+      .eq('organization_id', orgId)
+      .gte('shift_date', periodStart)
+      .lte('shift_date', periodEnd),
+    supabase
+      .from('z_report_days')
+      .select('report_date, cash_tips, cc_tips')
+      .eq('organization_id', orgId)
+      .gte('report_date', periodStart)
+      .lte('report_date', periodEnd),
+  ]);
+
+  const shiftsByEmployee = new Map<string, ShiftNight[]>();
+  for (const r of shiftRows ?? []) {
+    const list = shiftsByEmployee.get(r.employee_id as string) ?? [];
+    list.push({
+      date:     r.shift_date as string,
+      hours:    (Number(r.regular_hours) || 0) + (Number(r.overtime_hours) || 0),
+      isOpener: Boolean(r.is_opener),
+    });
+    shiftsByEmployee.set(r.employee_id as string, list);
+  }
+  for (const list of shiftsByEmployee.values()) {
+    list.sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  // A NULL tip column is nothing here rather than a reason to drop the night —
+  // the same reading as lib/pos/tip-rate.ts.
+  const poolByDate = new Map<string, number>(
+    (tipDays ?? []).map((d) => [
+      d.report_date as string,
+      (Number(d.cash_tips) || 0) + (Number(d.cc_tips) || 0),
+    ]),
+  );
+
+  return entries.map((e) => {
+    const shifts = shiftsByEmployee.get(e.employeeId) ?? [];
+    return {
+      employeeId:        e.employeeId,
+      employeeName:      e.employeeName,
+      totalHours:        e.totalHours,
+      totalCompensation: e.totalCompensation,
+      breakdown: {
+        role:                e.role,
+        regularHours:        e.regularHours,
+        overtimeHours:       e.overtimeHours,
+        hourlyRate:          e.hourlyRate,
+        regularPay:          e.regularPay,
+        overtimePay:         e.overtimePay,
+        tipAmount:           e.tipAmount,
+        tipsPerHour:         e.tipsPerHour,
+        effectiveHourlyRate: e.effectiveHourlyRate,
+        payType:             e.payType,
+      },
+      shifts,
+      // Only the nights this person actually worked. The pool on a night they
+      // were not in the building is not context, it is the bar's takings.
+      tipContext: shifts
+        .filter((s) => poolByDate.has(s.date))
+        .map((s) => ({ date: s.date, poolTotal: poolByDate.get(s.date) as number } as TipNight)),
+    };
+  });
 }
 
 export async function getPayrollRun(
@@ -90,7 +188,7 @@ export async function submitPayrollForApproval(
     return { ok: false, error: 'Nothing to submit — this period has no payroll entries' };
   }
 
-  const snapshot = toSnapshot(entries);
+  const snapshot = await freezeRun(org.id, periodStart, periodEnd, entries);
   const supabase = createAdminClient();
 
   const { error } = await supabase
@@ -168,7 +266,12 @@ export async function approvePayrollRun(
   if (!run) return { ok: false, error: 'No submitted run for this period' };
   if (run.status === 'approved') return { ok: true };
 
-  const current = toSnapshot(await computePayroll(periodStart, periodEnd));
+  // Frozen, not merely mapped: when the diff is stale this same value REPLACES
+  // the stored snapshot, and a replacement without the detail would leave an
+  // approved period the portal can only show totals for.
+  const current = await freezeRun(
+    org.id, periodStart, periodEnd, await computePayroll(periodStart, periodEnd),
+  );
   const diff = diffPayrollRun(run.snapshot ?? [], current);
 
   if (diff.isStale && !options.acceptChanges) {
@@ -282,7 +385,9 @@ export async function overrideApprovalGate(
       period_start:    periodStart,
       period_end:      periodEnd,
       status:          'approved',
-      snapshot:        toSnapshot(await computePayroll(periodStart, periodEnd)),
+      snapshot:        await freezeRun(
+        org.id, periodStart, periodEnd, await computePayroll(periodStart, periodEnd),
+      ),
       submitted_by:    user.id,
       submitted_at:    new Date().toISOString(),
       reviewed_by:     user.id,
