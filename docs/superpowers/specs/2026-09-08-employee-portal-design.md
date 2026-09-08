@@ -182,7 +182,14 @@ type SnapshotEntry = {
     effectiveHourlyRate: number; payType: BarbackPayType;
   };
   shifts?: Array<{ date: string; hours: number; isOpener: boolean }>;
-  tipContext?: Array<{ date: string; poolTotal: number; share: number }>;
+  /*
+    The pool TOTAL on each night worked, and deliberately no per-night share.
+    computePayroll works in period totals; a night-by-night share exists nowhere
+    in the app, and deriving one by dividing would print a figure that disagrees
+    with the tip total on the same card. The person's own share for the period
+    is `breakdown.tipAmount`.
+  */
+  tipContext?: Array<{ date: string; poolTotal: number }>;
 };
 ```
 
@@ -208,9 +215,10 @@ it as though it were is the failure this whole design is arranged around.
 - Nothing about colleagues, ever. No totals that are not this person's, except
   the tip pool figures they opted into.
 
-Tip context is per night worked: the pool total and this person's share, frozen
+Tip context is per night worked: the bar's pool total for that night, frozen
 into the snapshot with everything else so the one rule holds — **the portal reads
-the snapshot, never a recompute.**
+the snapshot, never a recompute.** Their own share is the period tip figure on
+the same card; see the type above for why it is not broken down per night.
 
 ### 8. Manager side
 
