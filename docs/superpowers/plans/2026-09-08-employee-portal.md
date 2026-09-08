@@ -137,10 +137,23 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_org_staff_join_code
   WHERE staff_join_code IS NOT NULL;
 ```
 
-- [ ] **Step 2: Verify the SQL parses**
+- [ ] **Step 2: Verify the SQL**
 
-Run: `npx supabase db lint --file supabase/migrations/20260908000000_add_employee_accounts.sql`
-Expected: no errors. If the Supabase CLI is unavailable in this environment, skip and rely on Task 2's tests, noting it in the commit message.
+`supabase db lint` lints a *database*, not a file — it needs either Docker (for
+`supabase start`) or a linked project. If one is available:
+
+```bash
+npx supabase db reset          # applies every migration to the local stack
+```
+
+Expected: the migration applies with no error, and `\d employee_accounts` shows
+the two unique indexes and the CHECK constraint.
+
+**If neither Docker nor a linked project is available**, the SQL cannot be
+executed here. Say so plainly in the commit message and carry the verification
+into the manual checklist at the end of this plan — do not claim it was
+validated. Nothing else in this plan depends on the table existing, because
+every test below runs against the pure functions.
 
 - [ ] **Step 3: Commit**
 
