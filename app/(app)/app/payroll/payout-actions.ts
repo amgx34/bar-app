@@ -6,7 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthUser, getCurrentOrg } from '@/lib/org';
 import { canManagePayroll } from '@/lib/permissions';
 import {
-  PAYOUT_METHODS, remainingAdvanceCapacity, totalPaidTo,
+  PAYOUT_METHODS, remainingAdvanceCapacity,
   type Payout, type PayoutMethod,
 } from '@/lib/payroll/payouts';
 import { computePayroll } from './actions';
@@ -56,7 +56,7 @@ export async function loadPayouts(
   const { org } = await getCurrentOrg();
   const supabase = createAdminClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('payroll_payouts')
     .select('id, employee_id, method, amount_paid, paid_at, covers_days')
     .eq('organization_id', org.id)
@@ -65,6 +65,19 @@ export async function loadPayouts(
     // Oldest first: the payments list reads as a history, and an advance
     // precedes the settlement it was taken against.
     .order('paid_at', { ascending: true });
+
+  // Throw rather than fall back to `[]`. As of this branch the migration
+  // adding `covers_days`/`idempotency_key`
+  // (supabase/migrations/20260909000000_payouts_ledger.sql) has not been run
+  // anywhere, and this SELECT now names `covers_days` — if it deploys ahead of
+  // the migration, PostgREST rejects the query and every caller of this
+  // function (the payroll page, markPaid's cap, the NACHA export) would
+  // silently read every employee as unpaid. That is worse than a page error:
+  // it zeroes `alreadyPaid` in the advance cap and the ACH net-of-advances
+  // arithmetic, which is exactly the double-payment C1/I4 exist to prevent.
+  // Callers here are server actions and a server page, so throwing surfaces a
+  // real error screen instead of rendering a lie.
+  if (error) throw new Error(`Failed to load payouts: ${error.message}`);
 
   return (data ?? []).map((row) => ({
     id:         row.id as string,
@@ -130,16 +143,45 @@ export async function markPaid(input: {
     the amount; the pot decides whether there is room. Capping against the
     ticked days would refuse $300 of genuinely-earned Thursday work because an
     earlier advance had notionally "used up" days the person had not worked yet.
+
+    The cap reads payouts by INTERVAL OVERLAP, not the exact period match
+    `loadPayouts` (the display) uses. The payroll screen offers week and month
+    views over the same days, and an advance recorded on the week view is a
+    different `period_start`/`period_end` than the month view — an exact match
+    would make that advance invisible from the month view and let the whole
+    month be paid on top of it. Switching the DISPLAY to overlap instead would
+    have the opposite problem: a month-sized payout would count against a week
+    view and make a week that was never paid look overpaid — trading one wrong
+    figure for another. The cap must never permit an overpayment, so it reads
+    wider; the display must not invent payments against a period they were not
+    made for, so it stays exact. The consequence is the cap can refuse here
+    while the screen shows nothing paid for this exact period — which is why
+    the refusal message names both figures rather than just the amount.
   */
   const entries = await computePayroll(periodStart, periodEnd);
   const earnedSoFar = entries.find((e) => e.employeeId === employeeId)?.totalCompensation ?? 0;
 
-  const existing = await loadPayouts(periodStart, periodEnd);
-  const alreadyPaid = totalPaidTo(existing.filter((p) => p.employeeId === employeeId));
+  const { data: overlapping, error: overlapError } = await supabase
+    .from('payroll_payouts')
+    .select('amount_paid')
+    .eq('organization_id', org.id)
+    .eq('employee_id', employeeId)
+    .lte('period_start', periodEnd)
+    .gte('period_end', periodStart);
+
+  // Same reasoning as loadPayouts: a swallowed error here would zero
+  // `alreadyPaid` and let the cap wave through an amount that has, in truth,
+  // already been paid via a different period view.
+  if (overlapError) throw new Error(`Failed to check existing payouts: ${overlapError.message}`);
+
+  const alreadyPaid = (overlapping ?? [])
+    .reduce((sum, p) => sum + (Number(p.amount_paid) || 0), 0);
 
   const capacity = remainingAdvanceCapacity(earnedSoFar, alreadyPaid);
   if (amountPaid > capacity + 0.005) {
     // Both figures named, so the owner can act rather than guess at the rule.
+    // "Already paid" here may exceed what the screen shows for this exact
+    // period — it counts every overlapping period view, which is the point.
     return {
       ok: false,
       error:
@@ -150,8 +192,10 @@ export async function markPaid(input: {
 
   // Insert, not upsert: a period holds many payments now, so there is no
   // natural row to overwrite. Idempotency comes from the unique index on
-  // (organization_id, idempotency_key) — a double-tap carries the same key and
-  // the second insert conflicts rather than paying twice.
+  // (organization_id, idempotency_key) plus `ignoreDuplicates: true` below —
+  // ON CONFLICT DO NOTHING — so a double-tap carrying the same key does not
+  // error and does not insert a second row; it silently does nothing and this
+  // call still reports success, rather than paying twice.
   const { error } = await supabase
     .from('payroll_payouts')
     .upsert(
