@@ -28,6 +28,7 @@ import {
   type TipRemoval,
 } from '@/lib/payroll/adjustments';
 import { overtimeFromSettings, overtimePay, splitWeeklyOvertime } from '@/lib/payroll/overtime';
+import { addTip, type TipLedger } from '@/lib/payroll/tip-ledger';
 import { ParsedEmployeeShift, parseDate } from '@/lib/csv-parsers/parse-employee-shifts';
 import { ParsedZReport } from '@/lib/csv-parsers/parse-z-reports';
 import { ParsedZReportText } from '@/lib/csv-parsers/parse-z-report-text';
@@ -509,43 +510,81 @@ export interface PayrollEntry {
    * as a deliberate arrangement rather than a missing split.
    */
   payType: BarbackPayType;
+  /**
+   * Tips per night, keyed YYYY-MM-DD. Sums to `tipAmount` EXCEPT where a tip
+   * transfer moved money between people — a transfer belongs to no night, so it
+   * lands on the total only. The payout dialog names both figures when they
+   * differ rather than letting two numbers disagree quietly.
+   */
+  tipsByDate?: Record<string, number>;
+  /**
+   * The nights behind `totalHours`. The payout dialog needs them to draw a day
+   * list and to allocate the workweek's overtime; deriving them from
+   * `tipsByDate` would miss any night that earned no tips.
+   */
+  shiftDays?: { date: string; hours: number }[];
 }
 
 /**
- * Compute payroll for employees within a date range
+ * Compute payroll for employees within a date range.
+ *
+ * Resolves the org from the caller's membership. The employee portal cannot use
+ * this — an employee has no membership by design and getCurrentOrg would
+ * redirect them — so it calls computePayrollForOrg below with the org id from
+ * their own session.
  */
 export async function computePayroll(
   startDate: string,
   endDate: string
 ): Promise<PayrollEntry[]> {
-  const supabase = await createClient();
   const { org } = await getCurrentOrg();
+  if (!org?.id) throw new Error('Organization not found');
+  return computePayrollForOrg(org.id, startDate, endDate);
+}
 
-  if (!org?.id) {
-    throw new Error('Organization not found');
-  }
+/**
+ * The same computation against a named org.
+ *
+ * Callers MUST establish that they may see that org's payroll before calling —
+ * there is no membership check in here. Today that is getCurrentOrg above, and
+ * getCurrentEmployee in the portal, which resolves an org id from an active
+ * employee_accounts row and nothing from the request.
+ */
+export async function computePayrollForOrg(
+  orgId: string,
+  startDate: string,
+  endDate: string
+): Promise<PayrollEntry[]> {
+  const supabase = await createClient();
+
+  const { data: orgRow } = await supabase
+    .from('organizations')
+    .select('bar_settings')
+    .eq('id', orgId)
+    .maybeSingle();
+  const settings = (orgRow?.bar_settings ?? {}) as Record<string, unknown>;
 
   // Configurable barback cut (Settings → Tip & Pay → Barback tip %).
   // Falls back to 15 % if not set.
-  const barbackFrac = barbackFractionFromSettings(org.bar_settings ?? {});
-  const barbackSplitMethod = barbackSplitFromSettings(org.bar_settings ?? {});
+  const barbackFrac = barbackFractionFromSettings(settings);
+  const barbackSplitMethod = barbackSplitFromSettings(settings);
   // Empty unless the bar runs headcount tiers, in which case barbackFrac above
   // is only the fallback for a night no tier covers.
-  const barbackTiers = barbackTiersFromSettings(org.bar_settings ?? {});
+  const barbackTiers = barbackTiersFromSettings(settings);
 
   // Configurable since the app was built, but never applied to anything until
   // now — see lib/payroll/adjustments.ts for how each type is funded.
-  const openerCfg = openerBonusFromSettings(org.bar_settings ?? {});
+  const openerCfg = openerBonusFromSettings(settings);
   // Defaults to 1.5x enabled, which is what every pay run did before the
   // setting existed — see lib/payroll/overtime.ts.
-  const overtimeCfg = overtimeFromSettings(org.bar_settings ?? {});
+  const overtimeCfg = overtimeFromSettings(settings);
 
   try {
     // Fetch all employees for the organization
     const { data: employees, error: empError } = await supabase
       .from('employees')
       .select('*')
-      .eq('organization_id', org?.id);
+      .eq('organization_id', orgId);
 
     if (empError) throw empError;
 
@@ -563,7 +602,7 @@ export async function computePayroll(
     const { data: shifts, error: shiftsError } = await supabase
       .from('employee_shifts')
       .select('*')
-      .eq('organization_id', org?.id)
+      .eq('organization_id', orgId)
       .gte('shift_date', startDate)
       .lte('shift_date', endDate);
 
@@ -573,7 +612,7 @@ export async function computePayroll(
     const { data: zReports, error: zError } = await supabase
       .from('z_report_days')
       .select('*')
-      .eq('organization_id', org?.id)
+      .eq('organization_id', orgId)
       .gte('report_date', startDate)
       .lte('report_date', endDate);
 
@@ -583,7 +622,7 @@ export async function computePayroll(
     const { data: serverTipsRows } = await supabase
       .from('z_report_server_tips')
       .select('*')
-      .eq('organization_id', org.id)
+      .eq('organization_id', orgId)
       .gte('report_date', startDate)
       .lte('report_date', endDate);
 
@@ -641,7 +680,7 @@ export async function computePayroll(
     const { data: adjustmentRows } = await supabase
       .from('payroll_adjustments')
       .select('employee_id, counterparty_employee_id, amount')
-      .eq('organization_id', org.id)
+      .eq('organization_id', orgId)
       .eq('kind', 'tip_transfer')
       .gte('shift_date', startDate)
       .lte('shift_date', endDate)
@@ -664,7 +703,7 @@ export async function computePayroll(
     const { data: removalRows } = await supabase
       .from('payroll_adjustments')
       .select('shift_date, employee_id, amount, reason')
-      .eq('organization_id', org.id)
+      .eq('organization_id', orgId)
       .eq('kind', 'tip_removal')
       .gte('shift_date', startDate)
       .lte('shift_date', endDate);
@@ -684,6 +723,23 @@ export async function computePayroll(
     const employeeTipAmounts = new Map<string, number>(
       payrollEmployees.map((e) => [e.id, 0])
     );
+
+    /*
+      The same tips, kept per night instead of only as a period total.
+      The payout dialog values a chosen set of days from this, so it MUST be the
+      same arithmetic the run itself uses — a second tip calculation would let
+      the dialog propose an advance the run disagrees with.
+
+      Every write to employeeTipAmounts writes here too. The invariant is that
+      each employee's map sums to their tipAmount.
+    */
+    const tipsByEmployeeByDate: TipLedger = new Map();
+
+    const addTips = (employeeId: string, date: string, amount: number) => {
+      if (!amount) return;
+      employeeTipAmounts.set(employeeId, (employeeTipAmounts.get(employeeId) || 0) + amount);
+      addTip(tipsByEmployeeByDate, employeeId, date, amount);
+    };
 
     for (const report of zReports || []) {
       // Removals come off BEFORE the barback cut and the bartender split, so a
@@ -721,7 +777,7 @@ export async function computePayroll(
       });
 
       for (const [employeeId, amount] of barbackSplit.tipsByEmployee) {
-        employeeTipAmounts.set(employeeId, (employeeTipAmounts.get(employeeId) || 0) + amount);
+        addTips(employeeId, report.report_date, amount);
       }
 
       const poolTips = barbackSplit.poolTips;
@@ -746,10 +802,7 @@ export async function computePayroll(
         : { bonusTips: 0, bonusHours: 0, fundedFromPool: 0 };
 
       if (openerShiftToday && bonus.bonusTips > 0) {
-        employeeTipAmounts.set(
-          openerShiftToday.employee_id,
-          (employeeTipAmounts.get(openerShiftToday.employee_id) || 0) + bonus.bonusTips
-        );
+        addTips(openerShiftToday.employee_id, report.report_date, bonus.bonusTips);
       }
       if (openerShiftToday && bonus.bonusHours > 0) {
         openerBonusHours.set(
@@ -764,10 +817,7 @@ export async function computePayroll(
         poolShiftsToday.forEach((s) => {
           const hrs = (s.regular_hours || 0) + (s.overtime_hours || 0);
           const tip = (hrs / poolHoursToday) * shareablePool;
-          employeeTipAmounts.set(
-            s.employee_id,
-            (employeeTipAmounts.get(s.employee_id) || 0) + tip
-          );
+          addTips(s.employee_id, report.report_date, tip);
         });
       }
 
@@ -784,16 +834,10 @@ export async function computePayroll(
           if (!emp) continue;
 
           if (emp.tip_mode === 'individual') {
-            employeeTipAmounts.set(
-              emp.id,
-              (employeeTipAmounts.get(emp.id) || 0) + serverEntry.tipsPaidOut
-            );
+            addTips(emp.id, report.report_date, serverEntry.tipsPaidOut);
           } else if (emp.tip_mode === 'sales_pct' && totalDaySales > 0) {
             const tipShare = (serverEntry.totalSales / totalDaySales) * dailyTips;
-            employeeTipAmounts.set(
-              emp.id,
-              (employeeTipAmounts.get(emp.id) || 0) + tipShare
-            );
+            addTips(emp.id, report.report_date, tipShare);
           }
         }
       }
@@ -889,6 +933,13 @@ export async function computePayroll(
         effectiveHourlyRate,
         totalCompensation,
         payType,
+        tipsByDate: Object.fromEntries(tipsByEmployeeByDate.get(employee.id) ?? []),
+        shiftDays: employeeShifts
+          .map((s) => ({
+            date: s.shift_date as string,
+            hours: (Number(s.regular_hours) || 0) + (Number(s.overtime_hours) || 0),
+          }))
+          .sort((a, b) => a.date.localeCompare(b.date)),
       });
     }
 
