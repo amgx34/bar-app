@@ -6,7 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthUser, getCurrentOrg } from '@/lib/org';
 import { canManagePayroll } from '@/lib/permissions';
 import {
-  PAYOUT_METHODS, remainingAdvanceCapacity,
+  PAYOUT_METHODS, remainingAdvanceCapacity, totalPaidTo,
   type Payout, type PayoutMethod,
 } from '@/lib/payroll/payouts';
 import { computePayroll } from './actions';
@@ -90,6 +90,59 @@ export async function loadPayouts(
   }));
 }
 
+/**
+ * Every payout whose stored period OVERLAPS [periodStart, periodEnd], across
+ * every employee — not the exact match `loadPayouts` (display) uses.
+ *
+ * The payroll screen offers week and month views over the same days, and an
+ * advance is stored under whichever period box was on screen when it was
+ * recorded. An exact match would make a week-recorded advance invisible from
+ * the month view and let it be paid again on top. Reading wider closes that
+ * hole for both places that decide whether money should move: the advance
+ * cap in `markPaid`, and the ACH route's net-of-advances arithmetic. Both
+ * MUST read through this one function — two separately-written overlap
+ * queries drifting apart is exactly how this hole reopened once already
+ * (the cap moved to overlap in an earlier pass; the ACH route did not).
+ *
+ * Direction is deliberate, not incidental: over-deducting (counting a
+ * payout that turns out to belong to a different window) UNDERPAYS, which
+ * is visible on the pay stub and can be topped up by hand. Under-deducting
+ * OVERPAYS via ACH, which is neither visible nor recoverable. This codebase
+ * always prefers the safe failure, so both callers read wider rather than
+ * narrower.
+ *
+ * Throws rather than returning `[]` on error, for the same reason as
+ * `loadPayouts`: a swallowed error here would zero `alreadyPaid` in both the
+ * cap and the ACH arithmetic and silently permit the double payment this
+ * function exists to prevent.
+ */
+export async function loadPayoutsOverlapping(
+  periodStart: string,
+  periodEnd: string,
+): Promise<Payout[]> {
+  const { org } = await getCurrentOrg();
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase
+    .from('payroll_payouts')
+    .select('id, employee_id, method, amount_paid, paid_at, covers_days')
+    .eq('organization_id', org.id)
+    .lte('period_start', periodEnd)
+    .gte('period_end', periodStart)
+    .order('paid_at', { ascending: true });
+
+  if (error) throw new Error(`Failed to load overlapping payouts: ${error.message}`);
+
+  return (data ?? []).map((row) => ({
+    id:         row.id as string,
+    employeeId: row.employee_id as string,
+    method:     row.method as PayoutMethod,
+    amountPaid: Number(row.amount_paid ?? 0),
+    paidAt:     row.paid_at as string,
+    coversDays: (row.covers_days as string[] | null) ?? null,
+  }));
+}
+
 /** Confirms the employee is at the caller's bar before anything is written. */
 async function assertEmployeeInOrg(
   supabase: ReturnType<typeof createAdminClient>,
@@ -144,38 +197,19 @@ export async function markPaid(input: {
     ticked days would refuse $300 of genuinely-earned Thursday work because an
     earlier advance had notionally "used up" days the person had not worked yet.
 
-    The cap reads payouts by INTERVAL OVERLAP, not the exact period match
-    `loadPayouts` (the display) uses. The payroll screen offers week and month
-    views over the same days, and an advance recorded on the week view is a
-    different `period_start`/`period_end` than the month view — an exact match
-    would make that advance invisible from the month view and let the whole
-    month be paid on top of it. Switching the DISPLAY to overlap instead would
-    have the opposite problem: a month-sized payout would count against a week
-    view and make a week that was never paid look overpaid — trading one wrong
-    figure for another. The cap must never permit an overpayment, so it reads
-    wider; the display must not invent payments against a period they were not
-    made for, so it stays exact. The consequence is the cap can refuse here
-    while the screen shows nothing paid for this exact period — which is why
-    the refusal message names both figures rather than just the amount.
+    The cap reads payouts through `loadPayoutsOverlapping`, not the exact
+    period match `loadPayouts` (the display) uses — see that function's doc
+    comment for why, and why the ACH export's net-of-advances arithmetic reads
+    through the SAME function rather than its own query. The consequence is
+    the cap can refuse here while the screen shows nothing paid for this exact
+    period — which is why the refusal message names both figures rather than
+    just the amount.
   */
   const entries = await computePayroll(periodStart, periodEnd);
   const earnedSoFar = entries.find((e) => e.employeeId === employeeId)?.totalCompensation ?? 0;
 
-  const { data: overlapping, error: overlapError } = await supabase
-    .from('payroll_payouts')
-    .select('amount_paid')
-    .eq('organization_id', org.id)
-    .eq('employee_id', employeeId)
-    .lte('period_start', periodEnd)
-    .gte('period_end', periodStart);
-
-  // Same reasoning as loadPayouts: a swallowed error here would zero
-  // `alreadyPaid` and let the cap wave through an amount that has, in truth,
-  // already been paid via a different period view.
-  if (overlapError) throw new Error(`Failed to check existing payouts: ${overlapError.message}`);
-
-  const alreadyPaid = (overlapping ?? [])
-    .reduce((sum, p) => sum + (Number(p.amount_paid) || 0), 0);
+  const overlapping = await loadPayoutsOverlapping(periodStart, periodEnd);
+  const alreadyPaid = totalPaidTo(overlapping.filter((p) => p.employeeId === employeeId));
 
   const capacity = remainingAdvanceCapacity(earnedSoFar, alreadyPaid);
   if (amountPaid > capacity + 0.005) {

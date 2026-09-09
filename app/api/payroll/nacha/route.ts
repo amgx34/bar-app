@@ -16,7 +16,7 @@ import { createAdminClient }         from '@/lib/supabase/admin';
 import { getCurrentOrg }             from '@/lib/org';
 import { computePayroll }            from '@/app/(app)/app/payroll/actions';
 import { getPayrollRun }             from '@/app/(app)/app/payroll/approval-actions';
-import { loadPayouts }               from '@/app/(app)/app/payroll/payout-actions';
+import { loadPayoutsOverlapping }    from '@/app/(app)/app/payroll/payout-actions';
 import { decrypt }                   from '@/lib/direct-deposit/crypto';
 import { generateNachaFile }         from '@/lib/payroll/nacha';
 import { netOfAdvances }             from '@/lib/payroll/ach-net';
@@ -92,9 +92,17 @@ export async function GET(req: NextRequest) {
   // the approved total MINUS everything already paid. Without this, a bar that
   // hands an employee a $240 cash advance mid-period and then exports ACH would
   // send the FULL period total on top of it: a real, unrecoverable overpayment.
-  // The exact-period read matches what the payroll screen displays and what the
-  // cap in markPaid enforces (see payout-actions.ts / loadPayouts).
-  const payouts = await loadPayouts(startDate, endDate);
+  //
+  // Reads through `loadPayoutsOverlapping`, the SAME function the advance cap
+  // in markPaid uses — not the exact-match `loadPayouts` the payroll screen
+  // displays. The payroll screen offers week and month views over the same
+  // days, and an advance is stored under whichever period box was on screen
+  // when it was recorded; an exact match on the export's (usually month-sized)
+  // range would miss a week-recorded advance entirely and send the full gross
+  // on top of cash already handed over. Under-deducting overpays via ACH,
+  // which is neither visible nor recoverable, so this reads wider on purpose —
+  // see loadPayoutsOverlapping's doc comment for the full reasoning.
+  const payouts = await loadPayoutsOverlapping(startDate, endDate);
   const payoutsByEmployee = new Map<string, Payout[]>();
   for (const p of payouts) {
     const list = payoutsByEmployee.get(p.employeeId) ?? [];
