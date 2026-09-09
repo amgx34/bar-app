@@ -25,10 +25,12 @@ interface PayrollTableProps {
   /** Hidden for roles that may not change pay. */
   canAdjust?: boolean;
   /**
-   * Who has already been handed their money, by employee id. A missing entry
-   * is the unpaid state — see lib/payroll/payouts.ts.
+   * Every payment recorded for each employee this period, oldest first. An
+   * empty list is the unpaid state — see lib/payroll/payouts.ts.
    */
-  payouts: ReadonlyMap<string, Payout>;
+  payouts: Map<string, Payout[]>;
+  /** The bar's overtime config, so the day picker prices nights as the run does. */
+  overtime: { enabled: boolean; multiplier: number };
   totals: {
     totalHours: number;
     regularPay: number;
@@ -127,6 +129,7 @@ export default function PayrollTable({
   startDate,
   endDate,
   payouts,
+  overtime,
   canAdjust = false,
 }: PayrollTableProps) {
   const [adjusting, setAdjusting] = useState<PayrollEntry | null>(null);
@@ -285,11 +288,15 @@ export default function PayrollTable({
                     employeeId={entry.employeeId}
                     employeeName={entry.employeeName}
                     amount={entry.totalCompensation}
-                    payout={payouts.get(entry.employeeId)}
+                    payouts={payouts.get(entry.employeeId) ?? []}
                     periodStart={startDate ?? ''}
                     periodEnd={endDate ?? ''}
                     canAdjust={canAdjust}
                     onChanged={() => router.refresh()}
+                    shifts={entry.shiftDays ?? []}
+                    tipsByDate={entry.tipsByDate ?? {}}
+                    hourlyRate={entry.hourlyRate}
+                    overtime={overtime}
                   />
                 </div>
 
@@ -471,11 +478,15 @@ export default function PayrollTable({
                       employeeId={entry.employeeId}
                       employeeName={entry.employeeName}
                       amount={entry.totalCompensation}
-                      payout={payouts.get(entry.employeeId)}
+                      payouts={payouts.get(entry.employeeId) ?? []}
                       periodStart={startDate ?? ''}
                       periodEnd={endDate ?? ''}
                       canAdjust={canAdjust}
                       onChanged={() => router.refresh()}
+                      shifts={entry.shiftDays ?? []}
+                      tipsByDate={entry.tipsByDate ?? {}}
+                      hourlyRate={entry.hourlyRate}
+                      overtime={overtime}
                     />
                   </TableCell>
                   {canAdjust && (

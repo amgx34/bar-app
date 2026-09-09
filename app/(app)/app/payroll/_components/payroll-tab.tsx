@@ -33,6 +33,8 @@ interface PayrollTabProps {
   weeklyTrend: WeeklyPoint[];
   /** Who has already been handed their money for this period. */
   payouts: Payout[];
+  /** The bar's overtime config, so the day picker prices nights as the run does. */
+  overtime: { enabled: boolean; multiplier: number };
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -68,6 +70,7 @@ export default function PayrollTab({
   employees,
   weeklyTrend,
   payouts,
+  overtime,
   canAdjust = false,
 }: PayrollTabProps) {
   const router = useRouter();
@@ -78,10 +81,17 @@ export default function PayrollTab({
 
   // Keyed once here rather than scanning the array per row: the table renders
   // this lookup for every employee in both the desktop and the phone layout.
-  const payoutsById = useMemo(
-    () => new Map(payouts.map((p) => [p.employeeId, p])),
-    [payouts],
-  );
+  // A list per employee, not a single row: a period can hold an advance and a
+  // settlement, and both belong on the screen.
+  const payoutsById = useMemo(() => {
+    const m = new Map<string, Payout[]>();
+    for (const p of payouts) {
+      const list = m.get(p.employeeId) ?? [];
+      list.push(p);
+      m.set(p.employeeId, list);
+    }
+    return m;
+  }, [payouts]);
   const payoutSummary = summarizePayouts(payrollEntries, payoutsById);
 
   const totals = payrollEntries.reduce(
@@ -311,6 +321,7 @@ export default function PayrollTab({
         endDate={endDate}
         payouts={payoutsById}
         canAdjust={canAdjust}
+        overtime={overtime}
       />
 
       {canAdjust && addShiftOpen && (

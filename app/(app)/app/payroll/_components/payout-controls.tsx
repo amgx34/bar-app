@@ -5,8 +5,10 @@ import { toast } from 'sonner';
 import { Check, HandCoins } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PayoutDialog } from './payout-dialog';
-import { unmarkPaid } from '../payout-actions';
-import { PAYOUT_METHOD_LABEL, type Payout, type PayoutSummary } from '@/lib/payroll/payouts';
+import { deletePayout } from '../payout-actions';
+import {
+  PAYOUT_METHOD_LABEL, totalPaidTo, type Payout, type PayoutSummary,
+} from '@/lib/payroll/payouts';
 
 /**
  * The paid / not-paid controls, shared by the desktop table and the phone
@@ -66,6 +68,13 @@ export function PayoutProgress({ summary }: { summary: PayoutSummary }) {
 
       {!allPaid && (
         <span className="text-sm tabular-nums">
+          {summary.advancedTotal > 0 && (
+            <>
+              <span className="text-muted-foreground">paid out </span>
+              <span className="font-semibold">${summary.advancedTotal.toFixed(2)}</span>
+              <span className="text-muted-foreground"> · </span>
+            </>
+          )}
           <span className="text-muted-foreground">still owed </span>
           <span className="font-semibold">${outstanding.toFixed(2)}</span>
         </span>
@@ -77,48 +86,78 @@ export function PayoutProgress({ summary }: { summary: PayoutSummary }) {
 type CellProps = {
   employeeId: string;
   employeeName: string;
-  /** Live figure from the run — what gets frozen if they are marked paid now. */
+  /** Live figure from the run — the FULL period total, not the balance. */
   amount: number;
-  payout: Payout | undefined;
+  payouts: Payout[];
   periodStart: string;
   periodEnd: string;
   canAdjust: boolean;
   onChanged: () => void;
-  /** Phones get a full-width button; the table gets something cell-sized. */
   layout: 'row' | 'block';
+  shifts: { date: string; hours: number }[];
+  tipsByDate: Record<string, number>;
+  hourlyRate: number;
+  overtime: { enabled: boolean; multiplier: number };
 };
 
 /**
- * One person's paid state, in both directions.
+ * One person's paid state, in three flavours now: nothing, part, all.
  *
  * A paid chip stays a button rather than becoming static text: marking the
  * wrong person paid is a one-tap mistake, and undo has to be as reachable as
- * the thing it undoes.
+ * the thing it undoes. With a ledger, undo removes the LAST payment rather than
+ * the period — wiping an advance from last week along with today's slip would
+ * be a much worse mistake than the one being corrected.
  */
 export function PayoutCell({
-  employeeId, employeeName, amount, payout, periodStart, periodEnd,
-  canAdjust, onChanged, layout,
+  employeeId, employeeName, amount, payouts, periodStart, periodEnd,
+  canAdjust, onChanged, layout, shifts, tipsByDate, hourlyRate, overtime,
 }: CellProps) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const block = layout === 'block';
 
-  function undo() {
+  const paidSoFar = totalPaidTo(payouts);
+  const balance = Math.max(0, amount - paidSoFar);
+  const fullyPaid = payouts.length > 0 && balance <= 0;
+  const partly = payouts.length > 0 && balance > 0;
+
+  function undoLast() {
+    const last = payouts[payouts.length - 1];
+    if (!last) return;
     startTransition(async () => {
-      const res = await unmarkPaid({ employeeId, periodStart, periodEnd });
+      const res = await deletePayout({ payoutId: last.id });
       if (!res.ok) {
         toast.error(res.error ?? 'Could not undo that');
         return;
       }
-      toast.success(`${employeeName} marked unpaid`);
+      toast.success(`Removed ${PAYOUT_METHOD_LABEL[last.method].toLowerCase()} payment`);
       onChanged();
     });
   }
 
-  if (payout) {
-    const label = `${PAYOUT_METHOD_LABEL[payout.method]} · ${shortDate(payout.paidAt)}`;
+  const dialog = open && (
+    <PayoutDialog
+      open={open}
+      onOpenChange={setOpen}
+      employeeId={employeeId}
+      employeeName={employeeName}
+      amount={balance}
+      periodStart={periodStart}
+      periodEnd={periodEnd}
+      shifts={shifts}
+      tipsByDate={tipsByDate}
+      hourlyRate={hourlyRate}
+      overtime={overtime}
+      alreadyPaid={paidSoFar}
+      onSaved={onChanged}
+    />
+  );
 
-    // Read-only roles see the fact without a control that would only refuse.
+  if (fullyPaid) {
+    const last = payouts[payouts.length - 1];
+    const label = `${PAYOUT_METHOD_LABEL[last.method]} · ${shortDate(last.paidAt)}`;
+
     if (!canAdjust) {
       return (
         <span
@@ -136,13 +175,12 @@ export function PayoutCell({
     return (
       <button
         type="button"
-        onClick={undo}
+        onClick={undoLast}
         disabled={pending}
-        title={`Paid ${PAYOUT_METHOD_LABEL[payout.method].toLowerCase()} — $${payout.amountPaid.toFixed(2)}. Click to undo.`}
-        aria-label={`${employeeName} is paid. Undo.`}
+        title={`Paid $${paidSoFar.toFixed(2)} across ${payouts.length} payment(s). Click to remove the last one.`}
+        aria-label={`${employeeName} is paid. Undo the last payment.`}
         className={cn(
           'group inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-200 disabled:opacity-50 dark:bg-emerald-950/60 dark:text-emerald-200 dark:hover:bg-emerald-900',
-          // 44px on a phone; the table row is already dense enough without it.
           block && 'h-11 w-full justify-center text-sm',
         )}
       >
@@ -152,6 +190,37 @@ export function PayoutCell({
           Undo
         </span>
       </button>
+    );
+  }
+
+  if (partly) {
+    // Amber, not green: money has moved but this person is not finished, and a
+    // green tick here would read as done on a Friday-afternoon skim.
+    if (!canAdjust) {
+      return (
+        <span className={cn('text-xs text-muted-foreground', block && 'block text-center')}>
+          ${paidSoFar.toFixed(2)} of ${amount.toFixed(2)}
+        </span>
+      );
+    }
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label={`Pay ${employeeName} the remaining $${balance.toFixed(2)}`}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-200 dark:bg-amber-950/60 dark:text-amber-200 dark:hover:bg-amber-900',
+            block && 'h-11 w-full justify-center text-sm',
+          )}
+        >
+          <HandCoins className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span className="truncate tabular-nums">
+            ${paidSoFar.toFixed(2)} of ${amount.toFixed(2)}
+          </span>
+        </button>
+        {dialog}
+      </>
     );
   }
 
@@ -173,19 +242,7 @@ export function PayoutCell({
         <HandCoins className="h-3.5 w-3.5 shrink-0" aria-hidden />
         Mark paid
       </button>
-
-      {open && (
-        <PayoutDialog
-          open={open}
-          onOpenChange={setOpen}
-          employeeId={employeeId}
-          employeeName={employeeName}
-          amount={amount}
-          periodStart={periodStart}
-          periodEnd={periodEnd}
-          onSaved={onChanged}
-        />
-      )}
+      {dialog}
     </>
   );
 }

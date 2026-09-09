@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { computePayroll } from './actions';
 import { loadPayouts } from './payout-actions';
 import { getCurrentOrg } from '@/lib/org';
+import { overtimeFromSettings } from '@/lib/payroll/overtime';
 import { canManagePayroll } from '@/lib/permissions';
 import PayrollTab from './_components/payroll-tab';
 import DaySplitTab from './_components/day-split-tab';
@@ -59,6 +60,10 @@ export default async function PayrollPage({
   const view = resolvePayrollView(params.view);
   const canAdjust = canManagePayroll(role);
 
+  // The same config computePayroll uses, so the payout dialog and the run
+  // cannot disagree about which hours carry a premium.
+  const overtimeCfg = overtimeFromSettings(org.bar_settings ?? {});
+
   if (view === 'day') {
     // Validated, not trusted — same as the pay period below. A `?date=` off a
     // shared link flows into a date comparison, where junk produced a 500.
@@ -96,6 +101,7 @@ export default async function PayrollPage({
           employees={employees as never}
           weeklyTrend={weeklyTrend}
           payouts={payouts}
+          overtime={overtimeCfg}
           canAdjust={canAdjust}
         />
       </Suspense>
