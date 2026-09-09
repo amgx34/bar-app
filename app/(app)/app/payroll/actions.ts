@@ -562,6 +562,13 @@ export async function computePayroll(
  * RLS still stands as a second line of defence there. Anybody passing an admin
  * client MUST have already established that they may see that org's payroll —
  * this function performs no such check itself.
+ *
+ * This file never constructs the service-role client itself (the caller passes
+ * it in, if at all), so the scope-audit script — which only scans files
+ * containing a literal call to that constructor — skips this file entirely.
+ * Every query below must be org-scoped by hand (this function takes `orgId`
+ * as a parameter for exactly that reason); a query added here that forgets
+ * `.eq('organization_id', …)` will not be caught by `npm run audit:scope`.
  */
 export async function computePayrollForOrg(
   orgId: string,
