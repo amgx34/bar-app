@@ -36,7 +36,7 @@ describe('valueDays', () => {
     expect(out.total).toBe(150);
   });
 
-  it('splits the day that straddles the threshold', () => {
+  it('lands a day exactly on the threshold as all regular', () => {
     // Mon-Wed are 30 hours; Thursday's first 10 reach exactly 40, so Thursday
     // is all regular and the premium starts on Friday.
     const out = valueDays({
@@ -45,6 +45,41 @@ describe('valueDays', () => {
     });
     expect(out.days[0].regularHours).toBe(10);
     expect(out.days[0].overtimeHours).toBe(0);
+  });
+
+  it('splits a day that straddles the threshold into both parts', () => {
+    // Mon+Tue+Wed at 12h each = 36. Thursday's 12 hours push the week from 36
+    // to 48: only 4 of them are the last regular hours, the other 8 are
+    // premium. A buggy all-or-nothing split (whole day overtime once the week
+    // would exceed 40) would report 0 regular / 12 overtime here instead.
+    const uneven = [
+      { date: '2026-09-07', hours: 12 },
+      { date: '2026-09-08', hours: 12 },
+      { date: '2026-09-09', hours: 12 },
+      { date: '2026-09-10', hours: 12 },
+    ];
+    const out = valueDays({
+      shifts: uneven, tipsByDate: noTips, hourlyRate: 10, overtime: ot,
+      selected: ['2026-09-10'],
+    });
+    expect(out.days[0].regularHours).toBe(4);
+    expect(out.days[0].overtimeHours).toBe(8);
+    expect(out.days[0].wage).toBe(160);
+  });
+
+  it('folds two shift rows on the same date before splitting overtime', () => {
+    // If the fold were a plain .set() instead of a sum, the second row would
+    // silently overwrite the first and the day would be under-counted.
+    const out = valueDays({
+      shifts: [
+        { date: '2026-09-07', hours: 4 },
+        { date: '2026-09-07', hours: 5 },
+      ],
+      tipsByDate: noTips, hourlyRate: 10, overtime: ot,
+      selected: ['2026-09-07'],
+    });
+    expect(out.days[0].hours).toBe(9);
+    expect(out.days[0].total).toBe(90);
   });
 
   it('only makes a day premium when the earlier days used the week up', () => {
