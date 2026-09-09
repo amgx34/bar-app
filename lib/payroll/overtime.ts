@@ -97,7 +97,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
  * start. Done in UTC so a clock change cannot move a shift into another week
  * and silently re-price it.
  */
-function weekStartOf(iso: string): string | null {
+export function weekStartOf(iso: string): string | null {
   if (typeof iso !== 'string' || !ISO_DATE.test(iso)) return null;
   const [y, m, d] = iso.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
