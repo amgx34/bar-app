@@ -98,13 +98,26 @@ export async function getMyPeriods(): Promise<{
     // [periodStart, periodEnd] would match nothing and silently read
     // advancesReceived as 0. What actually applies to these worked days is any
     // payout whose stored period overlaps them at all.
-    const { data: payoutRows } = await supabase
+    const { data: payoutRows, error: payoutError } = await supabase
       .from('payroll_payouts')
       .select('amount_paid')
       .eq('organization_id', me.orgId)
       .eq('employee_id', me.employeeId)
       .lte('period_start', periodEnd)
       .gte('period_end', periodStart);
+
+    // A swallowed error here used to read as "$0 advances", which is
+    // indistinguishable from the truth on a portal that is not allowed to
+    // recompute. That matters especially now: the migration adding
+    // `covers_days`/`idempotency_key` to `payroll_payouts`
+    // (supabase/migrations/20260909000000_payouts_ledger.sql) has not run
+    // anywhere yet, so a deploy ahead of that migration would make this query
+    // fail on every request. Omit the whole in-progress block rather than show
+    // an advances figure of $0 that looks like a fact.
+    if (payoutError) {
+      inProgress = null;
+      return { approved, inProgressHours, inProgress };
+    }
 
     const advancesReceived = (payoutRows ?? [])
       .reduce((sum, r) => sum + (Number(r.amount_paid) || 0), 0);
