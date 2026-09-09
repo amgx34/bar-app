@@ -192,8 +192,9 @@ export function PayoutDialog({
               {transferGap && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">
                   These nights add up to {money(nightsTotal)}, but the run says{' '}
-                  {money(amount + alreadyPaid)} — a tip transfer belongs to no
-                  single night. The run&rsquo;s figure is what caps this payment.
+                  {money(amount + alreadyPaid)} — a tip transfer, a tip cash-out
+                  or removal, or opener bonus hours belong to no single night.
+                  The run&rsquo;s figure is what caps this payment.
                 </p>
               )}
             </div>
