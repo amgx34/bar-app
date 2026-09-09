@@ -28,9 +28,22 @@ ALTER TABLE payroll_payouts ADD COLUMN IF NOT EXISTS covers_days DATE[];
 -- carries the same key and the second write collides instead of paying again.
 ALTER TABLE payroll_payouts ADD COLUMN IF NOT EXISTS idempotency_key UUID;
 
+-- Backfill existing rows with distinct UUIDs. Every historical row is a real,
+-- distinct payment, so each receives its own idempotency key and cannot collide.
+UPDATE payroll_payouts SET idempotency_key = gen_random_uuid() WHERE idempotency_key IS NULL;
+
+-- NOT NULL constraint: the old index protected all rows unconditionally. A
+-- nullable key would silently allow a future caller to reintroduce double
+-- payments by omitting the key. Instead, fail loudly at the constraint layer:
+-- any caller that omits idempotency_key now hits a NOT NULL violation, which is
+-- the better failure mode. markPaid (the only writer) already requires the key.
+ALTER TABLE payroll_payouts ALTER COLUMN idempotency_key SET NOT NULL;
+
+-- Unconditional unique index, matching the guarantee of the old index it
+-- replaces. No WHERE clause: all rows, including those added in the future, are
+-- protected against duplicate payment.
 CREATE UNIQUE INDEX IF NOT EXISTS ux_payroll_payout_idempotency
-  ON payroll_payouts (organization_id, idempotency_key)
-  WHERE idempotency_key IS NOT NULL;
+  ON payroll_payouts (organization_id, idempotency_key);
 
 -- The period read is now a list rather than a lookup, and it is the payroll
 -- screen's only query against this table.
