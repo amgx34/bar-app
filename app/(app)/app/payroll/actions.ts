@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
 import {
@@ -548,14 +549,27 @@ export async function computePayroll(
  * Callers MUST establish that they may see that org's payroll before calling —
  * there is no membership check in here. Today that is getCurrentOrg above, and
  * getCurrentEmployee in the portal, which resolves an org id from an active
- * employee_accounts row and nothing from the request.
+ * employee_accounts row and nothing from the request. Both resolve the org id
+ * from server state, never from the request.
+ *
+ * The optional `client` exists for the employee portal: its users hold no
+ * `memberships` row by design (see lib/employee-portal/session.ts), so every
+ * table here — RLS'd as `organization_id IN (SELECT ... FROM memberships WHERE
+ * user_id = auth.uid())` — would return zero rows under the default
+ * cookie-scoped client, and this function would silently report $0 earned for
+ * every employee. The portal passes the service-role client explicitly. The
+ * manager path leaves this unset and keeps querying through createClient(), so
+ * RLS still stands as a second line of defence there. Anybody passing an admin
+ * client MUST have already established that they may see that org's payroll —
+ * this function performs no such check itself.
  */
 export async function computePayrollForOrg(
   orgId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  client?: SupabaseClient
 ): Promise<PayrollEntry[]> {
-  const supabase = await createClient();
+  const supabase = client ?? await createClient();
 
   const { data: orgRow } = await supabase
     .from('organizations')

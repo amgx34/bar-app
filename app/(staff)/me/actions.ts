@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentEmployee } from '@/lib/employee-portal/session';
 import { buildStub, type PayStub } from '@/lib/employee-portal/stub';
 import type { SnapshotEntry, ShiftNight } from '@/lib/payroll/run-diff';
+import { computePayrollForOrg } from '@/app/(app)/app/payroll/actions';
 
 export type ApprovedPeriod = {
   periodStart: string;
@@ -28,6 +29,7 @@ export type ApprovedPeriod = {
 export async function getMyPeriods(): Promise<{
   approved: ApprovedPeriod[];
   inProgressHours: ShiftNight[];
+  inProgress: { earnedSoFar: number; advancesReceived: number; stillToCome: number } | null;
 }> {
   const me = await getCurrentEmployee();
   const supabase = createAdminClient();
@@ -71,5 +73,52 @@ export async function getMyPeriods(): Promise<{
     isOpener: Boolean(s.is_opener),
   }));
 
-  return { approved, inProgressHours };
+  /*
+    Advances are FACT: a payout row is money that actually moved, and
+    amount_paid is frozen at mark time. Showing it is not a recompute.
+
+    `earnedSoFar` is the one recompute this portal performs. It is phrased as
+    elapsed fact — what these already-worked days are worth — never as what the
+    period will pay. Mid-week that number would move, and a figure that moves is
+    the confidently-wrong number this codebase refuses everywhere else.
+  */
+  const periodStart = inProgressHours[0]?.date ?? null;
+  const periodEnd = inProgressHours[inProgressHours.length - 1]?.date ?? null;
+
+  let inProgress: {
+    earnedSoFar: number; advancesReceived: number; stillToCome: number;
+  } | null = null;
+
+  if (periodStart && periodEnd) {
+    const { data: payoutRows } = await supabase
+      .from('payroll_payouts')
+      .select('amount_paid')
+      .eq('organization_id', me.orgId)
+      .eq('employee_id', me.employeeId)
+      .gte('period_start', periodStart)
+      .lte('period_end', periodEnd);
+
+    const advancesReceived = (payoutRows ?? [])
+      .reduce((sum, r) => sum + (Number(r.amount_paid) || 0), 0);
+
+    // computePayrollForOrg, NOT computePayroll: the latter resolves its org
+    // through getCurrentOrg, which redirects anybody without a membership —
+    // and an employee has none by design. The org id here came from the
+    // employee's own session, never from the request. The admin client is
+    // passed explicitly because this session holds no membership row, so the
+    // default RLS-scoped client would return zero rows for every query inside
+    // computePayrollForOrg and silently report $0 earned.
+    const entries = await computePayrollForOrg(me.orgId, periodStart, periodEnd, supabase);
+    const earnedSoFar =
+      entries.find((e) => e.employeeId === me.employeeId)?.totalCompensation ?? 0;
+
+    inProgress = {
+      earnedSoFar,
+      advancesReceived,
+      // Clamped: an overpayment is not a debt this screen should assert.
+      stillToCome: Math.max(0, earnedSoFar - advancesReceived),
+    };
+  }
+
+  return { approved, inProgressHours, inProgress };
 }

@@ -6,6 +6,9 @@ import { PeriodCard } from './_components/period-card';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'My hours and pay' };
 
+const money = (n: number) =>
+  n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+
 /**
  * What an employee sees.
  *
@@ -19,7 +22,7 @@ export const metadata: Metadata = { title: 'My hours and pay' };
  * context for their own share.
  */
 export default async function MyPayPage() {
-  const { approved, inProgressHours } = await getMyPeriods();
+  const { approved, inProgressHours, inProgress } = await getMyPeriods();
 
   const inProgressTotal = inProgressHours.reduce((s, h) => s + h.hours, 0);
   const nothingYet = approved.length === 0 && inProgressHours.length === 0;
@@ -62,15 +65,38 @@ export default async function MyPayPage() {
                 </div>
               ))}
             </div>
+            {inProgress && (
+              <div className="space-y-1.5 border-t pt-3 text-sm">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-muted-foreground">Earned so far</span>
+                  <span className="tabular-nums">
+                    {money(inProgress.earnedSoFar)}
+                  </span>
+                </div>
+                {inProgress.advancesReceived > 0 && (
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-muted-foreground">Advances received</span>
+                    <span className="tabular-nums">
+                      {money(inProgress.advancesReceived)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-baseline justify-between gap-3 font-medium">
+                  <span>Still to come for the days worked so far</span>
+                  <span className="tabular-nums">{money(inProgress.stillToCome)}</span>
+                </div>
+              </div>
+            )}
+
             {/*
-              Said out loud rather than shown as a zero. These hours have no
-              approved pay figure, and inventing one would be a number nobody
-              signed off. Showing the nights is the point: this is where a
-              missing shift can still be caught.
+              Every figure above is about nights that have already happened, so
+              none of them is a promise about the period. That distinction is
+              the whole reason this screen may show a live number at all.
             */}
             <p className="border-t pt-3 text-xs text-muted-foreground">
-              These hours have not been approved yet, so there is no pay figure
-              to show. If a night is missing or wrong, tell your manager now.
+              These figures cover the days worked so far and have not been
+              approved yet. They are not your final pay for this period. If a
+              night is missing or wrong, tell your manager now.
             </p>
           </CardContent>
         </Card>
