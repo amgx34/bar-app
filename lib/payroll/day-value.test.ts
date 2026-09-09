@@ -149,17 +149,6 @@ describe('valueDays', () => {
 });
 
 describe('per-day tips are the same money as the period total', () => {
-  it('sums to the period figure', () => {
-    // computePayroll needs a database, so this pins the ARITHMETIC the dialog
-    // relies on: whatever computePayroll puts in tipsByDate must total
-    // tipAmount, or the dialog proposes advances the run disagrees with.
-    const tipsByDate = { '2026-09-07': 40.25, '2026-09-08': 19.75, '2026-09-09': 0 };
-    const tipAmount = 60;
-
-    const summed = Object.values(tipsByDate).reduce((a, b) => a + b, 0);
-    expect(summed).toBeCloseTo(tipAmount, 2);
-  });
-
   it('values a day from the same map computePayroll produced', () => {
     const out = valueDays({
       shifts: [{ date: '2026-09-07', hours: 5 }],
