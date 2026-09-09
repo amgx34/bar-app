@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { Check, HandCoins } from 'lucide-react';
+import { Check, ChevronDown, HandCoins, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PayoutDialog } from './payout-dialog';
 import { deletePayout } from '../payout-actions';
@@ -19,6 +19,115 @@ import {
 function shortDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/** "3 days" or, for one or two, the dates themselves — compact either way. */
+function coversDaysLabel(coversDays: string[] | null): string | null {
+  if (!coversDays || coversDays.length === 0) return null;
+  if (coversDays.length <= 2) {
+    return coversDays.map((d) => shortDate(`${d}T00:00:00`)).join(', ');
+  }
+  return `${coversDays.length} days`;
+}
+
+/**
+ * The payment history a single ledger row can now hold: date, amount, method,
+ * and — the only way back from a mis-recorded advance while a balance still
+ * remains — a per-payment remove, gated on `canAdjust`.
+ *
+ * Kept compact on purpose: this expands inside a dense payroll table on a
+ * phone, so it is a disclosure rather than always-on.
+ */
+function PaymentsList({
+  payouts, canAdjust, onChanged,
+}: {
+  payouts: Payout[];
+  canAdjust: boolean;
+  onChanged: () => void;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  function remove(payoutId: string) {
+    setRemovingId(payoutId);
+    startTransition(async () => {
+      const res = await deletePayout({ payoutId });
+      if (!res.ok) {
+        toast.error(res.error ?? 'Could not remove that payment');
+        setRemovingId(null);
+        return;
+      }
+      toast.success('Payment removed');
+      onChanged();
+    });
+  }
+
+  return (
+    <ul className="mt-1.5 space-y-1 border-l-2 border-muted pl-2.5">
+      {payouts.map((p) => {
+        const days = coversDaysLabel(p.coversDays);
+        return (
+          <li key={p.id} className="flex items-center justify-between gap-2 text-xs">
+            <span className="min-w-0 truncate text-muted-foreground">
+              {shortDate(p.paidAt)} · {PAYOUT_METHOD_LABEL[p.method]} ·{' '}
+              <span className="font-medium tabular-nums text-foreground">
+                ${p.amountPaid.toFixed(2)}
+              </span>
+              {days && <span> · {days}</span>}
+            </span>
+            {canAdjust && (
+              <button
+                type="button"
+                onClick={() => remove(p.id)}
+                disabled={pending && removingId === p.id}
+                aria-label={`Remove the ${PAYOUT_METHOD_LABEL[p.method].toLowerCase()} payment of $${p.amountPaid.toFixed(2)} from ${shortDate(p.paidAt)}`}
+                className="shrink-0 rounded p-0.5 text-muted-foreground/70 hover:bg-muted hover:text-destructive disabled:opacity-50"
+              >
+                <X className="h-3 w-3" aria-hidden />
+              </button>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
+ * Toggle that reveals `PaymentsList` under a chip. A plain disclosure rather
+ * than a popover or dialog: this sits inline in a table cell / phone card and
+ * must not fight the rest of the row for space.
+ */
+function PaymentsDisclosure({
+  payouts, canAdjust, onChanged, block,
+}: {
+  payouts: Payout[];
+  canAdjust: boolean;
+  onChanged: () => void;
+  block: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  if (payouts.length === 0) return null;
+
+  return (
+    <div className={cn(block && 'w-full')}>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="mt-0.5 inline-flex items-center gap-0.5 text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+      >
+        {expanded ? 'Hide' : payouts.length === 1 ? '1 payment' : `${payouts.length} payments`}
+        <ChevronDown
+          className={cn('h-3 w-3 transition-transform', expanded && 'rotate-180')}
+          aria-hidden
+        />
+      </button>
+      {expanded && (
+        <PaymentsList payouts={payouts} canAdjust={canAdjust} onChanged={onChanged} />
+      )}
+    </div>
+  );
 }
 
 export function PayoutProgress({ summary }: { summary: PayoutSummary }) {
@@ -70,7 +179,10 @@ export function PayoutProgress({ summary }: { summary: PayoutSummary }) {
         <span className="text-sm tabular-nums">
           {summary.advancedTotal > 0 && (
             <>
-              <span className="text-muted-foreground">paid out </span>
+              {/* "advanced", not "paid out": advancedTotal excludes anyone
+                  already fully paid, so this figure FALLS as people are
+                  settled even though more money keeps leaving the building. */}
+              <span className="text-muted-foreground">advanced </span>
               <span className="font-semibold">${summary.advancedTotal.toFixed(2)}</span>
               <span className="text-muted-foreground"> · </span>
             </>
@@ -160,36 +272,48 @@ export function PayoutCell({
 
     if (!canAdjust) {
       return (
-        <span
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200',
-            block && 'w-full justify-center py-2',
-          )}
-        >
-          <Check className="h-3.5 w-3.5" aria-hidden />
-          {label}
-        </span>
+        <div className={cn('inline-flex flex-col items-start', block && 'w-full items-center')}>
+          <span
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200',
+              block && 'w-full justify-center py-2',
+            )}
+          >
+            <Check className="h-3.5 w-3.5" aria-hidden />
+            {label}
+          </span>
+          <PaymentsDisclosure payouts={payouts} canAdjust={false} onChanged={onChanged} block={block} />
+        </div>
       );
     }
 
     return (
-      <button
-        type="button"
-        onClick={undoLast}
-        disabled={pending}
-        title={`Paid $${paidSoFar.toFixed(2)} across ${payouts.length} payment(s). Click to remove the last one.`}
-        aria-label={`${employeeName} is paid. Undo the last payment.`}
-        className={cn(
-          'group inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-200 disabled:opacity-50 dark:bg-emerald-950/60 dark:text-emerald-200 dark:hover:bg-emerald-900',
-          block && 'h-11 w-full justify-center text-sm',
-        )}
-      >
-        <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />
-        <span className="truncate">{label}</span>
-        <span className="text-emerald-600/70 opacity-0 transition-opacity group-hover:opacity-100 dark:text-emerald-300/70">
-          Undo
-        </span>
-      </button>
+      <div className={cn('inline-flex flex-col items-start', block && 'w-full items-center')}>
+        <button
+          type="button"
+          onClick={undoLast}
+          disabled={pending}
+          title={`Paid $${paidSoFar.toFixed(2)} across ${payouts.length} payment(s). Click to remove the last one.`}
+          aria-label={`${employeeName} is paid. Undo the last payment.`}
+          className={cn(
+            'group inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-200 disabled:opacity-50 dark:bg-emerald-950/60 dark:text-emerald-200 dark:hover:bg-emerald-900',
+            block && 'h-11 w-full justify-center text-sm',
+          )}
+        >
+          <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span className="truncate">{label}</span>
+          <span className="text-emerald-600/70 opacity-0 transition-opacity group-hover:opacity-100 dark:text-emerald-300/70">
+            Undo
+          </span>
+        </button>
+        {/* The chip above only ever undoes the LAST payment — a mis-recorded
+            advance from earlier in the ledger needs its own remove, which is
+            what this disclosure is for (see the design's payments-list
+            requirement and the fix for the "can never be removed" defect). */}
+        <PaymentsDisclosure
+          payouts={payouts} canAdjust={canAdjust} onChanged={onChanged} block={block}
+        />
+      </div>
     );
   }
 
@@ -198,13 +322,16 @@ export function PayoutCell({
     // green tick here would read as done on a Friday-afternoon skim.
     if (!canAdjust) {
       return (
-        <span className={cn('text-xs text-muted-foreground', block && 'block text-center')}>
-          ${paidSoFar.toFixed(2)} of ${amount.toFixed(2)}
-        </span>
+        <div className={cn('inline-flex flex-col items-start', block && 'w-full items-center')}>
+          <span className={cn('text-xs text-muted-foreground', block && 'block text-center')}>
+            ${paidSoFar.toFixed(2)} of ${amount.toFixed(2)}
+          </span>
+          <PaymentsDisclosure payouts={payouts} canAdjust={false} onChanged={onChanged} block={block} />
+        </div>
       );
     }
     return (
-      <>
+      <div className={cn('inline-flex flex-col items-start', block && 'w-full items-center')}>
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -219,8 +346,14 @@ export function PayoutCell({
             ${paidSoFar.toFixed(2)} of ${amount.toFixed(2)}
           </span>
         </button>
+        {/* This is the only way to remove a mis-recorded advance while a
+            balance remains: paying the rest and undoing would remove the
+            settlement, not the mistake, and hand the advance back. */}
+        <PaymentsDisclosure
+          payouts={payouts} canAdjust={canAdjust} onChanged={onChanged} block={block}
+        />
         {dialog}
-      </>
+      </div>
     );
   }
 
