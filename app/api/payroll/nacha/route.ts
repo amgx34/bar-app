@@ -16,9 +16,12 @@ import { createAdminClient }         from '@/lib/supabase/admin';
 import { getCurrentOrg }             from '@/lib/org';
 import { computePayroll }            from '@/app/(app)/app/payroll/actions';
 import { getPayrollRun }             from '@/app/(app)/app/payroll/approval-actions';
+import { loadPayouts }               from '@/app/(app)/app/payroll/payout-actions';
 import { decrypt }                   from '@/lib/direct-deposit/crypto';
 import { generateNachaFile }         from '@/lib/payroll/nacha';
+import { netOfAdvances }             from '@/lib/payroll/ach-net';
 import type { NachaEntry, NachaConfig } from '@/lib/payroll/nacha';
+import type { Payout } from '@/lib/payroll/payouts';
 
 export const runtime    = 'nodejs';
 export const maxDuration = 30;
@@ -83,7 +86,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'No payroll entries for this period' }, { status: 404 });
   }
 
-  const employeeIds = payrollEntries.map(e => e.employeeId);
+  // ── Net out advances already handed over ────────────────────────────────────
+  // An advance is a DEBIT against the period, never a settlement of days (see
+  // docs/superpowers/specs/2026-09-08-partial-payouts-design.md) — payday pays
+  // the approved total MINUS everything already paid. Without this, a bar that
+  // hands an employee a $240 cash advance mid-period and then exports ACH would
+  // send the FULL period total on top of it: a real, unrecoverable overpayment.
+  // The exact-period read matches what the payroll screen displays and what the
+  // cap in markPaid enforces (see payout-actions.ts / loadPayouts).
+  const payouts = await loadPayouts(startDate, endDate);
+  const payoutsByEmployee = new Map<string, Payout[]>();
+  for (const p of payouts) {
+    const list = payoutsByEmployee.get(p.employeeId) ?? [];
+    list.push(p);
+    payoutsByEmployee.set(p.employeeId, list);
+  }
+
+  const netEntries = netOfAdvances(payrollEntries, payoutsByEmployee);
+  if (!netEntries.length) {
+    return NextResponse.json({
+      error: 'Nothing left to pay',
+      detail: 'Every employee on this run has already received their full pay as advances.',
+    }, { status: 422 });
+  }
+
+  const employeeIds = netEntries.map(e => e.employeeId);
 
   // ── Direct deposit accounts ──────────────────────────────────────────────────
   const admin = createAdminClient();
@@ -108,7 +135,13 @@ export async function GET(req: NextRequest) {
   const nachaEntries: NachaEntry[]  = [];
   const skipped:      string[]      = [];
 
-  for (const entry of payrollEntries) {
+  let grossTotal = 0;
+  let netTotal   = 0;
+
+  for (const entry of netEntries) {
+    grossTotal += entry.gross;
+    netTotal   += entry.netAmount;
+
     const accounts = ddByEmployee.get(entry.employeeId);
     if (!accounts?.length) {
       skipped.push(entry.employeeName);
@@ -117,7 +150,9 @@ export async function GET(req: NextRequest) {
 
     // Handle split deposits:
     // Accounts sorted by priority. Last account (highest priority number) gets remainder.
-    let remaining = entry.totalCompensation;
+    // `remaining` starts from the NET amount — gross minus advances — never the
+    // gross total, or a split deposit would still pay out the full period.
+    let remaining = entry.netAmount;
 
     for (let i = 0; i < accounts.length; i++) {
       const acct   = accounts[i];
@@ -129,7 +164,7 @@ export async function GET(req: NextRequest) {
       } else if (acct.deposit_type === 'fixed_amount' && acct.deposit_value) {
         amount = Math.min(acct.deposit_value, remaining);
       } else if (acct.deposit_type === 'percentage' && acct.deposit_value) {
-        amount = Math.round((entry.totalCompensation * acct.deposit_value / 100) * 100) / 100;
+        amount = Math.round((entry.netAmount * acct.deposit_value / 100) * 100) / 100;
       } else {
         amount = remaining;
       }
@@ -175,6 +210,11 @@ export async function GET(req: NextRequest) {
       period_end:      endDate,
       entry_count:     result.entryCount,
       total_amount:    result.totalAmount,
+      // Both figures kept so the file can be reconciled later: gross is what
+      // the run computed, net is what actually went out after advances
+      // already handed over this period were subtracted (see netOfAdvances).
+      gross_total:     Math.round(grossTotal * 100) / 100,
+      net_total:       Math.round(netTotal * 100) / 100,
       effective_date:  result.effectiveDate,
       skipped_count:   skipped.length,
       generated_by:    user.email,
