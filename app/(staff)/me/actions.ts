@@ -90,13 +90,21 @@ export async function getMyPeriods(): Promise<{
   } | null = null;
 
   if (periodStart && periodEnd) {
+    // Overlap, not containment. A payout is keyed to the full calendar pay
+    // period the manager had on screen when they recorded it (see
+    // lib/date-range.ts via payout-actions.ts), which almost always extends
+    // beyond the days actually worked so far — a Tue-Fri run of worked days
+    // sits inside a Mon-Sun payout period. Asking for a payout CONTAINED in
+    // [periodStart, periodEnd] would match nothing and silently read
+    // advancesReceived as 0. What actually applies to these worked days is any
+    // payout whose stored period overlaps them at all.
     const { data: payoutRows } = await supabase
       .from('payroll_payouts')
       .select('amount_paid')
       .eq('organization_id', me.orgId)
       .eq('employee_id', me.employeeId)
-      .gte('period_start', periodStart)
-      .lte('period_end', periodEnd);
+      .lte('period_start', periodEnd)
+      .gte('period_end', periodStart);
 
     const advancesReceived = (payoutRows ?? [])
       .reduce((sum, r) => sum + (Number(r.amount_paid) || 0), 0);
