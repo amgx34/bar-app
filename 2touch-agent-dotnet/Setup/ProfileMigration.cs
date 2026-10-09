@@ -74,36 +74,90 @@ public static class ProfileMigration
     /// <summary>
     /// Upgrades <paramref name="cfg"/> in place. Safe to call repeatedly; a
     /// config that is already current, hand-mapped, or hand-edited is untouched.
+    ///
+    /// TWO ERAS ARE RECOGNISED, because there are two of them in the field:
+    ///
+    ///   • Up to 1.0.0 — the four-column Z source, no tender split. Its whole
+    ///     Z mapping is replaced.
+    ///   • 1.0.2 to 1.2.x — the CURRENT six-column Z source, but written before
+    ///     HourlySales and ServerSales existed. Nothing about its Z feed is
+    ///     wrong, so only the missing feeds are filled in.
+    ///
+    /// The second era was invisible for a release. The Z source has been
+    /// byte-identical since 1.0.2, so those boxes never match the V1
+    /// fingerprint and fell through Apply untouched — reporting no hourly or
+    /// per-server trade forever, through any number of rail-update.exe runs,
+    /// because the binary is the only thing an update replaces.
     /// </summary>
     public static void Apply(AgentConfig cfg)
     {
-        if (!IsSameSql(cfg.Tables.ZReport, ZReportV1)) return;
+        if (IsSameSql(cfg.Tables.ZReport, ZReportV1))
+        {
+            // Replaced wholesale rather than patched: the aliases the column map
+            // points at only exist because this exact text puts them there, so the
+            // two have to move together.
+            cfg.Tables.ZReport = TwoTouchProfile.ZReport.Source;
+            cfg.Columns.ZReport.CashSales = "[CashSales]";
+            cfg.Columns.ZReport.CardSales = "[CardSales]";
 
-        // Replaced wholesale rather than patched: the aliases the column map
-        // points at only exist because this exact text puts them there, so the
-        // two have to move together.
-        cfg.Tables.ZReport = TwoTouchProfile.ZReport.Source;
-        cfg.Columns.ZReport.CashSales = "[CashSales]";
-        cfg.Columns.ZReport.CardSales = "[CardSales]";
+            // 2Touch's ticket dates carry the time, which is what makes the
+            // business-day cutoff meaningful. Older configs never wrote the flag at
+            // all (see LocalConfigWriter), so it is restated here alongside the
+            // source that guarantees it.
+            cfg.Columns.ZReport.DateHasTime = true;
 
-        // 2Touch's ticket dates carry the time, which is what makes the
-        // business-day cutoff meaningful. Older configs never wrote the flag at
-        // all (see LocalConfigWriter), so it is restated here alongside the
-        // source that guarantees it.
-        cfg.Columns.ZReport.DateHasTime = true;
+            AddFeedsThatDidNotExistYet(cfg);
+            cfg.ProfileUpgraded = true;
+            return;
+        }
 
-        // The ZReportV1 fingerprint only ever appears in a config the 1.1.0
-        // wizard wrote against a real 2Touch database — see the class comment.
-        // HourlySales and ServerSales did not exist yet, so a config from that
-        // era has nothing in Tables.HourlySales / Tables.ServerSales beyond the
-        // compiled-in default. Since the whole config is already confirmed to be
-        // a 2Touch profile, hand it the same mapping a fresh wizard run against
-        // this schema would produce, through the one place that mapping is
-        // defined rather than a second copy of it here.
-        TwoTouchProfile.Apply(TwoTouchProfile.HourlySales, cfg);
-        TwoTouchProfile.Apply(TwoTouchProfile.ServerSales, cfg);
+        // Already on the current Z source. That text is only ever produced by
+        // TwoTouchProfile itself, so matching it is the same proof of "this is
+        // a wizard-written 2Touch config" that the V1 fingerprint gives — and
+        // the same reason it is safe to hand this box queries against
+        // tblSalesHdrHist, which its Z and EW feeds already read every cycle.
+        if (IsSameSql(cfg.Tables.ZReport, TwoTouchProfile.ZReport.Source))
+        {
+            if (AddFeedsThatDidNotExistYet(cfg)) cfg.ProfileUpgraded = true;
+        }
+    }
 
-        cfg.ProfileUpgraded = true;
+    /// <summary>
+    /// Fills in HourlySales and ServerSales when this config has never heard of
+    /// them, and reports whether anything was actually written.
+    ///
+    /// ONLY A BLANK IS FILLED. An empty Tables entry is how the whole agent
+    /// spells "this bar has no such feed" (SyncService.Enabled), and it is also
+    /// what a config predating the feed binds to — the two are genuinely
+    /// indistinguishable here, and filling it is the reading that matches what
+    /// Apply already did for every V1 config. A NON-empty value is somebody's
+    /// answer, hand-written or wizard-chosen, and is never replaced.
+    ///
+    /// Routed through TwoTouchProfile.Apply rather than assigning the columns
+    /// here, so the mapping has exactly one definition. That also carries
+    /// DateHasTime, which Hourly is gated on in addition to Enabled() — wiring
+    /// the table without it produces a feed skipped on every cycle, which is a
+    /// silent no-op wearing the shape of a fix.
+    /// </summary>
+    private static bool AddFeedsThatDidNotExistYet(AgentConfig cfg)
+    {
+        var wrote = false;
+
+        if (string.IsNullOrWhiteSpace(cfg.Tables.HourlySales))
+        {
+            TwoTouchProfile.Apply(TwoTouchProfile.HourlySales, cfg);
+            cfg.Columns.HourlySales.DateHasTime = true;
+            wrote = true;
+        }
+
+        if (string.IsNullOrWhiteSpace(cfg.Tables.ServerSales))
+        {
+            TwoTouchProfile.Apply(TwoTouchProfile.ServerSales, cfg);
+            cfg.Columns.ServerSales.DateHasTime = true;
+            wrote = true;
+        }
+
+        return wrote;
     }
 
     /// <summary>

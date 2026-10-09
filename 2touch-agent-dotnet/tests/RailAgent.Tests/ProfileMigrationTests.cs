@@ -120,8 +120,13 @@ public class ProfileMigrationTests
     [Fact]
     public void ACurrentConfigIsUntouchedAndItIsIdempotent()
     {
+        // EVERY feed, which is what a fresh wizard run against a 2Touch
+        // database actually writes. This test used to apply only the Z feed and
+        // assert nothing happened — but that config is precisely the 1.1.x
+        // shape UpgradesTheEraBetweenTheSplitAndTheNewFeeds below now repairs,
+        // so asserting "untouched" there was asserting the bug.
         var cfg = new AgentConfig();
-        TwoTouchProfile.Apply(TwoTouchProfile.ZReport, cfg);
+        foreach (var feed in TwoTouchProfile.All) TwoTouchProfile.Apply(feed, cfg);
         var before = cfg.Tables.ZReport;
 
         ProfileMigration.Apply(cfg);
@@ -130,6 +135,86 @@ public class ProfileMigrationTests
         Assert.False(cfg.ProfileUpgraded);
         Assert.Equal(before, cfg.Tables.ZReport);
         Assert.Equal("[CashSales]", cfg.Columns.ZReport.CashSales);
+    }
+
+    [Fact]
+    public void UpgradesTheEraBetweenTheSplitAndTheNewFeeds()
+    {
+        // The gap this closes. The Z source has been byte-identical since
+        // 1.0.2, so a box set up anywhere between the tender split and the
+        // release that added HourlySales/ServerSales carries the CURRENT Z
+        // query — and therefore never matches the ZReportV1 fingerprint — while
+        // its two newer feeds sit empty. Such a box reports no hourly or
+        // per-server trade through any number of rail-update.exe upgrades,
+        // because the binary is all that updates and the mapping lives in
+        // appsettings.local.json. Found on a real install whose --test printed
+        // "Hourly: not configured" beside a perfectly healthy six-column Z row.
+        var cfg = new AgentConfig();
+        TwoTouchProfile.Apply(TwoTouchProfile.ZReport, cfg);
+
+        ProfileMigration.Apply(cfg);
+
+        Assert.True(cfg.ProfileUpgraded);
+        Assert.Equal(TwoTouchProfile.HourlySales.Source, cfg.Tables.HourlySales);
+        Assert.Equal("[TicketNo]", cfg.Columns.HourlySales.TicketNo);
+        Assert.Equal(TwoTouchProfile.ServerSales.Source, cfg.Tables.ServerSales);
+        Assert.Equal("[ServerName]", cfg.Columns.ServerSales.ServerName);
+
+        // The Z feed was already current and must not be disturbed on the way.
+        Assert.Equal(TwoTouchProfile.ZReport.Source, cfg.Tables.ZReport);
+        Assert.Equal("[CashSales]", cfg.Columns.ZReport.CashSales);
+    }
+
+    [Fact]
+    public void TheHourlyFeedNeedsItsTimestampFlagToSurviveTheUpgrade()
+    {
+        // SyncService gates Hourly on DateHasTime in addition to Enabled(): a
+        // date-only column has no hour, and reporting hour 0 for every ticket
+        // draws a curve showing the whole night landing at midnight. Wiring the
+        // table without the flag would hand the bar a feed that is skipped on
+        // every cycle anyway — a silent no-op dressed as a fix.
+        var cfg = new AgentConfig();
+        TwoTouchProfile.Apply(TwoTouchProfile.ZReport, cfg);
+
+        ProfileMigration.Apply(cfg);
+
+        Assert.True(cfg.Columns.HourlySales.DateHasTime);
+        Assert.True(SyncService.Enabled(cfg.Tables.HourlySales));
+    }
+
+    [Fact]
+    public void AHandMappedNewFeedIsNotOverwritten()
+    {
+        // Empty means "this bar has no such feed" everywhere else in the agent,
+        // but a NON-empty value is somebody's work. The migration may fill a
+        // blank; it may never replace an answer.
+        var cfg = new AgentConfig();
+        TwoTouchProfile.Apply(TwoTouchProfile.ZReport, cfg);
+        cfg.Tables.HourlySales = "[dbo].[vwOurOwnHourly]";
+        cfg.Columns.HourlySales.TicketNo = "[CheckNumber]";
+
+        ProfileMigration.Apply(cfg);
+
+        Assert.Equal("[dbo].[vwOurOwnHourly]", cfg.Tables.HourlySales);
+        Assert.Equal("[CheckNumber]", cfg.Columns.HourlySales.TicketNo);
+        // The other blank feed is still filled — one hand-mapped feed does not
+        // make the whole config off-limits.
+        Assert.Equal(TwoTouchProfile.ServerSales.Source, cfg.Tables.ServerSales);
+    }
+
+    [Fact]
+    public void AHandMappedZSourceDoesNotAcquireTheNewFeeds()
+    {
+        // The new branch keys on the Z source being verbatim 2Touch. A bar on
+        // another schema must not be handed queries against tblSalesHdrHist,
+        // which does not exist on their server.
+        var cfg = WithZSource("[dbo].[vwNightlyTotals]");
+
+        ProfileMigration.Apply(cfg);
+
+        Assert.False(cfg.ProfileUpgraded);
+        Assert.Equal("", cfg.Tables.HourlySales);
+        Assert.Equal("", cfg.Tables.ServerSales);
     }
 
     [Fact]
