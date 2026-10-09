@@ -8,6 +8,7 @@ import {
   diffPayrollRun,
   type RunDiff, type SnapshotEntry, type ShiftNight, type TipNight,
 } from '@/lib/payroll/run-diff';
+import { canSeeOpenRun, type OpenRun } from '@/lib/payroll/open-run';
 import { dispatch } from '@/lib/notifications/deliver';
 import { computePayroll, type PayrollEntry } from './actions';
 
@@ -223,6 +224,54 @@ export async function submitPayrollForApproval(
 
   revalidatePath('/app/payroll/review');
   return { ok: true };
+}
+
+/**
+ * The newest run still waiting on somebody, for the banner in the Payroll shell.
+ *
+ * Keyed on STATUS, not on a period — unlike getPayrollRun above, which every
+ * other caller uses because it already knows which fortnight it is looking at.
+ * The banner does not: its whole job is to say that a period needs attention to
+ * someone who is not currently thinking about one. That is what
+ * ix_payroll_run_pending (organization_id, status, submitted_at DESC) was
+ * created for in the migration, and this is its first reader.
+ *
+ * Counted as well as fetched, because two periods can be open at once — the
+ * unique index is per period — and a banner that silently showed only the
+ * newest would be a second way for a pay run to go unnoticed.
+ */
+export async function getOpenPayrollRun(): Promise<OpenRun | null> {
+  const { org, role } = await getCurrentOrg();
+  if (!canSeeOpenRun(role)) return null;
+
+  const supabase = createAdminClient();
+
+  const { data, count } = await supabase
+    .from('payroll_runs')
+    .select('period_start, period_end, status, review_note, snapshot', { count: 'exact' })
+    .eq('organization_id', org.id)
+    .in('status', ['pending_approval', 'changes_requested'])
+    .order('submitted_at', { ascending: false })
+    .limit(1);
+
+  const run = data?.[0];
+  if (!run) return null;
+
+  // Straight off the snapshot, never recomputed. The snapshot IS what was
+  // submitted, and a banner showing a freshly-derived total would disagree with
+  // the review screen it links to — over exactly the gap that screen exists to
+  // make somebody look at.
+  const snapshot = (run.snapshot ?? []) as SnapshotEntry[];
+
+  return {
+    periodStart: run.period_start as string,
+    periodEnd:   run.period_end as string,
+    status:      run.status as OpenRun['status'],
+    reviewNote:  (run.review_note as string | null) ?? null,
+    employees:   snapshot.length,
+    total:       snapshot.reduce((sum, e) => sum + (Number(e.totalCompensation) || 0), 0),
+    alsoWaiting: Math.max(0, (count ?? 1) - 1),
+  };
 }
 
 /**

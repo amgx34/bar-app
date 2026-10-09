@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { SectionTabs } from '../_components/section-tabs';
 import { RunPayrollLink, RunPayrollLinkFallback } from './_components/run-payroll-link';
+import { OpenRunBanner } from './_components/open-run-banner';
 
 /**
  * Payroll's shell: one heading, one call to action, one tab strip.
@@ -31,6 +32,13 @@ export default function PayrollLayout({ children }: { children: React.ReactNode 
           <RunPayrollLink />
         </Suspense>
       </div>
+
+      {/* Above the tabs, so it is the same notice wherever you are in Payroll.
+          Its own Suspense boundary: it costs one indexed row, but the shell
+          should never wait on it to paint. */}
+      <Suspense fallback={null}>
+        <OpenRunBanner />
+      </Suspense>
 
       <SectionTabs />
 
