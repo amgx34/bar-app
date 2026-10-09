@@ -5,9 +5,11 @@ import { toast } from 'sonner';
 import { Check, ChevronDown, HandCoins, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PayoutDialog } from './payout-dialog';
+import { PayEveryoneDialog } from './pay-everyone-dialog';
 import { deletePayout } from '../payout-actions';
 import {
-  PAYOUT_METHOD_LABEL, totalPaidTo, type Payout, type PayoutSummary,
+  PAYOUT_METHOD_LABEL, totalPaidTo,
+  type BulkPayableEntry, type Payout, type PayoutSummary,
 } from '@/lib/payroll/payouts';
 
 /**
@@ -130,11 +132,40 @@ function PaymentsDisclosure({
   );
 }
 
-export function PayoutProgress({ summary }: { summary: PayoutSummary }) {
+type ProgressProps = {
+  summary: PayoutSummary;
+  /** Omitted on screens with no settle-everyone action — the bar is then read-only. */
+  bulk?: {
+    entries: BulkPayableEntry[];
+    alreadyPaidByEmployee: ReadonlyMap<string, number>;
+    periodStart: string;
+    periodEnd: string;
+    canAdjust: boolean;
+    onChanged: () => void;
+  };
+};
+
+export function PayoutProgress({ summary, bulk }: ProgressProps) {
   const { paidCount, totalCount, outstanding, allPaid } = summary;
+  const [payAllOpen, setPayAllOpen] = useState(false);
   if (totalCount === 0) return null;
 
   const pct = Math.round((paidCount / totalCount) * 100);
+
+  /*
+    The settle-everyone affordance, and why it is a BUTTON.
+
+    The ask was to make the bar's text clickable. It is a labelled button
+    instead, in the same place: this is the largest money action in the app —
+    one press records a payment for every unpaid person on the run — and a
+    label that turns out to be clickable is how somebody settles a whole period
+    while trying to select the figure next to it. The dialog it opens names
+    every person and amount before anything is written.
+
+    Hidden once everyone is square, so the finished state stays a statement
+    rather than an invitation to press something.
+  */
+  const canPayAll = Boolean(bulk?.canAdjust) && !allPaid && outstanding > 0;
 
   return (
     <div
@@ -174,6 +205,30 @@ export function PayoutProgress({ summary }: { summary: PayoutSummary }) {
           style={{ width: `${pct}%` }}
         />
       </div>
+
+      {canPayAll && bulk && (
+        <>
+          <button
+            type="button"
+            onClick={() => setPayAllOpen(true)}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <HandCoins className="h-3.5 w-3.5" aria-hidden />
+            Pay remaining {totalCount - paidCount}
+          </button>
+          {payAllOpen && (
+            <PayEveryoneDialog
+              open={payAllOpen}
+              onOpenChange={setPayAllOpen}
+              periodStart={bulk.periodStart}
+              periodEnd={bulk.periodEnd}
+              entries={bulk.entries}
+              alreadyPaidByEmployee={bulk.alreadyPaidByEmployee}
+              onSaved={bulk.onChanged}
+            />
+          )}
+        </>
+      )}
 
       {!allPaid && (
         <span className="text-sm tabular-nums">

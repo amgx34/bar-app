@@ -150,6 +150,114 @@ export function remainingAdvanceCapacity(
   return Math.max(0, earnedSoFarThisPeriod - alreadyPaidThisPeriod);
 }
 
+/** One person's share of a settle-everyone, as the dialog lists it and the action writes it. */
+export type BulkPayoutLine = {
+  employeeId:   string;
+  employeeName: string;
+  /** The BALANCE being handed over now, never the period total. */
+  amount:       number;
+  /** What they had already received this period. Shown so the balance is explicable. */
+  alreadyPaid:  number;
+};
+
+/** Somebody the plan deliberately will not pay, and why. */
+export type BulkPayoutSkip = {
+  employeeId:   string;
+  employeeName: string;
+  reason:       'already-paid' | 'over-cap';
+  /** Present for 'over-cap': what capacity remained. */
+  available?:   number;
+};
+
+export type BulkPayoutPlan = {
+  lines:   BulkPayoutLine[];
+  skipped: BulkPayoutSkip[];
+  total:   number;
+};
+
+/** Everything the plan needs about one person. Name included so skips can be reported. */
+export type BulkPayableEntry = PayableEntry & { employeeName: string };
+
+/**
+ * Who gets paid, how much, and who does not — for "pay everyone at once".
+ *
+ * Pure and separate from the write for the reason the rest of this file is:
+ * the arithmetic deciding that money moves is the part worth being able to
+ * test without a database, and it is the part a reviewer should be able to
+ * read in one sitting.
+ *
+ * THREE RULES, all of them inherited rather than invented, so the bulk path
+ * cannot disagree with the per-person one:
+ *
+ *   • Pay the BALANCE, never the period total. Someone who drew a $300 advance
+ *     on Tuesday is owed the rest, and handing them the full figure would pay
+ *     that advance a second time.
+ *   • Anyone already square is skipped, not paid zero. A zero-amount ledger row
+ *     is a payment that did not happen, and it would show up in their payments
+ *     list forever as though it had.
+ *   • The cap is `remainingAdvanceCapacity` — the same function markPaid uses,
+ *     fed from the same overlapping-payout read. A bulk write that applied a
+ *     looser rule than the single write would be a way around the cap, which
+ *     exists because this app cannot claw money back.
+ *
+ * `alreadyPaidByEmployee` MUST be built from `loadPayoutsOverlapping`, not from
+ * the exact-period `loadPayouts` the table renders. An advance recorded while
+ * the screen was on the week view is invisible to a month-view exact match, and
+ * paying "the balance" against a total that ignored it is the double payment
+ * the overlap read exists to prevent.
+ */
+export function planBulkPayout(
+  entries: readonly BulkPayableEntry[],
+  alreadyPaidByEmployee: ReadonlyMap<string, number>,
+): BulkPayoutPlan {
+  const lines: BulkPayoutLine[] = [];
+  const skipped: BulkPayoutSkip[] = [];
+
+  for (const entry of entries) {
+    const alreadyPaid = alreadyPaidByEmployee.get(entry.employeeId) ?? 0;
+    const balance = entry.totalCompensation - alreadyPaid;
+
+    // Square, or overpaid by a downward recompute. Either way nothing is owed
+    // and nothing should be written.
+    if (balance <= 0.005) {
+      skipped.push({
+        employeeId: entry.employeeId, employeeName: entry.employeeName,
+        reason: 'already-paid',
+      });
+      continue;
+    }
+
+    // Belt and braces: with balance derived from the same two numbers the cap
+    // compares, this cannot currently fire. It stays because the cap is the
+    // rule and the balance is a convenience — if a future change lets the two
+    // diverge, this refuses rather than quietly overpaying, and names who.
+    const capacity = remainingAdvanceCapacity(entry.totalCompensation, alreadyPaid);
+    if (balance > capacity + 0.005) {
+      skipped.push({
+        employeeId: entry.employeeId, employeeName: entry.employeeName,
+        reason: 'over-cap', available: capacity,
+      });
+      continue;
+    }
+
+    // Rounded at the boundary, once. Cents that only exist in float are not
+    // money, and NUMERIC(12,2) would round them on the way in anyway — doing it
+    // here means the dialog's total is the total that gets written.
+    lines.push({
+      employeeId:   entry.employeeId,
+      employeeName: entry.employeeName,
+      amount:       Math.round(balance * 100) / 100,
+      alreadyPaid,
+    });
+  }
+
+  return {
+    lines,
+    skipped,
+    total: Math.round(lines.reduce((sum, l) => sum + l.amount, 0) * 100) / 100,
+  };
+}
+
 /** Narrows a value off the wire — the column is CHECK-constrained, the type is not. */
 export function isPayoutMethod(value: unknown): value is PayoutMethod {
   return typeof value === 'string' && (PAYOUT_METHODS as readonly string[]).includes(value);

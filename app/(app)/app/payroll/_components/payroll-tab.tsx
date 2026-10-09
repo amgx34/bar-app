@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { WeeklyPoint } from './weekly-trend-chart';
 import { PayoutProgress } from './payout-controls';
-import { summarizePayouts, type Payout } from '@/lib/payroll/payouts';
+import { summarizePayouts, totalPaidTo, type Payout } from '@/lib/payroll/payouts';
 import ZReportTextUpload from './z-report-text-upload';
 import EmployeeShiftsUpload from './employee-shifts-upload';
 import { PeriodToggle } from '../../_components/period-toggle';
@@ -93,6 +93,33 @@ export default function PayrollTab({
     return m;
   }, [payouts]);
   const payoutSummary = summarizePayouts(payrollEntries, payoutsById);
+
+  /*
+    What the settle-everyone dialog plans from.
+
+    `alreadyPaidByEmployee` is built from `payouts`, which the page loaded with
+    the EXACT-period loadPayouts. The server re-plans from
+    loadPayoutsOverlapping before writing anything, so an advance recorded
+    while the screen was on another period view can make the server pay less
+    than this dialog listed — never more. That asymmetry is deliberate and is
+    the same direction every other payout reader takes: over-deducting
+    underpays, which is visible and fixable by hand; under-deducting overpays,
+    which is neither.
+  */
+  const bulkEntries = useMemo(
+    () => payrollEntries.map((e) => ({
+      employeeId:        e.employeeId,
+      employeeName:      e.employeeName,
+      totalCompensation: e.totalCompensation,
+    })),
+    [payrollEntries],
+  );
+
+  const alreadyPaidByEmployee = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const [employeeId, list] of payoutsById) m.set(employeeId, totalPaidTo(list));
+    return m;
+  }, [payoutsById]);
 
   const totals = payrollEntries.reduce(
     (acc, entry) => ({
@@ -312,7 +339,19 @@ export default function PayrollTab({
           lg:grid-cols-5 and a sixth card would orphan onto its own row. This
           also puts the question — how much of this is done — immediately
           before the rows that answer it person by person. */}
-      {payrollEntries.length > 0 && <PayoutProgress summary={payoutSummary} />}
+      {payrollEntries.length > 0 && (
+        <PayoutProgress
+          summary={payoutSummary}
+          bulk={{
+            entries: bulkEntries,
+            alreadyPaidByEmployee,
+            periodStart: startDate,
+            periodEnd: endDate,
+            canAdjust,
+            onChanged: () => router.refresh(),
+          }}
+        />
+      )}
 
       <PayrollTable
         entries={payrollEntries}

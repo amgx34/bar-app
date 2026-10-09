@@ -6,8 +6,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthUser, getCurrentOrg } from '@/lib/org';
 import { canManagePayroll } from '@/lib/permissions';
 import {
-  PAYOUT_METHODS, remainingAdvanceCapacity, totalPaidTo,
-  type Payout, type PayoutMethod,
+  PAYOUT_METHODS, planBulkPayout, remainingAdvanceCapacity, totalPaidTo,
+  type BulkPayableEntry, type BulkPayoutSkip, type Payout, type PayoutMethod,
 } from '@/lib/payroll/payouts';
 import { computePayroll } from './actions';
 
@@ -252,6 +252,166 @@ export async function markPaid(input: {
 
   revalidatePath('/app/payroll');
   return { ok: true };
+}
+
+const markManySchema = z.object({
+  periodStart: isoDate,
+  periodEnd:   isoDate,
+  method:      z.enum(PAYOUT_METHODS as unknown as [PayoutMethod, ...PayoutMethod[]]),
+  // One key PER EMPLOYEE, generated when the dialog opened. Confirming twice
+  // therefore replays the same keys and collides on the unique index rather
+  // than paying the whole room a second time.
+  keys:        z.record(z.string().uuid(), z.string().uuid()),
+});
+
+export type BulkPayoutResult = {
+  ok:      boolean;
+  error?:  string;
+  /** How many ledger rows the write actually created. */
+  paid:    number;
+  total:   number;
+  skipped: BulkPayoutSkip[];
+};
+
+/**
+ * Settle everyone who still has a balance for a period, in one action.
+ *
+ * DELIBERATELY NOT A CLIENT LOOP OVER markPaid. That would be one round trip
+ * and one full computePayroll per employee — a dozen recomputes of the same
+ * period to answer the same question — and a failure halfway would leave the
+ * browser holding a half-finished payroll with no way to describe it. Here the
+ * run is computed once, the overlapping payouts are read once, and the whole
+ * set either passes the cap or is named in `skipped`.
+ *
+ * Every rule the single path enforces is enforced here, through the same
+ * functions rather than a second copy: the caller may manage payroll, every
+ * employee belongs to this bar, the amount is a BALANCE, and no payment may
+ * exceed remainingAdvanceCapacity. A bulk route with a looser rule would be a
+ * way around a cap that exists because this app cannot claw money back.
+ */
+export async function markManyPaid(input: {
+  periodStart: string;
+  periodEnd: string;
+  method: PayoutMethod;
+  keys: Record<string, string>;
+}): Promise<BulkPayoutResult> {
+  const empty = { paid: 0, total: 0, skipped: [] as BulkPayoutSkip[] };
+
+  const parsed = markManySchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid payout', ...empty };
+  }
+
+  const { org, role } = await getCurrentOrg();
+  const user = await getAuthUser();
+  if (!user) return { ok: false, error: 'Not signed in', ...empty };
+  if (!canManagePayroll(role)) {
+    return { ok: false, error: 'Only owners and managers can mark payouts', ...empty };
+  }
+
+  const { periodStart, periodEnd, method, keys } = parsed.data;
+  const supabase = createAdminClient();
+
+  const entries = await computePayroll(periodStart, periodEnd);
+  if (entries.length === 0) {
+    return { ok: false, error: 'This period has no payroll entries', ...empty };
+  }
+
+  // Overlapping, not exact — see loadPayoutsOverlapping. An advance recorded
+  // from the week view is invisible to a month-view exact match, and "the
+  // balance" computed without it pays that advance again.
+  const overlapping = await loadPayoutsOverlapping(periodStart, periodEnd);
+  const alreadyPaid = new Map<string, number>();
+  for (const entry of entries) {
+    alreadyPaid.set(
+      entry.employeeId,
+      totalPaidTo(overlapping.filter((p) => p.employeeId === entry.employeeId)),
+    );
+  }
+
+  const payable: BulkPayableEntry[] = entries.map((e) => ({
+    employeeId:        e.employeeId,
+    employeeName:      e.employeeName,
+    totalCompensation: e.totalCompensation,
+  }));
+
+  const plan = planBulkPayout(payable, alreadyPaid);
+  if (plan.lines.length === 0) {
+    return { ok: true, paid: 0, total: 0, skipped: plan.skipped };
+  }
+
+  /*
+    Org membership for the whole set in ONE query rather than per employee.
+
+    These ids come from computePayroll, which is already scoped to this org, so
+    this is belt and braces rather than the primary defence — but the single
+    path checks and a bulk path that did not would be the weaker of the two
+    doors into the same table. Anyone missing is dropped rather than failing
+    the batch: one stale roster row must not stop a bar paying everybody else.
+  */
+  const { data: inOrg } = await supabase
+    .from('employees')
+    .select('id')
+    .eq('organization_id', org.id)
+    .in('id', plan.lines.map((l) => l.employeeId));
+
+  const allowed = new Set((inOrg ?? []).map((e) => e.id as string));
+  const lines = plan.lines.filter((l) => allowed.has(l.employeeId));
+
+  // A key per employee is required. Writing without one would hit the NOT NULL
+  // on idempotency_key, but failing here names the bug instead of surfacing a
+  // constraint violation to somebody paying their staff.
+  const missingKey = lines.find((l) => !keys[l.employeeId]);
+  if (missingKey) {
+    return {
+      ok: false,
+      error: `No idempotency key for ${missingKey.employeeName} — reopen the dialog and try again.`,
+      ...empty,
+    };
+  }
+
+  const paidAt = new Date().toISOString();
+
+  // One upsert, ON CONFLICT DO NOTHING on (organization_id, idempotency_key).
+  // A replayed confirmation inserts nothing and reports what it actually wrote,
+  // which is zero — not a second payday.
+  //
+  // admin-scope-ok: every row sets organization_id to the resolved org, and
+  // each employee_id was just confirmed to belong to it by the query above.
+  const { data: inserted, error } = await supabase
+    .from('payroll_payouts')
+    .upsert(
+      lines.map((l) => ({
+        organization_id: org.id,
+        employee_id:     l.employeeId,
+        period_start:    periodStart,
+        period_end:      periodEnd,
+        method,
+        amount_paid:     l.amount,
+        // Null, exactly as a single "Mark paid" does: this settles the period,
+        // not a chosen set of nights.
+        covers_days:     null,
+        idempotency_key: keys[l.employeeId],
+        paid_at:         paidAt,
+        marked_by:       user.id,
+      })),
+      { onConflict: 'organization_id,idempotency_key', ignoreDuplicates: true },
+    )
+    .select('amount_paid');
+
+  if (error) return { ok: false, error: error.message, ...empty };
+
+  const written = inserted ?? [];
+
+  revalidatePath('/app/payroll');
+  return {
+    ok:      true,
+    // What was WRITTEN, not what was planned. On a replay these are zero, and
+    // reporting the plan would tell an owner they had just paid everyone twice.
+    paid:    written.length,
+    total:   Math.round(written.reduce((s, r) => s + (Number(r.amount_paid) || 0), 0) * 100) / 100,
+    skipped: plan.skipped,
+  };
 }
 
 /**
