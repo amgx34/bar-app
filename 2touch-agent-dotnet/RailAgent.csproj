@@ -16,7 +16,7 @@
          and rail-update.exe compares it against the manifest Rail publishes, so
          bumping this number here is the whole release process.
          Keep it SemVer: the updater parses it with System.Version. -->
-    <Version>1.3.0</Version>
+    <Version>1.4.0</Version>
     <!-- Shown in the file properties dialog on the POS box, where an operator
          reading a version number is most likely to be looking. -->
     <Product>Rail 2Touch Agent</Product>

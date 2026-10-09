@@ -95,6 +95,39 @@ It redirects to `/login` or `/setup`, and resolves the active org from the
 - `GET /api/agent/manifest` — what version of the POS agent is current, polled by
   `rail-update.exe` on each POS box. Unauthenticated by design.
 
+**A sync that moved nothing is not a healthy sync.** The agent catches a failing
+feed per-feed so one broken mapping cannot cost the bar its other three — but it
+used to then push an empty array, and the route recorded that as a clean
+`last_sync_at` with no errors. One bar ran a month that way: green strip, current
+agent version, and no sales since August. Three things keep it visible now, and
+all three are load-bearing:
+
+- `SyncService` collects feed failures, logs them at **Error**, returns
+  `SyncResult.Ok = false`, and sends them as `payload.agentErrors`, which the
+  ingest folds into `last_sync_errors` prefixed `agent:`. The agent's own log is
+  the Windows Event Log on a box behind a bar — not a channel anyone reads.
+- `assessSyncHealth` has a `no-data` status for "checked in on time, reported no
+  errors, brought nothing back". It warns in amber rather than alarming, because
+  a bar closed for two days is genuinely indistinguishable from a dead feed here.
+  An **absent** `last_sync_summary` means "cannot say", never "moved nothing" —
+  old agents must not light up every dashboard.
+- `appsettings.json` sets `Logging:EventLog:LogLevel`. Microsoft's EventLog
+  provider caps itself at Warning regardless of `LogLevel:Default`, because that
+  rule is per-provider. Left alone, every `✓ Sync complete — Z:2 EW:16` the agent
+  writes is discarded, and the Application log shows only the Start/Stop entries
+  `ServiceBase.AutoLog` writes directly — which are not ours and pass through no
+  filter, so their presence proves nothing about the agent.
+
+**`rail-update.exe` replaces the binary and nothing else.** The schema mapping
+lives in each box's `appsettings.local.json`, so a feed added in a new release
+reaches an existing bar only through `ProfileMigration`, which recognises a
+wizard-written 2Touch config by the exact text of its Z source. It matches **two**
+eras — the pre-1.0.0 four-column source, and the current six-column one, which has
+been byte-identical since 1.0.2 and so is also what every 1.1.x–1.2.x box carries.
+Boxes in that second range matched nothing for a release and reported no hourly or
+per-server trade, permanently. A migration may fill a blank feed; it may never
+replace a non-empty one, which is somebody's answer.
+
 **POS sales deplete stock.** The item audit no longer just creates inventory rows:
 quantities move `current_stock` and write `usage_logs` with `reason: 'pos_sale'`.
 The agent re-sends a 2-day window every 5 minutes, so depletion is delta-based
@@ -188,6 +221,35 @@ sign off. Approving accepted changes REPLACES the snapshot — storing the
 superseded one would record an approval of numbers nobody agreed to. The NACHA
 export is gated on an approved run, escapable only via `overrideApprovalGate()`,
 which writes down the reason.
+
+**Settling a period pays BALANCES, and the cap is the same one.** "Pay remaining
+N" on the payout bar (`PayoutProgress` → `PayEveryoneDialog` → `markManyPaid`)
+is one action, not a client loop over `markPaid` — a loop would mean a
+`computePayroll` per employee and a half-finished payroll the browser cannot
+describe. It computes the run once, reads `loadPayoutsOverlapping` once, and
+plans through `planBulkPayout` in `lib/payroll/payouts.ts`, which is pure and
+tested. Three rules it inherits rather than reinvents: pay the balance (never
+`totalCompensation`, or an advance is paid twice), skip anyone already square
+(a zero-amount row is a payment that did not happen), and refuse anything over
+`remainingAdvanceCapacity`. The dialog plans with the SAME function so what is
+listed is what is written, and it reports what the server actually wrote —
+never what it planned, because a replayed confirmation writes nothing and
+"done" would read as a second payday. Idempotency keys are minted one per
+employee when the dialog opens, so a double-tap collides on
+`ux_payroll_payout_idempotency` instead of paying the whole room again.
+
+**An unfinished pay run is announced outside the review screen.** Submitting
+wrote `payroll_runs` and then went quiet — the status existed only on
+`/app/payroll/review`, the one screen somebody has already left once they are
+waiting for an answer. `OpenRunBanner` renders from the Payroll *layout* (like
+`SectionTabs`, so no page can double it) and reads `getOpenPayrollRun()`, which
+keys on STATUS rather than a period — that is what `ix_payroll_run_pending` was
+created for, and this is its first reader. The wording lives in
+`lib/payroll/open-run.ts`, pure and tested: only an owner gets a verb on a
+pending run because only an owner can approve one, and a role that cannot act
+gets the sentence without a button rather than a control that would refuse it.
+Figures come off `run.snapshot`, never a recompute, or the banner would
+disagree with the screen it links to.
 
 ## Env vars (`.env.local`)
 
