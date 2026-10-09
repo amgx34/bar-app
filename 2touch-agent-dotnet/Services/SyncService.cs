@@ -68,6 +68,30 @@ public sealed class SyncService(SqlReader sql, RailClient rail, IOptions<AgentCo
         List<HourlySalesRow>? hourly = null;
         List<ServerSalesRow>? server = null;
 
+        /*
+            Every feed below is wrapped so that one broken mapping cannot cost
+            the bar its other three. That part was right. What was wrong was
+            where the failure then went: a LogWarning into the Windows Event
+            Log, which by default discards everything the agent writes, and
+            then a push of an empty array that Rail recorded as a clean sync.
+
+            A bar in that state is indistinguishable in Rail from a healthy one
+            — green strip, current last_sync_at, no errors — and stays that way
+            until somebody runs --test on the POS box itself. So the errors are
+            collected here and travel with the payload, which is the only
+            channel out of this machine that anyone actually reads.
+        */
+        var errors = new List<string>();
+
+        void FeedFailed(string feed, Exception e)
+        {
+            // Error, not Warning: a feed that is configured and throwing is not
+            // a curiosity. Logged AND sent — the log is for whoever is standing
+            // at the box, the payload is for everyone else.
+            log.LogError(e, "{Feed} query failed", feed);
+            errors.Add($"{feed} query failed: {e.Message}");
+        }
+
         await using var conn = await sql.OpenAsync(ct);
         log.LogInformation("SQL Server connected via {DataSource}", conn.DataSource);
 
@@ -94,21 +118,21 @@ public sealed class SyncService(SqlReader sql, RailClient rail, IOptions<AgentCo
                     if (problem is not null) log.LogWarning("  {Date}: {Problem}", row.report_date, problem);
                 }
             }
-            catch (Exception e) { log.LogWarning("Z Report query failed: {Message}", e.Message); }
+            catch (Exception e) { FeedFailed("Z Report", e); }
         }
         else log.LogInformation("  Z Reports:  not configured — skipped");
 
         if (Enabled(_cfg.Tables.EwReport))
         {
             try { ew = await sql.QueryEwReportsAsync(conn, days, ct); log.LogInformation("  EW Reports: {Count} row(s)", ew.Count); }
-            catch (Exception e) { log.LogWarning("EW Report query failed: {Message}", e.Message); }
+            catch (Exception e) { FeedFailed("EW Report", e); }
         }
         else log.LogInformation("  EW Reports: not configured — skipped");
 
         if (Enabled(_cfg.Tables.ItemAudit))
         {
             try { audit = await sql.QueryItemAuditAsync(conn, days, ct); log.LogInformation("  Item Audit: {Count} row(s)", audit.Count); }
-            catch (Exception e) { log.LogWarning("Item Audit query failed: {Message}", e.Message); }
+            catch (Exception e) { FeedFailed("Item Audit", e); }
         }
         else log.LogInformation("  Item Audit: not configured — skipped");
 
@@ -120,7 +144,7 @@ public sealed class SyncService(SqlReader sql, RailClient rail, IOptions<AgentCo
         if (Enabled(_cfg.Tables.HourlySales) && _cfg.Columns.HourlySales.DateHasTime)
         {
             try { hourly = await sql.QueryHourlySalesAsync(conn, days, ct); log.LogInformation("  Hourly:     {Count} row(s)", hourly.Count); }
-            catch (Exception e) { log.LogWarning("Hourly Sales query failed: {Message}", e.Message); }
+            catch (Exception e) { FeedFailed("Hourly Sales", e); }
         }
         else if (Enabled(_cfg.Tables.HourlySales))
             log.LogInformation("  Hourly:     skipped — configured date column has no time component, so it cannot yield an hour");
@@ -129,7 +153,7 @@ public sealed class SyncService(SqlReader sql, RailClient rail, IOptions<AgentCo
         if (Enabled(_cfg.Tables.ServerSales))
         {
             try { server = await sql.QueryServerSalesAsync(conn, days, ct); log.LogInformation("  Server:     {Count} row(s)", server.Count); }
-            catch (Exception e) { log.LogWarning("Server Sales query failed: {Message}", e.Message); }
+            catch (Exception e) { FeedFailed("Server Sales", e); }
         }
         else log.LogInformation("  Server:     not configured — skipped");
 
@@ -140,11 +164,29 @@ public sealed class SyncService(SqlReader sql, RailClient rail, IOptions<AgentCo
             if (audit.Count > 0) log.LogInformation("Audit sample: {Row}", audit[0]);
             if (hourly is { Count: > 0 }) log.LogInformation("Hourly sample: {Row}", hourly[0]);
             if (server is { Count: > 0 }) log.LogInformation("Server sample: {Row}", server[0]);
+            if (errors.Count > 0)
+            {
+                log.LogError("✗ {Count} feed(s) failed (test mode — nothing sent to Rail)", errors.Count);
+                return new SyncResult(false, z.Count, ew.Count, audit.Count, string.Join("; ", errors));
+            }
+
             log.LogInformation("✓ SQL connection and queries OK (test mode — nothing sent to Rail)");
             return new SyncResult(true, z.Count, ew.Count, audit.Count);
         }
 
-        await rail.PushAsync(z, ew, audit, ct, hourly, server);
+        await rail.PushAsync(z, ew, audit, ct, hourly, server, errors.Count > 0 ? errors : null);
+
+        if (errors.Count > 0)
+        {
+            // Still a push — the feeds that did work are the bar's data and
+            // belong in Rail — but never a tick. The counts are logged beside
+            // the failure so "Z:0" has its reason next to it.
+            log.LogError(
+                "✗ Sync completed with {Count} failed feed(s) — Z:{Z} EW:{EW} Audit:{Audit} Hourly:{Hourly} Server:{Server}",
+                errors.Count, z.Count, ew.Count, audit.Count, hourly?.Count ?? 0, server?.Count ?? 0);
+            return new SyncResult(false, z.Count, ew.Count, audit.Count, string.Join("; ", errors));
+        }
+
         log.LogInformation(
             "✓ Sync complete — Z:{Z} EW:{EW} Audit:{Audit} Hourly:{Hourly} Server:{Server}",
             z.Count, ew.Count, audit.Count, hourly?.Count ?? 0, server?.Count ?? 0);

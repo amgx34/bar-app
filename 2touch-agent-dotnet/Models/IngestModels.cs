@@ -58,6 +58,23 @@ public sealed record IngestPayload(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     IReadOnlyList<HourlySalesRow>? hourlySales = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    IReadOnlyList<ServerSalesRow>? serverSales = null);
+    IReadOnlyList<ServerSalesRow>? serverSales = null,
+    // Feeds that were configured, ran, and threw. Null on a clean cycle rather
+    // than an empty array, so "this agent reported no errors" and "this agent
+    // is too old to report errors" stay distinguishable server-side.
+    //
+    // These travel with the DATA because the agent's log does not travel at
+    // all: it is the Windows Event Log on a POS box behind a bar. A feed that
+    // failed silently for a month looked identical in Rail to one that was
+    // working, and the only way to tell them apart was a human running
+    // --test on the machine. See SyncService.RunOnceAsync.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<string>? agentErrors = null);
 
-public sealed record SyncResult(bool Ok, int ZReports, int EwReports, int ItemAudit, string? Error = null);
+/// <summary>
+/// One cycle's outcome. <paramref name="Ok"/> is false when a CONFIGURED feed
+/// failed — a skipped feed is not a failure — which is what gives `--once` a
+/// non-zero exit code instead of a tick over an empty push.
+/// </summary>
+public sealed record SyncResult(
+    bool Ok, int ZReports, int EwReports, int ItemAudit, string? Error = null);

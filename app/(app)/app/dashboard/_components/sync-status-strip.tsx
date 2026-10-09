@@ -32,6 +32,20 @@ const STYLES: Record<Exclude<SyncStatus, 'not-configured'>, {
     dot: 'text-destructive',
     label: 'Sync errors',
   },
+  /*
+    Amber, not red, and deliberately not "connected".
+
+    This is the state a bar sat in for a month while the strip read green: the
+    agent checking in every five minutes and bringing nothing back. It is also
+    what a closed bar looks like, so it must not accuse — but it must also
+    never again be indistinguishable from a healthy night.
+  */
+  'no-data': {
+    icon: AlertTriangle,
+    wrap: 'border-amber-500/40 bg-amber-500/5',
+    dot: 'text-amber-600 dark:text-amber-400',
+    label: 'No sales received',
+  },
   stale: {
     icon: Clock,
     wrap: 'border-amber-500/40 bg-amber-500/5',
@@ -46,7 +60,14 @@ const STYLES: Record<Exclude<SyncStatus, 'not-configured'>, {
   },
 };
 
-/** Only the figures worth a glance; zeroes are dropped rather than shown as noise. */
+/**
+ * Only the figures worth a glance; zeroes are dropped rather than shown as noise.
+ *
+ * EXCEPT when every figure is zero. Dropping them all rendered the emptiest
+ * possible sync as no text at all, sitting under a green "POS connected" — the
+ * absence of a number read as "nothing to mention" when it meant "nothing
+ * arrived". A sync that moved nothing now says so in words.
+ */
 function countLine(health: SyncHealth): string | null {
   const s = health.summary;
   const parts: string[] = [];
@@ -54,7 +75,8 @@ function countLine(health: SyncHealth): string | null {
   if (s.ewReports) parts.push(`${s.ewReports} shifts`);
   if (s.itemAudit) parts.push(`${s.itemAudit} items`);
   if (s.stockMoved) parts.push(`${s.stockMoved} stock moves`);
-  return parts.length ? parts.join(' · ') : null;
+  if (parts.length) return parts.join(' · ');
+  return health.status === 'no-data' ? 'nothing received on the last sync' : null;
 }
 
 export function SyncStatusStrip({ health }: { health: SyncHealth }) {

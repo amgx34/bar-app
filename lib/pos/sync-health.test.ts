@@ -103,6 +103,87 @@ describe('assessSyncHealth', () => {
     expect(h.agentVersion).toBe('1.2.0');
   });
 
+  /*
+    The bug this whole block exists for.
+
+    A bar's Z query threw on every cycle for a month. The agent caught it per
+    feed, pushed an empty array, and this function — which looked only at
+    recency and at errors — called it healthy. The dashboard showed "POS
+    connected", the counts line dropped the zeroes rather than printing them,
+    and nothing anywhere said that no sales had arrived since August.
+  */
+  it('does not call a sync healthy when it moved nothing at all', () => {
+    const h = assessSyncHealth(
+      agent({ last_sync_summary: { zReports: 0, ewReports: 0, itemAudit: 0 } }),
+      '2touch',
+      NOW,
+    );
+    expect(h.status).toBe('no-data');
+    expect(h.message).toMatch(/no sales/i);
+  });
+
+  it('says the closed-bar reading out loud rather than asserting a fault', () => {
+    // Two days shut is the same shape as a broken feed from here, and this
+    // function cannot tell them apart. The copy has to admit that, the way the
+    // stale band already does — a strip that cries wolf at every quiet Monday
+    // gets ignored by March.
+    const h = assessSyncHealth(
+      agent({ last_sync_summary: { zReports: 0, ewReports: 0, itemAudit: 0 } }),
+      '2touch',
+      NOW,
+    );
+    expect(h.message).toMatch(/closed/i);
+  });
+
+  it('is healthy as soon as any feed moved something', () => {
+    // One live feed is proof the pipe is open, so this must not fire on a bar
+    // that simply has no Item Audit view configured.
+    for (const summary of [
+      { zReports: 2, ewReports: 0, itemAudit: 0 },
+      { zReports: 0, ewReports: 11, itemAudit: 0 },
+      { zReports: 0, ewReports: 0, itemAudit: 51 },
+    ]) {
+      expect(assessSyncHealth(agent({ last_sync_summary: summary }), '2touch', NOW).status)
+        .toBe('healthy');
+    }
+  });
+
+  it('stays healthy when the agent is too old to report a summary', () => {
+    // No summary is "cannot say", not "moved nothing". An agent predating
+    // last_sync_summary must not light up every dashboard it touches.
+    expect(assessSyncHealth(agent(), '2touch', NOW).status).toBe('healthy');
+    expect(assessSyncHealth(agent({ last_sync_summary: null }), '2touch', NOW).status).toBe('healthy');
+    expect(assessSyncHealth(agent({ last_sync_summary: {} }), '2touch', NOW).status).toBe('healthy');
+  });
+
+  it('ranks a real error above an empty sync', () => {
+    // An error names what broke; "nothing arrived" only says that something
+    // did. The more actionable sentence wins.
+    const h = assessSyncHealth(
+      agent({
+        last_sync_errors: ['agent: Z Report query failed: Invalid column name'],
+        last_sync_summary: { zReports: 0, ewReports: 0, itemAudit: 0 },
+      }),
+      '2touch',
+      NOW,
+    );
+    expect(h.status).toBe('errors');
+  });
+
+  it('ranks silence above an empty sync', () => {
+    // A box that stopped reporting hours ago is a bigger fact than what its
+    // last payload happened to contain.
+    const h = assessSyncHealth(
+      agent({
+        last_sync_at: agoMinutes(90),
+        last_sync_summary: { zReports: 0, ewReports: 0, itemAudit: 0 },
+      }),
+      '2touch',
+      NOW,
+    );
+    expect(h.status).toBe('stale');
+  });
+
   it('never returns a negative age for a clock skewed into the future', () => {
     // The agent's clock is not ours, and a future timestamp must not render as
     // "-4 min ago".

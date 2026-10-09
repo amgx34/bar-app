@@ -88,6 +88,20 @@ type Payload = {
   itemAudit: ItemAuditRow[];
   hourlySales?: HourlySalesPayloadRow[];
   serverSales?: ServerSalesPayloadRow[];
+  /**
+   * Feeds that were configured on the POS box, ran, and threw.
+   *
+   * The agent catches a failing feed per-feed so one broken mapping cannot
+   * cost the bar its other three — but it used to then push an empty array
+   * and say nothing, and this route recorded that as a clean sync. A bar
+   * sending no sales at all looked exactly like a healthy one: green strip,
+   * current last_sync_at, no errors. These make the difference visible.
+   *
+   * Absent from every agent older than the release that added it, which is
+   * why it is optional and why its absence means "cannot report", never
+   * "nothing went wrong".
+   */
+  agentErrors?: string[];
 };
 
 // Shapes written to Supabase. Collected into arrays and sent as one upsert per
@@ -761,6 +775,17 @@ export async function POST(req: NextRequest) {
 
     if (insErr) result.errors.push(`pos_server_sales(${night}): ${insErr.message}`);
     else result.serversRecorded += rows.length;
+  }
+
+  // Failures the AGENT hit, folded in beside the ones this route hit.
+  //
+  // Prefixed so a reader can tell which side of the wire broke — "the POS
+  // query threw" and "the upsert was rejected" need different people. Bounded
+  // and truncated because this is a status line on an org row, not a log
+  // store, and the strings arrive over the network: HMAC proves they came from
+  // this bar's own agent, which is not the same as proving they are small.
+  for (const e of (data.agentErrors ?? []).slice(0, 5)) {
+    if (typeof e === 'string' && e.trim()) result.errors.push(`agent: ${e.slice(0, 300)}`);
   }
 
   // Record the outcome on the org so a failing sync is visible in the app.

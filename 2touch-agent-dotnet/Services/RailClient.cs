@@ -33,7 +33,8 @@ public class RailClient(IHttpClientFactory factory, IOptions<AgentConfig> cfg, I
         IReadOnlyList<ItemAuditRow> itemAudit,
         CancellationToken ct,
         IReadOnlyList<HourlySalesRow>? hourlySales = null,
-        IReadOnlyList<ServerSalesRow>? serverSales = null)
+        IReadOnlyList<ServerSalesRow>? serverSales = null,
+        IReadOnlyList<string>? agentErrors = null)
     {
         if (string.IsNullOrWhiteSpace(_rail.OrgId) || _rail.OrgId.StartsWith("REPLACE", StringComparison.Ordinal))
             throw new InvalidOperationException("Rail.OrgId is not configured — run the setup wizard (double-click the exe) or paste a pairing code from Rail → Settings → POS Integration → 2TouchPOS.");
@@ -41,7 +42,8 @@ public class RailClient(IHttpClientFactory factory, IOptions<AgentConfig> cfg, I
             throw new InvalidOperationException("Rail.AuthToken is not configured — run the setup wizard (double-click the exe) to pair this box.");
 
         var http = factory.CreateClient("rail");
-        var result = await SendAsync(http, _rail, zReports, ewReports, itemAudit, ct, hourlySales, serverSales);
+        var result = await SendAsync(
+            http, _rail, zReports, ewReports, itemAudit, ct, hourlySales, serverSales, agentErrors);
 
         if (!result.Ok)
             throw new HttpRequestException($"Rail ingest → {result.StatusCode}: {result.Body}");
@@ -67,7 +69,8 @@ public class RailClient(IHttpClientFactory factory, IOptions<AgentConfig> cfg, I
         IReadOnlyList<ItemAuditRow> itemAudit,
         CancellationToken ct,
         IReadOnlyList<HourlySalesRow>? hourlySales = null,
-        IReadOnlyList<ServerSalesRow>? serverSales = null)
+        IReadOnlyList<ServerSalesRow>? serverSales = null,
+        IReadOnlyList<string>? agentErrors = null)
     {
         var payload = new IngestPayload(
             org_id: rail.OrgId,
@@ -77,7 +80,10 @@ public class RailClient(IHttpClientFactory factory, IOptions<AgentConfig> cfg, I
             ewReports: ewReports,
             itemAudit: itemAudit,
             hourlySales: hourlySales,
-            serverSales: serverSales);
+            serverSales: serverSales,
+            // Omitted entirely when null, so the signed bytes of a clean cycle
+            // are byte-for-byte what they were before this field existed.
+            agentErrors: agentErrors is { Count: > 0 } ? agentErrors : null);
 
         var body = JsonSerializer.Serialize(payload, JsonOpts);
         var signature = Sign(body, rail.AuthToken);

@@ -24,7 +24,8 @@ public class SyncServiceTests
     };
 
     /// <summary>Records which feeds were queried, without a SQL Server.</summary>
-    private sealed class RecordingReader(IOptions<AgentConfig> cfg) : SqlReader(cfg)
+    /// <remarks>Unsealed so BrokenZReader below can break exactly one feed.</remarks>
+    private class RecordingReader(IOptions<AgentConfig> cfg) : SqlReader(cfg)
     {
         public List<string> Queried { get; } = [];
 
@@ -71,15 +72,18 @@ public class SyncServiceTests
         public IReadOnlyList<ItemAuditRow>? Audit { get; private set; }
         public IReadOnlyList<HourlySalesRow>? Hourly { get; private set; }
         public IReadOnlyList<ServerSalesRow>? Server { get; private set; }
+        public IReadOnlyList<string>? AgentErrors { get; private set; }
         public int Pushes { get; private set; }
 
         public override Task<string> PushAsync(
             IReadOnlyList<ZReportRow> z, IReadOnlyList<EwReportRow> ew,
             IReadOnlyList<ItemAuditRow> audit, CancellationToken ct,
             IReadOnlyList<HourlySalesRow>? hourlySales = null,
-            IReadOnlyList<ServerSalesRow>? serverSales = null)
+            IReadOnlyList<ServerSalesRow>? serverSales = null,
+            IReadOnlyList<string>? agentErrors = null)
         {
-            Z = z; Ew = ew; Audit = audit; Hourly = hourlySales; Server = serverSales; Pushes++;
+            Z = z; Ew = ew; Audit = audit; Hourly = hourlySales; Server = serverSales;
+            AgentErrors = agentErrors; Pushes++;
             return Task.FromResult("{\"zReports\":0,\"ewReports\":0,\"itemAudit\":0,\"errors\":[]}");
         }
     }
@@ -216,5 +220,91 @@ public class SyncServiceTests
 
         Assert.Contains("server", reader.Queried);
         Assert.Single(rail.Server!);
+    }
+
+    /// <summary>A reader whose Z query fails the way a bad mapping fails.</summary>
+    private sealed class BrokenZReader(IOptions<AgentConfig> cfg) : RecordingReader(cfg)
+    {
+        public override Task<List<ZReportRow>> QueryZReportsAsync(SqlConnection c, int days, CancellationToken ct)
+            => throw new InvalidOperationException("Invalid column name 'CashSales'.");
+    }
+
+    private static async Task<(CapturingRail Rail, SyncResult Result)> RunBrokenZAsync(AgentConfig cfg)
+    {
+        var options = Options.Create(cfg);
+        var rail = new CapturingRail(options);
+        var sync = new SyncService(new BrokenZReader(options), rail, options, NullLogger<SyncService>.Instance);
+        var result = await sync.RunOnceAsync(daysOverride: 2, test: false, CancellationToken.None);
+        return (rail, result);
+    }
+
+    /// <summary>
+    /// THE SILENT FAILURE. A configured feed whose query throws was caught,
+    /// logged at a level the Event Log discards, and the cycle then pushed an
+    /// empty array and reported success. Rail stored a clean last_sync_at, the
+    /// dashboard went green, and a bar sent no sales for a month while every
+    /// screen said it was connected. The failure has to travel with the
+    /// payload, because the agent's own log is not somewhere anyone looks.
+    /// </summary>
+    [Fact]
+    public async Task AFailedFeedTravelsToRailInsteadOfVanishing()
+    {
+        var (rail, _) = await RunBrokenZAsync(
+            Config("[dbo].[vwZReport]", "[dbo].[vwServerSales]", ""));
+
+        Assert.NotNull(rail.AgentErrors);
+        var reported = Assert.Single(rail.AgentErrors!);
+        Assert.Contains("Z Report", reported);
+        Assert.Contains("Invalid column name", reported);
+    }
+
+    [Fact]
+    public async Task AFailedFeedMakesTheCycleUnsuccessful()
+    {
+        // --once returns a non-zero exit code off this, so a scripted or manual
+        // run fails loudly rather than printing a tick over an empty push.
+        var (_, result) = await RunBrokenZAsync(
+            Config("[dbo].[vwZReport]", "[dbo].[vwServerSales]", ""));
+
+        Assert.False(result.Ok);
+    }
+
+    [Fact]
+    public async Task TheOtherFeedsStillFlowWhenOneFails()
+    {
+        // The per-feed catch earns its keep: one broken mapping must not cost
+        // the bar its hours and its stock depletion too.
+        var (rail, _) = await RunBrokenZAsync(
+            Config("[dbo].[vwZReport]", "[dbo].[vwServerSales]", "[dbo].[vwItemAudit]"));
+
+        Assert.Equal(1, rail.Pushes);
+        Assert.Empty(rail.Z!);
+        Assert.Single(rail.Ew!);
+        Assert.Single(rail.Audit!);
+    }
+
+    [Fact]
+    public async Task AHealthyCycleReportsNoErrors()
+    {
+        // The other half of the signal: "no errors" has to mean something, so
+        // a clean run must not send an empty-but-present list that Rail would
+        // have to distinguish from a real one.
+        var (_, rail, result) = await RunAsync(
+            Config("[dbo].[vwZReport]", "[dbo].[vwServerSales]", "[dbo].[vwItemAudit]"));
+
+        Assert.True(result.Ok);
+        Assert.Null(rail.AgentErrors);
+    }
+
+    [Fact]
+    public async Task ASkippedFeedIsNotAnError()
+    {
+        // Skipped and broken are different states and must stay different: a
+        // bar that genuinely has no Item Audit view would otherwise show a
+        // permanent error badge on its dashboard.
+        var (_, rail, result) = await RunAsync(Config("[dbo].[vwZReport]", "", ""));
+
+        Assert.True(result.Ok);
+        Assert.Null(rail.AgentErrors);
     }
 }

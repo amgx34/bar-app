@@ -23,6 +23,16 @@ export type SyncStatus =
   | 'healthy'
   /** Ran, but reported errors. Data may be partially applied. */
   | 'errors'
+  /**
+   * Checking in on time, reporting no errors, and bringing nothing back.
+   *
+   * The shape of a silent failure: a feed that throws is caught per-feed on
+   * the agent, so the cycle still succeeds and still writes a clean
+   * last_sync_at. Also the shape of a bar that has simply been closed for two
+   * days — the two are genuinely indistinguishable from here, which is why
+   * this warns in the words of the quieter reading rather than alarming.
+   */
+  | 'no-data'
   /** Nothing heard for a while. The agent or the POS box may be down. */
   | 'stale'
   /** Silent long enough that data is certainly missing. */
@@ -107,6 +117,25 @@ export function describeAge(minutes: number | null): string {
   return `${days} ${days === 1 ? 'day' : 'days'} ago`;
 }
 
+/**
+ * Whether the last sync brought anything back at all.
+ *
+ * Only the three original feeds count. Hourly and per-server trade are
+ * optional — plenty of bars have never had them mapped — so a zero there is
+ * ordinary and must not be read as a fault. shiftsProtected is excluded for
+ * the opposite reason: it counts rows deliberately NOT written.
+ *
+ * An ABSENT summary returns false, not true. Agents older than
+ * last_sync_summary report nothing here, and "cannot say" must never render as
+ * "moved nothing" — that would light up every dashboard running an old agent,
+ * which is exactly the cry-wolf failure this status exists to avoid.
+ */
+function movedNothing(summary: SyncSummary): boolean {
+  const counted = [summary.zReports, summary.ewReports, summary.itemAudit];
+  if (counted.every((n) => n === undefined)) return false;
+  return counted.every((n) => (n ?? 0) === 0);
+}
+
 export function assessSyncHealth(
   posConfig: PosConfigShape | null | undefined,
   posProvider: string | null | undefined,
@@ -175,6 +204,27 @@ export function assessSyncHealth(
       minutesAgo,
       lastSyncAt,
       message: `Nothing heard for ${describeDuration(minutesAgo)}. Normal if the POS is switched off, otherwise check the agent.`,
+    };
+  }
+
+  // Checking in, erroring on nothing, carrying nothing.
+  //
+  // Ranked below both of the above on purpose: an error names what broke, and
+  // silence says the box stopped talking. Both are more actionable than
+  // "something arrived and it was empty", so they are answered first.
+  //
+  // Ordered AFTER the recency bands for a second reason — a stale or down bar
+  // is usually also an empty one, and reporting the emptier fact would bury
+  // the simpler one.
+  if (movedNothing(summary)) {
+    return {
+      ...base,
+      status: 'no-data',
+      minutesAgo,
+      lastSyncAt,
+      message:
+        'The POS agent is checking in but has reported no sales, hours or items. '
+        + 'Normal if the bar has been closed, otherwise a feed has stopped returning data.',
     };
   }
 
