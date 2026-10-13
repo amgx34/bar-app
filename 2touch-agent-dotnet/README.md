@@ -355,9 +355,36 @@ before touching anything**, stops the service, keeps the old binary as
 new build does not come up cleanly it rolls back automatically. Nothing is
 deleted until the replacement has proven it starts.
 
-To automate it, register a Scheduled Task running `rail-update.exe --yes` as
-SYSTEM. `--check` exits `10` when an update is available, for monitoring that
-should not install anything.
+Setup registers that Scheduled Task automatically, so a box installed with the
+current wizard checks daily at 03:30 as SYSTEM and needs no visit. On a box
+installed before that existed — which is every box already in the field — run it
+once **from the install directory**, not from the folder you extracted:
+
+```powershell
+cd C:\rail-agent
+.\rail-update.exe --install-task     # daily 03:30, as SYSTEM, --yes
+.\rail-update.exe --remove-task      # stop checking
+schtasks /Run /TN "Rail 2Touch agent update"   # don't wait for 03:30
+```
+
+Both need Administrator. The uninstaller removes the task, so it never outlives
+the binary it points at.
+
+The install directory is not a style preference here. The task runs as SYSTEM
+every night, so the path it names is a standing grant of SYSTEM to anyone who
+can write that file — and a copy sitting in an operator's Downloads folder is
+writable by every user on the box. `--install-task` therefore always registers
+`C:\rail-agent\rail-update.exe` regardless of where you ran it from, refuses if
+no copy is installed there, and refuses again if that directory or any directory
+above it grants write access to a non-administrator.
+
+`--check` exits `10` when an update is available, for monitoring that should not
+install anything.
+
+**Publishing a release does not move any box by itself.** Until something runs
+`rail-update.exe`, a bar stays on the version it has — syncing normally, showing
+green in Rail, with nothing anywhere reporting that it is behind. Steps 1–4 make
+a release available; the Scheduled Task is what delivers it.
 
 ### Rolling back
 

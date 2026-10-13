@@ -1019,6 +1019,8 @@ public sealed class SetupWizard(string[] args, Unattended? unattended = null)
         CopyCompanion("rail-update.exe");
         CopyCompanion("rail-uninstall.exe");
 
+        RegisterUpdateTask();
+
         var result = ServiceControl.Install(target, _installDir);
         if (!result.Ok)
         {
@@ -1059,6 +1061,36 @@ public sealed class SetupWizard(string[] args, Unattended? unattended = null)
     /// non-fatal: a missing updater is worth a warning, but it must not fail an
     /// otherwise-good install of the thing that actually syncs data.
     /// </summary>
+    /// <summary>
+    /// Schedules the daily update check.
+    ///
+    /// Best-effort, like <see cref="CopyCompanion"/> and for the same reason: a
+    /// box that cannot register the task still syncs perfectly well, and failing
+    /// an otherwise-good install over it would be the wrong trade. It warns
+    /// rather than passing silently, because the symptom of a missing task is a
+    /// bar quietly running an old build for a year.
+    /// </summary>
+    private void RegisterUpdateTask()
+    {
+        var updater = Path.Combine(_installDir, "rail-update.exe");
+        if (!File.Exists(updater))
+        {
+            ConsoleUi.Warn("rail-update.exe is not installed, so no automatic update check was scheduled.");
+            return;
+        }
+
+        var result = ScheduledTask.Install(updater);
+        if (result.Ok)
+        {
+            ConsoleUi.Ok($"Automatic update check scheduled daily at {ScheduledTask.DefaultTime:HH\\:mm}");
+        }
+        else
+        {
+            ConsoleUi.Warn($"Could not schedule the automatic update check: {result.Output.Trim()}");
+            ConsoleUi.Info($@"Run {_installDir}\rail-update.exe --install-task later to set it up.");
+        }
+    }
+
     private void CopyCompanion(string fileName)
     {
         try
@@ -1179,6 +1211,9 @@ public sealed class SetupWizard(string[] args, Unattended? unattended = null)
             ["Sync interval",     $"every {_cfg.Sync.IntervalMinutes} min, {_cfg.Sync.LookbackDays}-day lookback"],
             ["Agent version",     AgentVersion.ReadFileVersion(Path.Combine(_installDir, AgentVersion.AgentExeName))?.ToString(3) ?? "unknown"],
             ["Update",            $@"{_installDir}\rail-update.exe"],
+            ["Auto-update",       ScheduledTask.Exists()
+                                      ? $"daily at {ScheduledTask.DefaultTime:HH\\:mm} (Task Scheduler)"
+                                      : "not scheduled — run rail-update.exe --install-task"],
             ["Uninstall",         $@"{_installDir}\rail-uninstall.exe"],
         ], indent: "    ");
 

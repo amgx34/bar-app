@@ -92,8 +92,9 @@ It redirects to `/login` or `/setup`, and resolves the active org from the
   own `pos_config.agent_token`. Per-org secret, never a shared one.
 - `GET /api/cron/2touch` — Vercel Cron (`vercel.json`, daily 13:00 UTC) email fallback
   for bars not running the agent. Gated on `CRON_SECRET`.
-- `GET /api/agent/manifest` — what version of the POS agent is current, polled by
-  `rail-update.exe` on each POS box. Unauthenticated by design.
+- `GET /api/agent/manifest` — what version of the POS agent is current. Read by
+  `rail-update.exe` **when that updater runs**, which is not the same as polling:
+  see below. Unauthenticated by design.
 
 **A sync that moved nothing is not a healthy sync.** The agent catches a failing
 feed per-feed so one broken mapping cannot cost the bar its other three — but it
@@ -127,6 +128,44 @@ been byte-identical since 1.0.2 and so is also what every 1.1.x–1.2.x box carr
 Boxes in that second range matched nothing for a release and reported no hourly or
 per-server trade, permanently. A migration may fill a blank feed; it may never
 replace a non-empty one, which is somebody's answer.
+
+**Nothing on a POS box checks for a new release on its own.** The service carries
+no update logic at all, and `rail-update.exe` reads the manifest only in the
+moment someone runs it. Publishing a release — bumping `AGENT_LATEST_VERSION`,
+`AGENT_DOWNLOAD_URL` and `AGENT_SHA256` on Vercel — makes it *available*; it does
+not move a single box. A bar sat on 1.2.0 for the whole of 1.3.x and 1.4.0 that
+way, green strip and all, syncing in every five minutes and missing the very
+release that would have fixed its own feed mapping, because the only thing that
+could have pulled it was a trip to the bar nobody made. The dashboard cannot show
+this: a box that is behind looks identical to a box that is current, since being
+behind is not an error and the agent never knew there was anything to report.
+
+What closes the gap is a Scheduled Task, registered by `ScheduledTask` in
+`Setup/ScheduledTask.cs` — daily at 03:30 as SYSTEM, running `rail-update.exe
+--yes`. The setup wizard registers it on every install and the uninstaller
+removes it; `rail-update.exe --install-task` does it on a box installed before
+this existed, which is the only way those boxes ever get it. Registration is a
+deliberate act rather than something the agent arranges for itself: an unattended
+binary swap is safe here only because `Updater.ApplyAsync` verifies the checksum
+before touching anything, keeps the old exe as `.bak`, and rolls back a build
+that will not start — but it is still a swap. The argument vector handed to
+`schtasks.exe` is pure and tested (`ScheduledTaskTests`) for the same reason
+`ServiceControl.Install` encodes `sc.exe`'s `key= value` quirk: a task built with
+an unquoted path or a locale-formatted `/ST` registers cleanly and then never
+runs, which is indistinguishable from having no task at all.
+
+**The path that task names is a permanent grant of SYSTEM.** It must therefore
+be the installed copy under `C:\rail-agent` and never `Environment.ProcessPath`,
+which is the folder the operator happened to extract the download into — usually
+Downloads, which every user on the box can write. `--install-task` resolves the
+installed path regardless of where it was run from, and `ScheduledTask.Install`
+refuses when the target file or **any directory above it** grants write, delete,
+create, chown or chmod rights to a principal that is not already an
+administrator (`GrantsWriteToNonAdmins`, tested against constructed ACLs). The
+check lives inside `Install` rather than its callers so a future caller cannot
+quietly skip it, and it fails closed: an ACL that cannot be read is refused, not
+assumed safe. Deny rules are ignored on purpose — a Deny only removes access, so
+counting one as a grant would reject a correctly hardened directory.
 
 **POS sales deplete stock.** The item audit no longer just creates inventory rows:
 quantities move `current_stock` and write `usage_logs` with `reason: 'pos_sale'`.
