@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 using System.Security.AccessControl;
 using System.Security.Principal;
 
@@ -147,12 +149,10 @@ public static class Hardening
                 return false;
             }
 
-            // A hard link is a second name for the same file, with no reparse
-            // point to spot, so an ACL written here lands on whatever was
-            // linked. Best-effort by design: fsutil failing is not proof of an
-            // attack, and refusing every install on a filesystem it cannot read
-            // would trade a narrow risk for a broad outage. The ordering below
-            // does not depend on it.
+            // An early, friendlier report of the same thing SecureTree enforces
+            // below. This pass runs before the directory is locked, so it is
+            // advisory only — the authoritative check happens at write time,
+            // once the parent is secured and nothing can be swapped.
             var linked = FindHardLinks(info);
             if (linked.Count > 0)
             {
@@ -198,41 +198,67 @@ public static class Hardening
     /// recovery path for a bad release.
     /// </summary>
     /// <summary>
+    /// Mirrors the Win32 struct exactly. The three timestamps are FILETIMEs —
+    /// pairs of 32-bit words, written out as such rather than as <c>long</c>,
+    /// which would take 8-byte alignment on x64 and silently shift every field
+    /// after it. NumberOfLinks would then read as garbage, and this whole check
+    /// would pass or fail at random.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BY_HANDLE_FILE_INFORMATION
+    {
+        public uint FileAttributes;
+        public uint CreationTimeLow;
+        public uint CreationTimeHigh;
+        public uint LastAccessTimeLow;
+        public uint LastAccessTimeHigh;
+        public uint LastWriteTimeLow;
+        public uint LastWriteTimeHigh;
+        public uint VolumeSerialNumber;
+        public uint FileSizeHigh;
+        public uint FileSizeLow;
+        public uint NumberOfLinks;
+        public uint FileIndexHigh;
+        public uint FileIndexLow;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetFileInformationByHandle(
+        SafeFileHandle hFile, out BY_HANDLE_FILE_INFORMATION lpFileInformation);
+
+    /// <summary>
     /// How many names this file has on the volume.
     ///
-    /// A hard link is a second name for the same inode, with no reparse point
-    /// involved, so rewriting the ACL at one path rewrites it on every other —
-    /// including a system file an attacker linked into the install directory
-    /// before hardening ran. .NET exposes no link count, so this shells out to
-    /// fsutil, the way the rest of this code shells out to sc.exe and schtasks.
+    /// A hard link is a second name for the same file, with no reparse point to
+    /// spot, so an ACL written at one name lands on every other — including a
+    /// system file an attacker linked in here before hardening ran, which
+    /// <c>mklink /H</c> does with no privilege at all.
     ///
-    /// Returns -1 when the count cannot be determined.
+    /// Asks the kernel directly. The first version shelled out to fsutil, which
+    /// was worse than the problem it was checking for: CreateProcess resolves a
+    /// bare name against the calling process's own directory, so an attacker who
+    /// could write to the install directory could drop fsutil.exe there and have
+    /// it run elevated the moment an operator hardened the box.
+    ///
+    /// Returns -1 when the count cannot be determined. Callers must treat that
+    /// as a refusal, never as "no links".
     /// </summary>
     public static int CountHardLinks(string path)
     {
         try
         {
-            var psi = new ProcessStartInfo("fsutil.exe")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            psi.ArgumentList.Add("hardlink");
-            psi.ArgumentList.Add("list");
-            psi.ArgumentList.Add(path);
+            using var handle = File.OpenHandle(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                // The agent's own exe is running while --install-task hardens
+                // the directory it lives in, so this must not demand exclusivity.
+                FileShare.ReadWrite | FileShare.Delete);
 
-            using var p = Process.Start(psi);
-            if (p is null) return -1;
-
-            var output = p.StandardOutput.ReadToEnd();
-            p.WaitForExit(15_000);
-            if (p.ExitCode != 0) return -1;
-
-            return output
-                .Split('\n')
-                .Count(line => !string.IsNullOrWhiteSpace(line));
+            return GetFileInformationByHandle(handle, out var info)
+                ? (int)info.NumberOfLinks
+                : -1;
         }
         catch
         {
@@ -347,7 +373,8 @@ public static class Hardening
         foreach (var path in PlanSecureOrder(root))
         {
             if (Directory.Exists(path)) continue;
-            if (CountHardLinks(path) > 1) found.Add(path);
+            // -1 means undeterminable, which is a refusal, never a pass.
+            if (CountHardLinks(path) != 1) found.Add(path);
         }
 
         return found;
@@ -424,6 +451,20 @@ public static class Hardening
             attempted.Add(entry.FullName);
             try
             {
+                // Authoritative hard-link check: the parent is locked by now, so
+                // this file cannot be swapped between here and the write below.
+                // Anything other than exactly one name — including a count we
+                // could not read — is refused rather than written to, since an
+                // ACL applied here would land on every other name too.
+                var links = CountHardLinks(entry.FullName);
+                if (links != 1)
+                {
+                    failures.Add($"{entry.FullName} (" + (links < 0
+                        ? "could not read its hard-link count"
+                        : $"has {links} hard links") + ", left untouched)");
+                    continue;
+                }
+
                 var acl = new FileSecurity();
                 // false, false = inherit from the parent we have just secured,
                 // and drop the explicit rules that are there now.

@@ -221,4 +221,25 @@ public class HardeningReparseTests : IDisposable
                 p => p.EndsWith("rail-update.exe", StringComparison.OrdinalIgnoreCase));
         }
     }
+
+    [SkippableFact]
+    public void A_hard_linked_file_reports_two_links()
+    {
+        var real = Path.Combine(_root, "a.txt");
+        File.WriteAllText(real, "x");
+        var link = Path.Combine(_root, "b.txt");
+        RunCmd($"mklink /H \"{link}\" \"{real}\"");
+        Skip.If(!File.Exists(link), "mklink /H unavailable");
+
+        Assert.Equal(2, Hardening.CountHardLinks(real));
+    }
+
+    [Fact]
+    public void An_unreadable_path_reports_an_undeterminable_count()
+    {
+        // -1 means "could not tell", and callers must treat that as a refusal
+        // rather than as "no links" — the fail-open that made the earlier
+        // fsutil version pointless.
+        Assert.Equal(-1, Hardening.CountHardLinks(Path.Combine(_root, "does-not-exist.txt")));
+    }
 }

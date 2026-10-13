@@ -244,7 +244,7 @@ public static class ScheduledTask
     /// </summary>
     private static ServiceControl.ScResult SchTasks(params string[] args)
     {
-        var psi = new ProcessStartInfo("schtasks.exe")
+        var psi = new ProcessStartInfo(SystemPaths.Executable("schtasks.exe"))
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,

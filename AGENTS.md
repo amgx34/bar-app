@@ -242,12 +242,28 @@ is the only reason the gap existed.
 **A hard link has no reparse point to spot.** It is a second name for the same
 file, so an ACL written at one path lands on every other — including a system
 file linked into the install directory before hardening ran, which a standard
-user can do with `mklink /H` and no privilege at all. `CountHardLinks` shells out
-to `fsutil` because .NET exposes no link count, and `TryHarden` refuses when it
-finds one. This one is explicitly best-effort: `fsutil` failing is not evidence
-of an attack, and refusing every install on a volume it cannot read would trade a
-narrow risk for a broad outage. The ordering guarantee above does not depend on
-it.
+user can do with `mklink /H` and no privilege at all. `CountHardLinks` asks the
+kernel through `GetFileInformationByHandle`; anything other than exactly one
+name is refused, and `-1` means "could not tell", which is also a refusal. The
+authoritative check runs inside `SecureTree` at write time, once the parent is
+locked and the file can no longer be swapped; the pass in `TryHarden` is only
+there to give a better error earlier.
+
+**Never launch a Windows tool by bare name.** `CreateProcess` resolves it against
+the calling process's own directory first, and every one of these launches is
+elevated, from the install directory, which a standard user can write to until
+hardening has succeeded. `new ProcessStartInfo("sc.exe")` therefore meant that
+dropping `C:\rail-agent\sc.exe` got you administrator the next time an operator
+touched anything. The first version of the hard-link check shelled out to
+`fsutil` and so was a cleaner exploit than the attack it was looking for.
+`SystemPaths.Executable` anchors every one to System32, and
+`SystemPathsTests.No_production_code_launches_a_bare_executable_name` scans the
+sources so the rule survives the next person who adds a call.
+
+`BY_HANDLE_FILE_INFORMATION` writes its FILETIMEs as pairs of `uint`. A `long`
+there takes 8-byte alignment on x64 and shifts every field after it, so
+`NumberOfLinks` reads as garbage and the check passes or fails at random — which
+is how it first behaved.
 
 What hardening must NOT do is delete files it does not recognise. The install
 directory legitimately holds things this code has no manifest for — uncollected

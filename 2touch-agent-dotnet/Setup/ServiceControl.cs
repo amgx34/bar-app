@@ -177,7 +177,7 @@ public static class ServiceControl
 
     private static ScResult Sc(params string[] args)
     {
-        var psi = new ProcessStartInfo("sc.exe")
+        var psi = new ProcessStartInfo(SystemPaths.Executable("sc.exe"))
         {
             RedirectStandardOutput = true,
             RedirectStandardError  = true,

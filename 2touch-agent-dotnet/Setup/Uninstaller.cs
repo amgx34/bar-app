@@ -275,7 +275,7 @@ public static class Uninstaller
     {
         try
         {
-            var psi = new ProcessStartInfo("cmd.exe")
+            var psi = new ProcessStartInfo(SystemPaths.Executable("cmd.exe"))
             {
                 // ping as a portable sleep: timeout.exe fails without a console.
                 Arguments = $"/c ping 127.0.0.1 -n 4 > nul & rd /s /q \"{installDir}\"",
