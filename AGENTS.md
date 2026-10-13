@@ -206,6 +206,18 @@ it. Setting the owner needs elevation, which is why `TryHarden` fails outright
 rather than half-applying when run unelevated — a hardening step that reported
 success without changing the owner is the exact bug this paragraph exists for.
 
+**The walk must not follow junctions.** `SearchOption.AllDirectories` does, and
+an elevated ACL rewrite that follows one retargets onto whatever it points at —
+a standard user has Modify here until hardening runs, so they can plant
+`C:\rail-agent\x → C:\Windows\System32` and wait for an administrator to run
+setup. `WalkForReset` recurses by hand, skips any entry carrying
+`FileAttributes.ReparsePoint` without descending *or* setting an ACL on the link
+itself (which would follow it just as surely), and enumerates with
+`AttributesToSkip = 0` so a planted file cannot hide behind the hidden or system
+attribute. `TryHarden` refuses the whole operation when it finds one, rather than
+pressing on: setup never creates a reparse point there, so one is the signature
+of a pre-staged directory and is worth a human looking at it.
+
 What hardening must NOT do is delete files it does not recognise. The install
 directory legitimately holds things this code has no manifest for — uncollected
 diagnostic reports, and `rail-2touch-agent.exe.bak`, which is the only thing

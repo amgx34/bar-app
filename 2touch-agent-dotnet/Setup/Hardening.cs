@@ -123,6 +123,29 @@ public static class Hardening
                 return false;
             }
 
+            // The install directory itself must be a real directory. Hardening a
+            // junction would apply the ACL to its target instead.
+            if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                error = $"{directory} is a junction or symbolic link, not a real directory. "
+                      + "Refusing to change permissions through it.";
+                return false;
+            }
+
+            // Look before touching anything. A reparse point under the install
+            // directory is never something setup created, and an elevated ACL
+            // rewrite that followed one would retarget onto whatever it points
+            // at. Refuse the whole operation rather than press on: this is the
+            // signature of a directory somebody pre-staged.
+            var (_, reparsePoints) = WalkForReset(info);
+            if (reparsePoints.Count > 0)
+            {
+                error = $"{directory} contains a junction or symbolic link, which setup never creates: "
+                      + string.Join("; ", reparsePoints.Take(3))
+                      + ". Nothing was changed — remove it and investigate how it got there.";
+                return false;
+            }
+
             info.SetAccessControl(BuildSecureAcl());
 
             // Children are not covered by the parent's new ACL if they carry
@@ -160,13 +183,69 @@ public static class Hardening
     /// restore. A cleanup that removed "unexpected" files would delete the
     /// recovery path for a bad release.
     /// </summary>
+    public static (List<string> touched, List<string> reparsePoints) WalkForReset(DirectoryInfo root)
+    {
+        var touched = new List<string>();
+        var reparsePoints = new List<string>();
+
+        // Hand-rolled rather than SearchOption.AllDirectories, which follows
+        // junctions. Walking into one means an elevated process rewriting the
+        // owner and DACL of whatever it points at — C:\Windows\System32, given
+        // an attacker who had write access here before hardening ran.
+        Descend(root, touched, reparsePoints);
+        return (touched, reparsePoints);
+    }
+
+    private static void Descend(DirectoryInfo dir, List<string> touched, List<string> reparsePoints)
+    {
+        IEnumerable<FileSystemInfo> entries;
+        try
+        {
+            // AttributesToSkip = 0: the default hides hidden and system files,
+            // and a planted file would simply set those attributes to be passed
+            // over silently.
+            entries = dir.EnumerateFileSystemInfos("*", new EnumerationOptions
+            {
+                RecurseSubdirectories = false,
+                AttributesToSkip = 0,
+                IgnoreInaccessible = false,
+            });
+        }
+        catch
+        {
+            return;
+        }
+
+        foreach (var entry in entries)
+        {
+            if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                // Recorded and then left completely alone. Setting an ACL on the
+                // link path would follow it to the target just as surely as
+                // descending would.
+                reparsePoints.Add(entry.FullName);
+                continue;
+            }
+
+            touched.Add(entry.FullName);
+
+            if (entry is DirectoryInfo child) Descend(child, touched, reparsePoints);
+        }
+    }
+
     private static List<string> ResetChildren(DirectoryInfo root)
     {
         var admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
         var failures = new List<string>();
 
-        foreach (var entry in root.EnumerateFileSystemInfos("*", SearchOption.AllDirectories))
+        var (touched, _) = WalkForReset(root);
+
+        foreach (var path in touched)
         {
+            FileSystemInfo entry = Directory.Exists(path)
+                ? new DirectoryInfo(path)
+                : new FileInfo(path);
+
             try
             {
                 if (entry is FileInfo file)
