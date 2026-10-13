@@ -1019,6 +1019,7 @@ public sealed class SetupWizard(string[] args, Unattended? unattended = null)
         CopyCompanion("rail-update.exe");
         CopyCompanion("rail-uninstall.exe");
 
+        HardenInstallDirectory();
         RegisterUpdateTask();
 
         var result = ServiceControl.Install(target, _installDir);
@@ -1061,6 +1062,31 @@ public sealed class SetupWizard(string[] args, Unattended? unattended = null)
     /// non-fatal: a missing updater is worth a warning, but it must not fail an
     /// otherwise-good install of the thing that actually syncs data.
     /// </summary>
+    /// <summary>
+    /// Takes write access to the install directory away from everyone who is not
+    /// an administrator.
+    ///
+    /// Not cosmetic, and not optional: the agent runs as LocalSystem, and a
+    /// directory created under C:\ inherits Modify for Authenticated Users from
+    /// the volume root. Left alone, any user who can log into the POS box can
+    /// replace rail-2touch-agent.exe and be SYSTEM at the next service start.
+    ///
+    /// Unlike the companions, a failure here is reported loudly — the install
+    /// still works, but it is no longer the install we think we shipped.
+    /// </summary>
+    private void HardenInstallDirectory()
+    {
+        if (Hardening.TryHarden(_installDir, out var error))
+        {
+            ConsoleUi.Ok($"{_installDir} locked to administrators (users may run, not modify)");
+            return;
+        }
+
+        ConsoleUi.Warn($"Could not secure {_installDir}: {error}");
+        ConsoleUi.Info("Until this is fixed, any user on this box can replace the agent, which runs as SYSTEM.");
+        ConsoleUi.Info($@"Fix it with: {_installDir}\rail-update.exe --harden");
+    }
+
     /// <summary>
     /// Schedules the daily update check.
     ///

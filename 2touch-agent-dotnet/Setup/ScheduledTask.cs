@@ -104,14 +104,30 @@ public static class ScheduledTask
     // ── Where the task is allowed to point ───────────────────────────────────
 
     /// <summary>
-    /// Rights that let a principal replace the file the task runs, or plant
-    /// something next to it. Read and execute are deliberately absent: an
-    /// install directory everyone can run and only administrators can change is
-    /// the shape we want, not a problem.
+    /// Rights that let a principal rewrite the file the task runs.
+    /// WriteData replaces its contents, AppendData adds to them; both change
+    /// what SYSTEM executes. Read and execute are deliberately absent.
     /// </summary>
-    private const FileSystemRights DangerousRights =
-        FileSystemRights.WriteData              // also CreateFiles
-        | FileSystemRights.AppendData           // also CreateDirectories
+    private const FileSystemRights DangerousOnFile =
+        FileSystemRights.WriteData
+        | FileSystemRights.AppendData
+        | FileSystemRights.Delete
+        | FileSystemRights.ChangePermissions
+        | FileSystemRights.TakeOwnership;
+
+    /// <summary>
+    /// Rights that let a principal swap out a file inside a directory —
+    /// creating one over it, or deleting it and writing a replacement.
+    ///
+    /// AppendData is deliberately NOT here. On a directory it means
+    /// "create subdirectories", which cannot touch an existing file, and it is
+    /// exactly what the volume root grants Authenticated Users on every Windows
+    /// box ("C:\ NT AUTHORITY\Authenticated Users:(AD)"). Treating it as
+    /// dangerous would make the walk below refuse every install on every
+    /// machine, which is a check that protects nothing because nobody can use it.
+    /// </summary>
+    private const FileSystemRights DangerousOnDirectory =
+        FileSystemRights.WriteData              // CreateFiles
         | FileSystemRights.Delete
         | FileSystemRights.DeleteSubdirectoriesAndFiles
         | FileSystemRights.ChangePermissions
@@ -145,13 +161,24 @@ public static class ScheduledTask
     /// and the failure mode of this check is an operator who cannot schedule
     /// updates, which is the bug we are here to fix.
     /// </summary>
-    public static bool GrantsWriteToNonAdmins(AuthorizationRuleCollection rules)
+    public static bool GrantsWriteToNonAdmins(AuthorizationRuleCollection rules, bool isDirectory)
     {
+        var dangerous = isDirectory ? DangerousOnDirectory : DangerousOnFile;
+
         foreach (FileSystemAccessRule rule in rules)
         {
             if (rule.AccessControlType != AccessControlType.Allow) continue;
+
+            // InheritOnly grants nothing on the object carrying the rule; it
+            // only reaches children, and every child here is evaluated on its
+            // own effective rules. This is not a corner case — it is the shape
+            // of the volume root's Authenticated Users ACE, so counting it
+            // flagged C:\ for every path on the machine and refused install
+            // directories that were already correct.
+            if (rule.PropagationFlags.HasFlag(PropagationFlags.InheritOnly)) continue;
+
             if (IsTrusted(rule.IdentityReference)) continue;
-            if ((rule.FileSystemRights & DangerousRights) != 0) return true;
+            if ((rule.FileSystemRights & dangerous) != 0) return true;
         }
 
         return false;
@@ -174,7 +201,8 @@ public static class ScheduledTask
             if (File.Exists(full) &&
                 GrantsWriteToNonAdmins(
                     new FileInfo(full).GetAccessControl()
-                        .GetAccessRules(true, true, typeof(SecurityIdentifier))))
+                        .GetAccessRules(true, true, typeof(SecurityIdentifier)),
+                    isDirectory: false))
             {
                 return full;
             }
@@ -183,7 +211,8 @@ public static class ScheduledTask
             {
                 if (GrantsWriteToNonAdmins(
                         dir.GetAccessControl()
-                           .GetAccessRules(true, true, typeof(SecurityIdentifier))))
+                           .GetAccessRules(true, true, typeof(SecurityIdentifier)),
+                        isDirectory: true))
                 {
                     return dir.FullName;
                 }

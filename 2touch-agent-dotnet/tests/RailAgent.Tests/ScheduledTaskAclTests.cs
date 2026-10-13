@@ -27,6 +27,8 @@ public class ScheduledTaskAclTests
         new(WellKnownSidType.BuiltinAdministratorsSid, null);
     private static readonly SecurityIdentifier System =
         new(WellKnownSidType.LocalSystemSid, null);
+    private static readonly SecurityIdentifier Authenticated =
+        new(WellKnownSidType.AuthenticatedUserSid, null);
 
     private static AuthorizationRuleCollection Rules(params FileSystemAccessRule[] rules)
     {
@@ -46,14 +48,14 @@ public class ScheduledTaskAclTests
     {
         Assert.True(ScheduledTask.GrantsWriteToNonAdmins(
             Rules(Allow(Admins, FileSystemRights.FullControl),
-                  Allow(Users, FileSystemRights.Modify))));
+                  Allow(Users, FileSystemRights.Modify)), isDirectory: true));
     }
 
     [Fact]
     public void Everyone_with_full_control_is_unsafe()
     {
         Assert.True(ScheduledTask.GrantsWriteToNonAdmins(
-            Rules(Allow(Everyone, FileSystemRights.FullControl))));
+            Rules(Allow(Everyone, FileSystemRights.FullControl)), isDirectory: true));
     }
 
     [Fact]
@@ -61,7 +63,7 @@ public class ScheduledTaskAclTests
     {
         // Enough to plant a DLL beside the exe, or to replace it after a delete.
         Assert.True(ScheduledTask.GrantsWriteToNonAdmins(
-            Rules(Allow(Users, FileSystemRights.CreateFiles))));
+            Rules(Allow(Users, FileSystemRights.CreateFiles)), isDirectory: true));
     }
 
     [Fact]
@@ -69,14 +71,14 @@ public class ScheduledTaskAclTests
     {
         // Delete-then-recreate is the usual way a weak ACL becomes code execution.
         Assert.True(ScheduledTask.GrantsWriteToNonAdmins(
-            Rules(Allow(Users, FileSystemRights.Delete))));
+            Rules(Allow(Users, FileSystemRights.Delete)), isDirectory: true));
     }
 
     [Fact]
     public void Users_able_to_take_ownership_is_unsafe()
     {
         Assert.True(ScheduledTask.GrantsWriteToNonAdmins(
-            Rules(Allow(Users, FileSystemRights.TakeOwnership))));
+            Rules(Allow(Users, FileSystemRights.TakeOwnership)), isDirectory: true));
     }
 
     // ── Must allow ───────────────────────────────────────────────────────────
@@ -86,7 +88,7 @@ public class ScheduledTaskAclTests
     {
         Assert.False(ScheduledTask.GrantsWriteToNonAdmins(
             Rules(Allow(Admins, FileSystemRights.FullControl),
-                  Allow(System, FileSystemRights.FullControl))));
+                  Allow(System, FileSystemRights.FullControl)), isDirectory: true));
     }
 
     [Fact]
@@ -97,7 +99,65 @@ public class ScheduledTaskAclTests
         Assert.False(ScheduledTask.GrantsWriteToNonAdmins(
             Rules(Allow(Admins, FileSystemRights.FullControl),
                   Allow(System, FileSystemRights.FullControl),
-                  Allow(Users, FileSystemRights.ReadAndExecute))));
+                  Allow(Users, FileSystemRights.ReadAndExecute)), isDirectory: true));
+    }
+
+    // ── Files and directories are not the same risk ──────────────────────────
+
+    [Fact]
+    public void Append_data_on_a_parent_directory_is_not_enough_to_be_unsafe()
+    {
+        // This is the real C:\ ACE — "NT AUTHORITY\Authenticated Users:(AD)".
+        // On a directory AppendData means "create subfolders", which cannot
+        // touch an existing file inside it. Counting it would refuse every
+        // normal install and make the whole check useless.
+        Assert.False(ScheduledTask.GrantsWriteToNonAdmins(
+            Rules(Allow(Admins, FileSystemRights.FullControl),
+                  Allow(Authenticated, FileSystemRights.AppendData)),
+            isDirectory: true));
+    }
+
+    [Fact]
+    public void Append_data_on_the_file_itself_is_unsafe()
+    {
+        // On a file AppendData means appending to its contents, which is a
+        // write to the binary the task runs.
+        Assert.True(ScheduledTask.GrantsWriteToNonAdmins(
+            Rules(Allow(Users, FileSystemRights.AppendData)),
+            isDirectory: false));
+    }
+
+    [Fact]
+    public void Deleting_files_inside_a_directory_is_unsafe()
+    {
+        // Delete-then-recreate is how write access to a directory becomes
+        // control of a file inside it.
+        Assert.True(ScheduledTask.GrantsWriteToNonAdmins(
+            Rules(Allow(Users, FileSystemRights.DeleteSubdirectoriesAndFiles)),
+            isDirectory: true));
+    }
+
+    [Fact]
+    public void An_inherit_only_rule_does_not_apply_to_the_directory_carrying_it()
+    {
+        // The exact ACE on C:\ — "(OI)(CI)(IO)(M)" for Authenticated Users.
+        // InheritOnly means it grants nothing on C:\ itself and only reaches
+        // children, which are evaluated on their own effective rules. Counting
+        // it made the walk flag C:\ for every path on the machine, so a
+        // correctly hardened install directory was still refused.
+        var security = new DirectorySecurity();
+        security.SetAccessRuleProtection(true, false);
+        security.AddAccessRule(Allow(Admins, FileSystemRights.FullControl));
+        security.AddAccessRule(new FileSystemAccessRule(
+            Authenticated,
+            FileSystemRights.Modify,
+            InheritanceFlags.ObjectInherit | InheritanceFlags.ContainerInherit,
+            PropagationFlags.InheritOnly,
+            AccessControlType.Allow));
+
+        Assert.False(ScheduledTask.GrantsWriteToNonAdmins(
+            security.GetAccessRules(true, true, typeof(SecurityIdentifier)),
+            isDirectory: true));
     }
 
     [Fact]
@@ -112,6 +172,6 @@ public class ScheduledTaskAclTests
             Users, FileSystemRights.FullControl, AccessControlType.Deny));
 
         Assert.False(ScheduledTask.GrantsWriteToNonAdmins(
-            security.GetAccessRules(true, false, typeof(SecurityIdentifier))));
+            security.GetAccessRules(true, false, typeof(SecurityIdentifier)), isDirectory: true));
     }
 }

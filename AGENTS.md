@@ -167,6 +167,30 @@ quietly skip it, and it fails closed: an ACL that cannot be read is refused, not
 assumed safe. Deny rules are ignored on purpose — a Deny only removes access, so
 counting one as a grant would reject a correctly hardened directory.
 
+**`C:\rail-agent` is not safe by default, and creating it does not make it so.**
+The volume root carries `NT AUTHORITY\Authenticated Users:(OI)(CI)(IO)(M)` — an
+inherit-only Modify that lands as plain Modify on every file created underneath.
+The agent binary runs as a LocalSystem service, so on a stock install any user
+who can log into the POS box can replace it and be SYSTEM at the next service
+start. That was true of every box installed before `Hardening` existed, with no
+scheduled task involved. `Hardening.BuildSecureAcl` severs inheritance
+(`SetAccessRuleProtection(true, false)` — protect, and do **not** copy the
+inherited rules in, since they are the problem) and grants Administrators and
+SYSTEM full control with Users read-and-execute. Setup applies it; `--harden`
+fixes a box in the field, and `--install-task` does it automatically when it
+finds the directory writable, so one visit fixes both.
+
+Two things the ACL walk must get right, each of which silently broke it once:
+
+- **Files and directories are different risks.** `AppendData` on a *file* appends
+  to the binary; on a *directory* it only means "create subdirectories" and
+  cannot touch a file inside. It is also precisely what `C:\` grants everyone
+  (`(AD)`), so treating it as dangerous on directories refused every install on
+  every machine.
+- **An `InheritOnly` ACE grants nothing on the object carrying it.** Skipping it
+  is why `FindUnsafePath` stops flagging `C:\` itself for every path on the box.
+  Children are evaluated on their own effective rules, so nothing is lost.
+
 **POS sales deplete stock.** The item audit no longer just creates inventory rows:
 quantities move `current_stock` and write `usage_logs` with `reason: 'pos_sale'`.
 The agent re-sends a 2-day window every 5 minutes, so depletion is delta-based

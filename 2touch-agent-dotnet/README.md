@@ -378,6 +378,25 @@ writable by every user on the box. `--install-task` therefore always registers
 no copy is installed there, and refuses again if that directory or any directory
 above it grants write access to a non-administrator.
 
+### Install directory permissions
+
+A folder created under `C:\` inherits **Modify for Authenticated Users** from the
+volume root. The agent runs as a LocalSystem service, so on a stock install any
+user who can log into the POS box can replace `rail-2touch-agent.exe` and be
+SYSTEM at the next service start — no scheduled task involved, and true of every
+box installed before this was added.
+
+Setup now locks the directory down automatically. For a box already in the field:
+
+```powershell
+.\rail-update.exe --harden     # admins + SYSTEM may change it; users may only run it
+```
+
+`--install-task` does this for you when it finds the directory writable, so one
+visit fixes both. To confirm, `icacls C:\rail-agent` should show Administrators
+and SYSTEM with `(F)`, `BUILTIN\Users` with `(RX)`, and **no** Authenticated
+Users entry.
+
 `--check` exits `10` when an update is available, for monitoring that should not
 install anything.
 
