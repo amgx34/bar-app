@@ -115,4 +115,63 @@ public class HardeningReparseTests : IDisposable
         Assert.False(ok);
         Assert.Contains("junction", error ?? "", StringComparison.OrdinalIgnoreCase);
     }
+
+    // ── Hard links ───────────────────────────────────────────────────────────
+
+    [SkippableFact]
+    public void A_hard_link_is_refused()
+    {
+        // No reparse point is involved: a hard link is a second name for the
+        // same inode, so rewriting the ACL at this path rewrites it on whatever
+        // system file the attacker linked to. mklink /H needs no privilege.
+        var real = Path.Combine(_root, "a.txt");
+        File.WriteAllText(real, "x");
+        RunCmd($"mklink /H \"{Path.Combine(_root, "b.txt")}\" \"{real}\"");
+        Skip.If(!File.Exists(Path.Combine(_root, "b.txt")), "mklink /H unavailable");
+
+        var ok = Hardening.TryHarden(_root, out var error);
+
+        Assert.False(ok);
+        Assert.Contains("hard link", error ?? "", StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void An_ordinary_file_has_one_link()
+    {
+        var solo = Path.Combine(_root, "solo.txt");
+        File.WriteAllText(solo, "x");
+
+        Assert.Equal(1, Hardening.CountHardLinks(solo));
+    }
+
+    // ── Ordering: a directory is secured before it is read ───────────────────
+
+    [Fact]
+    public void A_directory_is_secured_before_anything_inside_it()
+    {
+        // The TOCTOU fix. Enumerating a directory that is still writable by the
+        // attacker lets them swap an entry between the look and the write, so
+        // every directory must be locked down before its contents are read.
+        var sub = Path.Combine(_root, "sub");
+        Directory.CreateDirectory(sub);
+        File.WriteAllText(Path.Combine(sub, "deep.txt"), "x");
+
+        var order = Hardening.PlanSecureOrder(new DirectoryInfo(_root));
+
+        var subIndex = order.FindIndex(p => p.EndsWith("sub", StringComparison.OrdinalIgnoreCase));
+        var deepIndex = order.FindIndex(p => p.EndsWith("deep.txt", StringComparison.OrdinalIgnoreCase));
+
+        Assert.True(subIndex >= 0 && deepIndex >= 0, "both entries should be secured");
+        Assert.True(subIndex < deepIndex, "the subdirectory must be secured before its contents");
+    }
+
+    [Fact]
+    public void The_root_is_secured_first_of_all()
+    {
+        File.WriteAllText(Path.Combine(_root, "top.txt"), "x");
+
+        var order = Hardening.PlanSecureOrder(new DirectoryInfo(_root));
+
+        Assert.Equal(_root, order[0], ignoreCase: true);
+    }
 }

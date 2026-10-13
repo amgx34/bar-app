@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.AccessControl;
 using System.Security.Principal;
 
@@ -146,16 +147,30 @@ public static class Hardening
                 return false;
             }
 
-            info.SetAccessControl(BuildSecureAcl());
+            // A hard link is a second name for the same file, with no reparse
+            // point to spot, so an ACL written here lands on whatever was
+            // linked. Best-effort by design: fsutil failing is not proof of an
+            // attack, and refusing every install on a filesystem it cannot read
+            // would trade a narrow risk for a broad outage. The ordering below
+            // does not depend on it.
+            var linked = FindHardLinks(info);
+            if (linked.Count > 0)
+            {
+                error = $"{directory} contains a hard link, which setup never creates: "
+                      + string.Join("; ", linked.Take(3))
+                      + ". Nothing was changed — an ACL written there would land on the linked file too.";
+                return false;
+            }
 
-            // Children are not covered by the parent's new ACL if they carry
-            // explicit rules or a hostile owner of their own — and they can.
-            // File.Copy(overwrite: true) writes into an existing file and keeps
-            // that file's owner and DACL, so an attacker who pre-created
-            // C:\rail-agent\rail-2touch-agent.exe still owns the binary setup
-            // just installed. Reset each one to inherit from the directory we
-            // have just secured.
-            var failures = ResetChildren(info);
+            // Secure the root FIRST, then descend. Once this ACL is on, only
+            // administrators can add, rename or delete entries here, so what the
+            // walk sees next cannot be swapped under it. Children still need
+            // their own reset: File.Copy(overwrite: true) keeps the target
+            // file's owner and DACL, so an attacker who pre-created
+            // rail-2touch-agent.exe still owns the binary setup just installed.
+            var failures = new List<string>();
+            SecureTree(info, failures);
+
             if (failures.Count > 0)
             {
                 error = $"{directory} was secured, but {failures.Count} item(s) under it could not be: "
@@ -183,6 +198,96 @@ public static class Hardening
     /// restore. A cleanup that removed "unexpected" files would delete the
     /// recovery path for a bad release.
     /// </summary>
+    /// <summary>
+    /// How many names this file has on the volume.
+    ///
+    /// A hard link is a second name for the same inode, with no reparse point
+    /// involved, so rewriting the ACL at one path rewrites it on every other —
+    /// including a system file an attacker linked into the install directory
+    /// before hardening ran. .NET exposes no link count, so this shells out to
+    /// fsutil, the way the rest of this code shells out to sc.exe and schtasks.
+    ///
+    /// Returns -1 when the count cannot be determined.
+    /// </summary>
+    public static int CountHardLinks(string path)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("fsutil.exe")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            psi.ArgumentList.Add("hardlink");
+            psi.ArgumentList.Add("list");
+            psi.ArgumentList.Add(path);
+
+            using var p = Process.Start(psi);
+            if (p is null) return -1;
+
+            var output = p.StandardOutput.ReadToEnd();
+            p.WaitForExit(15_000);
+            if (p.ExitCode != 0) return -1;
+
+            return output
+                .Split('\n')
+                .Count(line => !string.IsNullOrWhiteSpace(line));
+        }
+        catch
+        {
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// The order in which a tree would be secured: a directory always before
+    /// anything inside it.
+    ///
+    /// That order is the whole TOCTOU defence. Enumerating a directory a
+    /// standard user can still write lets them swap an entry between the look
+    /// and the write, so each directory's ACL is applied first — after which
+    /// only administrators can change its contents and reading it is safe.
+    /// </summary>
+    public static List<string> PlanSecureOrder(DirectoryInfo root)
+    {
+        var order = new List<string> { root.FullName };
+        CollectInOrder(root, order);
+        return order;
+    }
+
+    private static void CollectInOrder(DirectoryInfo dir, List<string> order)
+    {
+        foreach (var entry in SafeEntries(dir))
+        {
+            if ((entry.Attributes & FileAttributes.ReparsePoint) != 0) continue;
+
+            order.Add(entry.FullName);
+            if (entry is DirectoryInfo child) CollectInOrder(child, order);
+        }
+    }
+
+    private static IEnumerable<FileSystemInfo> SafeEntries(DirectoryInfo dir)
+    {
+        try
+        {
+            // AttributesToSkip = 0: the default hides hidden and system files,
+            // and a planted file would simply set those attributes to be passed
+            // over silently.
+            return dir.EnumerateFileSystemInfos("*", new EnumerationOptions
+            {
+                RecurseSubdirectories = false,
+                AttributesToSkip = 0,
+                IgnoreInaccessible = false,
+            }).ToList();
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
     public static (List<string> touched, List<string> reparsePoints) WalkForReset(DirectoryInfo root)
     {
         var touched = new List<string>();
@@ -233,36 +338,62 @@ public static class Hardening
         }
     }
 
-    private static List<string> ResetChildren(DirectoryInfo root)
+    /// <summary>
+    /// Finds files in the tree that have more than one name on the volume.
+    /// </summary>
+    private static List<string> FindHardLinks(DirectoryInfo root)
     {
-        var admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
-        var failures = new List<string>();
+        var found = new List<string>();
 
-        var (touched, _) = WalkForReset(root);
-
-        foreach (var path in touched)
+        foreach (var path in PlanSecureOrder(root))
         {
-            FileSystemInfo entry = Directory.Exists(path)
-                ? new DirectoryInfo(path)
-                : new FileInfo(path);
+            if (Directory.Exists(path)) continue;
+            if (CountHardLinks(path) > 1) found.Add(path);
+        }
+
+        return found;
+    }
+
+    /// <summary>
+    /// Applies the secure ACL to a directory and then, only once it is locked,
+    /// to everything inside it.
+    ///
+    /// The order is the point. A directory is secured before it is read, so by
+    /// the time its entries are enumerated no non-administrator can swap one of
+    /// them for a junction between the look and the write. Reparse points are
+    /// skipped outright rather than written to: setting an ACL on a link path
+    /// follows it to the target just as surely as descending would.
+    /// </summary>
+    private static void SecureTree(DirectoryInfo dir, List<string> failures)
+    {
+        foreach (var entry in SafeEntries(dir))
+        {
+            if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                failures.Add($"{entry.Name} (junction or symbolic link, left untouched)");
+                continue;
+            }
 
             try
             {
                 if (entry is FileInfo file)
                 {
                     var acl = new FileSecurity();
-                    // false, false = inherit from the parent, and drop the
-                    // explicit rules that are there now.
+                    // false, false = inherit from the parent we have just
+                    // secured, and drop the explicit rules that are there now.
                     acl.SetAccessRuleProtection(false, false);
-                    acl.SetOwner(admins);
+                    acl.SetOwner(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
                     file.SetAccessControl(acl);
                 }
-                else if (entry is DirectoryInfo dir)
+                else if (entry is DirectoryInfo child)
                 {
                     var acl = new DirectorySecurity();
                     acl.SetAccessRuleProtection(false, false);
-                    acl.SetOwner(admins);
-                    dir.SetAccessControl(acl);
+                    acl.SetOwner(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
+                    child.SetAccessControl(acl);
+
+                    // Only now is it safe to read what is inside.
+                    SecureTree(child, failures);
                 }
             }
             catch (Exception ex)
@@ -270,7 +401,5 @@ public static class Hardening
                 failures.Add($"{entry.Name} ({ex.Message})");
             }
         }
-
-        return failures;
     }
 }

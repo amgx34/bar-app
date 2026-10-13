@@ -218,6 +218,26 @@ attribute. `TryHarden` refuses the whole operation when it finds one, rather tha
 pressing on: setup never creates a reparse point there, so one is the signature
 of a pre-staged directory and is worth a human looking at it.
 
+**Securing a directory before reading it is what closes the race.** Scanning a
+tree and then writing to the paths found is check-then-use: a directory deeper
+in still carries the attacker's ACL, so they can swap an entry between the look
+and the write even after the root is locked. `SecureTree` therefore applies the
+ACL to a directory *first* and only then enumerates it — once that write lands,
+no non-administrator can add, rename or delete inside, so what the walk sees next
+cannot be swapped under it. `PlanSecureOrder` exists so that ordering is a tested
+property rather than an accident of how the recursion was written. Never flatten
+this into "scan, then apply".
+
+**A hard link has no reparse point to spot.** It is a second name for the same
+file, so an ACL written at one path lands on every other — including a system
+file linked into the install directory before hardening ran, which a standard
+user can do with `mklink /H` and no privilege at all. `CountHardLinks` shells out
+to `fsutil` because .NET exposes no link count, and `TryHarden` refuses when it
+finds one. This one is explicitly best-effort: `fsutil` failing is not evidence
+of an attack, and refusing every install on a volume it cannot read would trade a
+narrow risk for a broad outage. The ordering guarantee above does not depend on
+it.
+
 What hardening must NOT do is delete files it does not recognise. The install
 directory legitimately holds things this code has no manifest for — uncollected
 diagnostic reports, and `rail-2touch-agent.exe.bak`, which is the only thing
