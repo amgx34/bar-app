@@ -24,6 +24,40 @@ namespace RailAgent.Setup;
 public static class Hardening
 {
     /// <summary>
+    /// Principals already as privileged as the service itself, so giving them
+    /// control over the install directory escalates nothing.
+    ///
+    /// The one definition of "trusted" — <see cref="ScheduledTask"/> uses it for
+    /// its ACL walk too, so the check that guards the task and the ACL we write
+    /// cannot drift apart.
+    /// </summary>
+    public static bool IsTrustedPrincipal(IdentityReference id)
+    {
+        var sid = id as SecurityIdentifier ?? TryTranslate(id);
+        if (sid is null) return false;
+
+        // NT SERVICE\TrustedInstaller owns most of %ProgramFiles% and has no
+        // WellKnownSidType of its own.
+        const string trustedInstaller =
+            "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464";
+
+        return sid.IsWellKnown(WellKnownSidType.BuiltinAdministratorsSid)
+            || sid.IsWellKnown(WellKnownSidType.LocalSystemSid)
+            || sid.IsWellKnown(WellKnownSidType.CreatorOwnerSid)
+            || sid.Value == trustedInstaller;
+    }
+
+    /// <summary>
+    /// GetOwner can hand back an NTAccount rather than a SID. A name that will
+    /// not translate is not a name we can vouch for, so it stays untrusted.
+    /// </summary>
+    private static SecurityIdentifier? TryTranslate(IdentityReference id)
+    {
+        try { return (SecurityIdentifier)id.Translate(typeof(SecurityIdentifier)); }
+        catch { return null; }
+    }
+
+    /// <summary>
     /// The ACL an install directory should carry: administrators and SYSTEM may
     /// change it, everyone else may run what is in it and nothing more.
     ///
@@ -40,6 +74,14 @@ public static class Hardening
         // true  = protect from inheritance
         // false = do NOT copy the inherited rules in first; they are the problem.
         security.SetAccessRuleProtection(true, false);
+
+        // An owner keeps implicit WRITE_DAC however the DACL reads, so a
+        // directory still owned by a standard user can simply be re-granted to
+        // them and every rule below is decoration. This is reachable: C:\ lets
+        // any authenticated user create folders, so a standard user can
+        // pre-create C:\rail-agent, and File.Copy preserves an existing file's
+        // owner — setup would harden a directory the attacker still owns.
+        security.SetOwner(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
 
         const InheritanceFlags toChildren =
             InheritanceFlags.ObjectInherit | InheritanceFlags.ContainerInherit;
@@ -82,6 +124,22 @@ public static class Hardening
             }
 
             info.SetAccessControl(BuildSecureAcl());
+
+            // Children are not covered by the parent's new ACL if they carry
+            // explicit rules or a hostile owner of their own — and they can.
+            // File.Copy(overwrite: true) writes into an existing file and keeps
+            // that file's owner and DACL, so an attacker who pre-created
+            // C:\rail-agent\rail-2touch-agent.exe still owns the binary setup
+            // just installed. Reset each one to inherit from the directory we
+            // have just secured.
+            var failures = ResetChildren(info);
+            if (failures.Count > 0)
+            {
+                error = $"{directory} was secured, but {failures.Count} item(s) under it could not be: "
+                      + string.Join("; ", failures.Take(3));
+                return false;
+            }
+
             return true;
         }
         catch (Exception ex)
@@ -89,5 +147,51 @@ public static class Hardening
             error = ex.Message;
             return false;
         }
+    }
+
+    /// <summary>
+    /// Puts every existing file and subdirectory back under the parent's
+    /// inheritance and ownership.
+    ///
+    /// Deliberately does NOT delete anything it does not recognise. The install
+    /// directory legitimately accumulates files this code has no manifest for —
+    /// diagnostic reports an operator has not collected yet, and
+    /// rail-2touch-agent.exe.bak, which is the only thing a rollback has to
+    /// restore. A cleanup that removed "unexpected" files would delete the
+    /// recovery path for a bad release.
+    /// </summary>
+    private static List<string> ResetChildren(DirectoryInfo root)
+    {
+        var admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
+        var failures = new List<string>();
+
+        foreach (var entry in root.EnumerateFileSystemInfos("*", SearchOption.AllDirectories))
+        {
+            try
+            {
+                if (entry is FileInfo file)
+                {
+                    var acl = new FileSecurity();
+                    // false, false = inherit from the parent, and drop the
+                    // explicit rules that are there now.
+                    acl.SetAccessRuleProtection(false, false);
+                    acl.SetOwner(admins);
+                    file.SetAccessControl(acl);
+                }
+                else if (entry is DirectoryInfo dir)
+                {
+                    var acl = new DirectorySecurity();
+                    acl.SetAccessRuleProtection(false, false);
+                    acl.SetOwner(admins);
+                    dir.SetAccessControl(acl);
+                }
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"{entry.Name} ({ex.Message})");
+            }
+        }
+
+        return failures;
     }
 }

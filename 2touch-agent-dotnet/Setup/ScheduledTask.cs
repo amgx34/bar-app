@@ -134,25 +134,6 @@ public static class ScheduledTask
         | FileSystemRights.TakeOwnership;
 
     /// <summary>
-    /// SIDs that are already as privileged as the task itself, so granting them
-    /// write access escalates nothing.
-    /// </summary>
-    private static bool IsTrusted(IdentityReference id)
-    {
-        if (id is not SecurityIdentifier sid) return false;
-
-        // NT SERVICE\TrustedInstaller owns most of %ProgramFiles% and has no
-        // WellKnownSidType of its own.
-        const string trustedInstaller =
-            "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464";
-
-        return sid.IsWellKnown(WellKnownSidType.BuiltinAdministratorsSid)
-            || sid.IsWellKnown(WellKnownSidType.LocalSystemSid)
-            || sid.IsWellKnown(WellKnownSidType.CreatorOwnerSid)
-            || sid.Value == trustedInstaller;
-    }
-
-    /// <summary>
     /// Whether any principal that is not already an administrator can modify
     /// what lives at this path.
     ///
@@ -177,11 +158,29 @@ public static class ScheduledTask
             // directories that were already correct.
             if (rule.PropagationFlags.HasFlag(PropagationFlags.InheritOnly)) continue;
 
-            if (IsTrusted(rule.IdentityReference)) continue;
+            if (Hardening.IsTrustedPrincipal(rule.IdentityReference)) continue;
             if ((rule.FileSystemRights & dangerous) != 0) return true;
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Whether the owner recorded on a security descriptor is a principal we
+    /// already trust. An unreadable or absent owner counts as untrusted: this
+    /// gate fails closed.
+    /// </summary>
+    private static bool IsOwnedByTrusted(FileSystemSecurity acl)
+    {
+        try
+        {
+            var owner = acl.GetOwner(typeof(SecurityIdentifier));
+            return owner is not null && Hardening.IsTrustedPrincipal(owner);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -198,20 +197,31 @@ public static class ScheduledTask
         {
             var full = Path.GetFullPath(path);
 
-            if (File.Exists(full) &&
-                GrantsWriteToNonAdmins(
-                    new FileInfo(full).GetAccessControl()
-                        .GetAccessRules(true, true, typeof(SecurityIdentifier)),
-                    isDirectory: false))
+            if (File.Exists(full))
             {
-                return full;
+                var acl = new FileInfo(full).GetAccessControl();
+
+                // The owner is as good as a write grant: WRITE_DAC is implicit,
+                // so whoever owns this can re-grant themselves Full Control at
+                // any time and the DACL above says nothing about it.
+                if (!IsOwnedByTrusted(acl)) return full;
+
+                if (GrantsWriteToNonAdmins(
+                        acl.GetAccessRules(true, true, typeof(SecurityIdentifier)),
+                        isDirectory: false))
+                {
+                    return full;
+                }
             }
 
             for (var dir = new FileInfo(full).Directory; dir is not null; dir = dir.Parent)
             {
+                var acl = dir.GetAccessControl();
+
+                if (!IsOwnedByTrusted(acl)) return dir.FullName;
+
                 if (GrantsWriteToNonAdmins(
-                        dir.GetAccessControl()
-                           .GetAccessRules(true, true, typeof(SecurityIdentifier)),
+                        acl.GetAccessRules(true, true, typeof(SecurityIdentifier)),
                         isDirectory: true))
                 {
                     return dir.FullName;

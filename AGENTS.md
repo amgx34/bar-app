@@ -191,6 +191,27 @@ Two things the ACL walk must get right, each of which silently broke it once:
   is why `FindUnsafePath` stops flagging `C:\` itself for every path on the box.
   Children are evaluated on their own effective rules, so nothing is lost.
 
+**A DACL is only half an ACL — the owner keeps implicit `WRITE_DAC`.** A
+directory locked to administrators but still *owned* by a standard user is not
+locked at all: the owner re-grants themselves Full Control and the rules say
+nothing about it. This is reachable rather than theoretical, because `C:\` lets
+any authenticated user create folders — a standard user can pre-create
+`C:\rail-agent` before setup ever runs, and `File.Copy(overwrite: true)` writes
+into an existing file while preserving *that file's* owner and DACL, so setup
+would install the agent into a binary the attacker still owns. So
+`BuildSecureAcl` sets the owner to Administrators, `TryHarden` resets every
+existing child to inherit from the secured parent, and `FindUnsafePath` treats an
+untrusted or unreadable owner as unsafe on the file and on every directory above
+it. Setting the owner needs elevation, which is why `TryHarden` fails outright
+rather than half-applying when run unelevated — a hardening step that reported
+success without changing the owner is the exact bug this paragraph exists for.
+
+What hardening must NOT do is delete files it does not recognise. The install
+directory legitimately holds things this code has no manifest for — uncollected
+diagnostic reports, and `rail-2touch-agent.exe.bak`, which is the only thing
+`--rollback` has to restore. Tidying away "unexpected" files would delete the
+recovery path for a bad release.
+
 **POS sales deplete stock.** The item audit no longer just creates inventory rows:
 quantities move `current_stock` and write `usage_logs` with `reason: 'pos_sale'`.
 The agent re-sends a 2-day window every 5 minutes, so depletion is delta-based

@@ -97,6 +97,35 @@ public class HardeningTests
         Assert.Equal(default, RightsFor(Hardening.BuildSecureAcl(), Authenticated));
     }
 
+    // ── Ownership ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Administrators_are_made_the_owner()
+    {
+        // An owner keeps implicit WRITE_DAC whatever the DACL says, so a
+        // directory locked down but still owned by a standard user is not
+        // locked down at all — they can re-grant themselves Full Control.
+        // C:\ lets any authenticated user create folders, so a standard user
+        // can pre-create C:\rail-agent and own it before setup ever runs.
+        Assert.Equal(
+            Admins,
+            Hardening.BuildSecureAcl().GetOwner(typeof(SecurityIdentifier)));
+    }
+
+    [Fact]
+    public void A_standard_user_owner_is_untrusted()
+    {
+        Assert.False(Hardening.IsTrustedPrincipal(Users));
+        Assert.False(Hardening.IsTrustedPrincipal(Authenticated));
+    }
+
+    [Fact]
+    public void Administrators_and_system_are_trusted_owners()
+    {
+        Assert.True(Hardening.IsTrustedPrincipal(Admins));
+        Assert.True(Hardening.IsTrustedPrincipal(System));
+    }
+
     [Fact]
     public void The_acl_we_write_passes_the_check_that_guards_the_task()
     {
