@@ -228,6 +228,17 @@ cannot be swapped under it. `PlanSecureOrder` exists so that ordering is a teste
 property rather than an accident of how the recursion was written. Never flatten
 this into "scan, then apply".
 
+`SecureTree` secures **the directory it is given**, not merely the entries inside
+it, and does not descend into one it failed to lock. A refactor once dropped the
+root's own `SetAccessControl`, and because every child is set to *inherit*, the
+whole tree then carried the volume root's `Authenticated Users: Modify` — so
+`TryHarden` returned true having made the directory no safer, and arguably worse
+for any file that previously had a protective explicit ACL. Every hardening test
+was either pure or a refusal path that returns before applying, so none of them
+noticed. `SecureTree` returns what it *attempted* for that reason: asserting the
+root is `attempted[0]` catches this without needing an elevated test host, which
+is the only reason the gap existed.
+
 **A hard link has no reparse point to spot.** It is a second name for the same
 file, so an ACL written at one path lands on every other — including a system
 file linked into the install directory before hardening ran, which a standard

@@ -174,4 +174,51 @@ public class HardeningReparseTests : IDisposable
 
         Assert.Equal(_root, order[0], ignoreCase: true);
     }
+
+    // ── The root itself ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void The_root_directory_is_secured_not_just_its_contents()
+    {
+        // Regression guard. A refactor once left SecureTree walking only the
+        // entries inside the directory, so the install directory never had its
+        // inheritance severed — and because children are set to inherit, every
+        // file then picked up the Authenticated Users Modify still flowing down
+        // from the volume root. TryHarden reported success while changing
+        // nothing that mattered, the precise failure this code exists to stop.
+        File.WriteAllText(Path.Combine(_root, "rail-update.exe"), "x");
+
+        var (attempted, _) = Hardening.SecureTree(new DirectoryInfo(_root));
+
+        Assert.NotEmpty(attempted);
+        Assert.Equal(_root, attempted[0], ignoreCase: true);
+    }
+
+    [Fact]
+    public void A_directory_that_could_not_be_secured_is_not_descended_into()
+    {
+        // The invariant that closes the race. Reading a directory still
+        // writable by a standard user lets them swap an entry between the look
+        // and the write, so if locking it down fails we must stop there rather
+        // than walk on into contents we cannot trust.
+        //
+        // Holds whichever way the run goes: securing the root needs elevation,
+        // so unelevated it fails and nothing inside may be touched, and
+        // elevated it succeeds and the contents follow it.
+        File.WriteAllText(Path.Combine(_root, "rail-update.exe"), "x");
+
+        var (attempted, failures) = Hardening.SecureTree(new DirectoryInfo(_root));
+
+        Assert.Equal(_root, attempted[0], ignoreCase: true);
+
+        if (failures.Any(f => f.StartsWith(_root, StringComparison.OrdinalIgnoreCase)))
+        {
+            Assert.Single(attempted);
+        }
+        else
+        {
+            Assert.Contains(attempted,
+                p => p.EndsWith("rail-update.exe", StringComparison.OrdinalIgnoreCase));
+        }
+    }
 }

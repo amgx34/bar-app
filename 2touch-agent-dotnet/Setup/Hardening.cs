@@ -168,8 +168,7 @@ public static class Hardening
             // their own reset: File.Copy(overwrite: true) keeps the target
             // file's owner and DACL, so an attacker who pre-created
             // rail-2touch-agent.exe still owns the binary setup just installed.
-            var failures = new List<string>();
-            SecureTree(info, failures);
+            var (_, failures) = SecureTree(info);
 
             if (failures.Count > 0)
             {
@@ -364,8 +363,49 @@ public static class Hardening
     /// skipped outright rather than written to: setting an ACL on a link path
     /// follows it to the target just as surely as descending would.
     /// </summary>
-    private static void SecureTree(DirectoryInfo dir, List<string> failures)
+    public static (List<string> attempted, List<string> failures) SecureTree(DirectoryInfo root)
     {
+        var attempted = new List<string>();
+        var failures = new List<string>();
+        SecureTree(root, attempted, failures, isRoot: true);
+        return (attempted, failures);
+    }
+
+    private static void SecureTree(
+        DirectoryInfo dir, List<string> attempted, List<string> failures, bool isRoot)
+    {
+        // Secure THIS directory before reading it. Leaving this out is not a
+        // cosmetic slip: without it the install directory keeps the volume
+        // root's inherited Authenticated Users Modify, and since every child is
+        // then set to inherit, the whole tree ends up carrying it. Hardening
+        // would report success having made the directory no safer.
+        attempted.Add(dir.FullName);
+        try
+        {
+            // The root severs inheritance outright. A subdirectory inherits
+            // from the parent that has just been secured, which is the same
+            // result by a shorter route.
+            if (isRoot)
+            {
+                dir.SetAccessControl(BuildSecureAcl());
+            }
+            else
+            {
+                var acl = new DirectorySecurity();
+                acl.SetAccessRuleProtection(false, false);
+                acl.SetOwner(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
+                dir.SetAccessControl(acl);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Do not descend into a directory we failed to lock: its contents
+            // are still swappable, which is the race this ordering exists to
+            // close.
+            failures.Add($"{dir.FullName} ({ex.Message})");
+            return;
+        }
+
         foreach (var entry in SafeEntries(dir))
         {
             if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
@@ -374,31 +414,26 @@ public static class Hardening
                 continue;
             }
 
+            if (entry is DirectoryInfo child)
+            {
+                // Recursing secures the child and only then reads inside it.
+                SecureTree(child, attempted, failures, isRoot: false);
+                continue;
+            }
+
+            attempted.Add(entry.FullName);
             try
             {
-                if (entry is FileInfo file)
-                {
-                    var acl = new FileSecurity();
-                    // false, false = inherit from the parent we have just
-                    // secured, and drop the explicit rules that are there now.
-                    acl.SetAccessRuleProtection(false, false);
-                    acl.SetOwner(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
-                    file.SetAccessControl(acl);
-                }
-                else if (entry is DirectoryInfo child)
-                {
-                    var acl = new DirectorySecurity();
-                    acl.SetAccessRuleProtection(false, false);
-                    acl.SetOwner(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
-                    child.SetAccessControl(acl);
-
-                    // Only now is it safe to read what is inside.
-                    SecureTree(child, failures);
-                }
+                var acl = new FileSecurity();
+                // false, false = inherit from the parent we have just secured,
+                // and drop the explicit rules that are there now.
+                acl.SetAccessRuleProtection(false, false);
+                acl.SetOwner(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
+                ((FileInfo)entry).SetAccessControl(acl);
             }
             catch (Exception ex)
             {
-                failures.Add($"{entry.Name} ({ex.Message})");
+                failures.Add($"{entry.FullName} ({ex.Message})");
             }
         }
     }
