@@ -99,6 +99,20 @@ public class SqlReader(IOptions<AgentConfig> cfg)
     public const string CutoffToken = "{cutoff}";
 
     /// <summary>
+    /// Exclusive upper bound, used only by a backfill.
+    ///
+    /// Applied to the BUSINESS date, not the raw column: with a 4am cutoff a 1am
+    /// ticket belongs to the night before, and a bound on the raw timestamp
+    /// would file it in the neighbouring chunk. Chunk boundaries are precisely
+    /// where that error shows up. Formatted invariantly so a box set to a
+    /// d/M/yyyy culture does not hand SQL Server a different day.
+    /// </summary>
+    private static string Until(string dateColumn, int cutoffHour, DateOnly? until)
+        => until is null
+            ? ""
+            : $"{Environment.NewLine}          AND {BusinessDate(dateColumn, cutoffHour)} < '{until:yyyy-MM-dd}'";
+
+    /// <summary>
     /// A table expression may be a plain name, or a derived table with joins —
     /// FROM accepts both. Where it is a derived table over a large history
     /// table, the outer WHERE filters a CAST and cannot seek, so the expression
@@ -115,7 +129,7 @@ public class SqlReader(IOptions<AgentConfig> cfg)
     // config the wizard fills from INFORMATION_SCHEMA (bracket-quoted) — never
     // from request data.
 
-    public static string ZReportSql(string table, ZReportColumns c, int lookbackDays, int cutoffHour, int? top = null) => $"""
+    public static string ZReportSql(string table, ZReportColumns c, int lookbackDays, int cutoffHour, int? top = null, DateOnly? until = null) => $"""
         SELECT {Top(top)}{BusinessDate(c.Date, cutoffHour)} AS report_date,
                SUM({c.Sales})     AS total_sales,
                SUM({c.CcTips})    AS cc_tips,
@@ -123,12 +137,12 @@ public class SqlReader(IOptions<AgentConfig> cfg)
                SUM({c.CashSales}) AS cash_sales,
                SUM({c.CardSales}) AS card_sales
         FROM {Source(table, lookbackDays, cutoffHour)}
-        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'
+        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'{Until(c.Date, cutoffHour, until)}
         GROUP BY {BusinessDate(c.Date, cutoffHour)}
         ORDER BY report_date DESC
         """;
 
-    public static string EwReportSql(string table, EwReportColumns c, int lookbackDays, int cutoffHour, int? top = null) => $"""
+    public static string EwReportSql(string table, EwReportColumns c, int lookbackDays, int cutoffHour, int? top = null, DateOnly? until = null) => $"""
         SELECT {Top(top)}{BusinessDate(c.Date, cutoffHour)}     AS shift_date,
                {c.EmployeeName}           AS employee_name,
                ISNULL({c.TotalSales}, 0)  AS total_sales,
@@ -136,18 +150,18 @@ public class SqlReader(IOptions<AgentConfig> cfg)
                ISNULL({c.RegularHours}, 0)  AS regular_hours,
                ISNULL({c.OvertimeHours}, 0) AS overtime_hours
         FROM {Source(table, lookbackDays, cutoffHour)}
-        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'
+        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'{Until(c.Date, cutoffHour, until)}
         ORDER BY shift_date DESC, employee_name
         """;
 
-    public static string ItemAuditSql(string table, ItemAuditColumns c, int lookbackDays, int cutoffHour, int? top = null) => $"""
+    public static string ItemAuditSql(string table, ItemAuditColumns c, int lookbackDays, int cutoffHour, int? top = null, DateOnly? until = null) => $"""
         SELECT {Top(top)}{BusinessDate(c.Date, cutoffHour)} AS sale_date,
                {c.ItemName}           AS item_name,
                {c.Category}           AS category_name,
                SUM({c.QtySold})       AS qty_sold,
                SUM({c.NetSales})      AS net_sales
         FROM {Source(table, lookbackDays, cutoffHour)}
-        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'
+        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'{Until(c.Date, cutoffHour, until)}
         GROUP BY {BusinessDate(c.Date, cutoffHour)}, {c.ItemName}, {c.Category}
         ORDER BY sale_date DESC, net_sales DESC
         """;
@@ -166,14 +180,14 @@ public class SqlReader(IOptions<AgentConfig> cfg)
     /// is actually managed by.
     /// </summary>
     public static string HourlySalesSql(
-        string table, HourlySalesColumns c, int lookbackDays, int cutoffHour, int? top = null) => $"""
+        string table, HourlySalesColumns c, int lookbackDays, int cutoffHour, int? top = null, DateOnly? until = null) => $"""
         SELECT {Top(top)}{BusinessDate(c.Date, cutoffHour)} AS business_date,
                DATEPART(HOUR, {c.Date})                     AS hour,
                SUM({c.Sales})                               AS net_sales,
                COUNT(DISTINCT {c.TicketNo})                 AS ticket_count,
                SUM({c.Tips})                                AS tips
         FROM {Source(table, lookbackDays, cutoffHour)}
-        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'
+        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'{Until(c.Date, cutoffHour, until)}
         GROUP BY {BusinessDate(c.Date, cutoffHour)}, DATEPART(HOUR, {c.Date})
         ORDER BY business_date DESC, hour
         """;
@@ -186,14 +200,14 @@ public class SqlReader(IOptions<AgentConfig> cfg)
     /// screen.
     /// </summary>
     public static string ServerSalesSql(
-        string table, ServerSalesColumns c, int lookbackDays, int cutoffHour, int? top = null) => $"""
+        string table, ServerSalesColumns c, int lookbackDays, int cutoffHour, int? top = null, DateOnly? until = null) => $"""
         SELECT {Top(top)}{BusinessDate(c.Date, cutoffHour)} AS business_date,
                {c.ServerName}                               AS server_name,
                SUM({c.Sales})                               AS net_sales,
                COUNT(DISTINCT {c.TicketNo})                 AS ticket_count,
                SUM({c.Tips})                                AS tips
         FROM {Source(table, lookbackDays, cutoffHour)}
-        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'
+        WHERE {BusinessDate(c.Date, cutoffHour)} >= '{Cutoff(lookbackDays)}'{Until(c.Date, cutoffHour, until)}
         GROUP BY {BusinessDate(c.Date, cutoffHour)}, {c.ServerName}
         ORDER BY business_date DESC, net_sales DESC
         """;
@@ -269,10 +283,10 @@ public class SqlReader(IOptions<AgentConfig> cfg)
         return rows;
     }
 
-    public virtual async Task<List<HourlySalesRow>> QueryHourlySalesAsync(SqlConnection conn, int lookbackDays, CancellationToken ct)
+    public virtual async Task<List<HourlySalesRow>> QueryHourlySalesAsync(SqlConnection conn, int lookbackDays, CancellationToken ct, DateOnly? until = null)
     {
         var sql = HourlySalesSql(_cfg.Tables.HourlySales, _cfg.Columns.HourlySales, lookbackDays,
-            FeedCutoff(_cfg.Columns.HourlySales.DateHasTime, _cfg.Sync.ResolvedCutoffHour));
+            FeedCutoff(_cfg.Columns.HourlySales.DateHasTime, _cfg.Sync.ResolvedCutoffHour), until: until);
 
         var rows = new List<HourlySalesRow>();
         await using var cmd = new SqlCommand(sql, conn);
@@ -289,10 +303,10 @@ public class SqlReader(IOptions<AgentConfig> cfg)
         return rows;
     }
 
-    public virtual async Task<List<ServerSalesRow>> QueryServerSalesAsync(SqlConnection conn, int lookbackDays, CancellationToken ct)
+    public virtual async Task<List<ServerSalesRow>> QueryServerSalesAsync(SqlConnection conn, int lookbackDays, CancellationToken ct, DateOnly? until = null)
     {
         var sql = ServerSalesSql(_cfg.Tables.ServerSales, _cfg.Columns.ServerSales, lookbackDays,
-            FeedCutoff(_cfg.Columns.ServerSales.DateHasTime, _cfg.Sync.ResolvedCutoffHour));
+            FeedCutoff(_cfg.Columns.ServerSales.DateHasTime, _cfg.Sync.ResolvedCutoffHour), until: until);
 
         var rows = new List<ServerSalesRow>();
         await using var cmd = new SqlCommand(sql, conn);

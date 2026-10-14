@@ -50,13 +50,13 @@ public class SyncServiceTests
             return Task.FromResult(new List<ItemAuditRow> { new("2026-08-06", "Lager", "Beer", 3m, 21m) });
         }
 
-        public override Task<List<HourlySalesRow>> QueryHourlySalesAsync(SqlConnection c, int days, CancellationToken ct)
+        public override Task<List<HourlySalesRow>> QueryHourlySalesAsync(SqlConnection c, int days, CancellationToken ct, DateOnly? until = null)
         {
             Queried.Add("hourly");
             return Task.FromResult(new List<HourlySalesRow> { new("2026-08-06", 20, 100m, 5, 10m) });
         }
 
-        public override Task<List<ServerSalesRow>> QueryServerSalesAsync(SqlConnection c, int days, CancellationToken ct)
+        public override Task<List<ServerSalesRow>> QueryServerSalesAsync(SqlConnection c, int days, CancellationToken ct, DateOnly? until = null)
         {
             Queried.Add("server");
             return Task.FromResult(new List<ServerSalesRow> { new("2026-08-06", "Alex", 100m, 5, 10m) });
@@ -80,7 +80,8 @@ public class SyncServiceTests
             IReadOnlyList<ItemAuditRow> audit, CancellationToken ct,
             IReadOnlyList<HourlySalesRow>? hourlySales = null,
             IReadOnlyList<ServerSalesRow>? serverSales = null,
-            IReadOnlyList<string>? agentErrors = null)
+            IReadOnlyList<string>? agentErrors = null,
+        bool backfill = false)
         {
             Z = z; Ew = ew; Audit = audit; Hourly = hourlySales; Server = serverSales;
             AgentErrors = agentErrors; Pushes++;

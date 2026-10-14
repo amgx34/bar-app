@@ -69,7 +69,17 @@ public sealed record IngestPayload(
     // working, and the only way to tell them apart was a human running
     // --test on the machine. See SyncService.RunOnceAsync.
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    IReadOnlyList<string>? agentErrors = null);
+    IReadOnlyList<string>? agentErrors = null,
+    // A one-off history pull rather than the five-minute cycle.
+    //
+    // The route uses it to leave the sync status alone. A backfill posts one
+    // chunk per month, each covering nights long past and carrying none of the
+    // feeds the bar normally sends, so letting those writes land on
+    // last_sync_at and last_sync_summary would make a healthy bar look dead for
+    // as long as the backfill ran. Omitted on a normal sync, so an older route
+    // that has never heard of it behaves exactly as before.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    bool? backfill = null);
 
 /// <summary>
 /// One cycle's outcome. <paramref name="Ok"/> is false when a CONFIGURED feed
@@ -78,3 +88,12 @@ public sealed record IngestPayload(
 /// </summary>
 public sealed record SyncResult(
     bool Ok, int ZReports, int EwReports, int ItemAudit, string? Error = null);
+
+/// <summary>One backfill window's outcome, for the summary printed at the end.</summary>
+public sealed record BackfillChunkResult(
+    RailAgent.Services.Backfill.Window Window,
+    int Rows,
+    IReadOnlyList<string> Errors)
+{
+    public bool Ok => Errors.Count == 0;
+}

@@ -112,6 +112,12 @@ all three are load-bearing:
   a bar closed for two days is genuinely indistinguishable from a dead feed here.
   An **absent** `last_sync_summary` means "cannot say", never "moved nothing" —
   old agents must not light up every dashboard.
+- `appsettings.json` sets `Logging:EventLog:LogLevel`. Microsoft's EventLog
+  provider caps itself at Warning regardless of `LogLevel:Default`, because that
+  rule is per-provider. Left alone, every `✓ Sync complete — Z:2 EW:16` the agent
+  writes is discarded, and the Application log shows only the Start/Stop entries
+  `ServiceBase.AutoLog` writes directly — which are not ours and pass through no
+  filter, so their presence proves nothing about the agent.
 
 **`pos_config` is one JSON blob with two writers per request, and the second one
 wins.** The ingest records the agent's version right after authentication and the
@@ -128,12 +134,6 @@ so the next write builds on the last. The builders live in `lib/pos/pos-config.t
 pure and tested, and `pos-config.test.ts` pins the ordering in both directions.
 Any future writer of this column must take the latest config and return what it
 wrote — never spread whatever was read first.
-- `appsettings.json` sets `Logging:EventLog:LogLevel`. Microsoft's EventLog
-  provider caps itself at Warning regardless of `LogLevel:Default`, because that
-  rule is per-provider. Left alone, every `✓ Sync complete — Z:2 EW:16` the agent
-  writes is discarded, and the Application log shows only the Start/Stop entries
-  `ServiceBase.AutoLog` writes directly — which are not ours and pass through no
-  filter, so their presence proves nothing about the agent.
 
 **`rail-update.exe` replaces the binary and nothing else.** The schema mapping
 lives in each box's `appsettings.local.json`, so a feed added in a new release
@@ -286,6 +286,33 @@ directory legitimately holds things this code has no manifest for — uncollecte
 diagnostic reports, and `rail-2touch-agent.exe.bak`, which is the only thing
 `--rollback` has to restore. Tidying away "unexpected" files would delete the
 recovery path for a bad release.
+
+**History is not backfilled by mapping a feed.** `ProfileMigration` adds a feed
+to an existing box's config; it cannot add the nights that passed while the feed
+was unmapped, because the ordinary sync carries a rolling two-day window.
+`--backfill --from --to --feeds` pulls a fixed range and posts it one window at
+a time (`lib`-free, `Services/Backfill.cs`, pure and tested). It is deliberately
+not `--once --days 365`: that is one request carrying a year of trade, past both
+the ingest route's body limit and its 30-second budget, and all-or-nothing.
+
+Three rules it inherits rather than reinvents. Windows **tile** — each upper
+bound is exclusive and is exactly the next lower bound — so no night is counted
+twice. They run **oldest first**, so an interrupted backfill leaves a contiguous
+history with the hole at the recent end, which the rolling sync then closes on
+its own. And `--feeds` has **no default**: backfilling `items` writes
+`usage_logs` with `reason: 'pos_sale'` and moves `current_stock` for every night
+in range, so a year of item audit restates a year of inventory. An unrecognised
+feed name is an error, never a silent omission.
+
+The upper bound is applied to the **business date**, not the raw timestamp. With
+a 4am cutoff a 1am ticket belongs to the night before, and a bound on the raw
+column files it in the neighbouring window — chunk boundaries being exactly
+where that shows up. A backfill payload also carries `backfill: true`, and the
+ingest then leaves `last_sync_at` and `last_sync_summary` alone: those describe
+the live five-minute cycle, and a long run would otherwise make a healthy bar
+look dead throughout and finish with the status describing last March. Feeds
+with no table mapped are refused before anything is queried, since zero rows
+from an unmapped feed reads as "the POS kept no history".
 
 **POS sales deplete stock.** The item audit no longer just creates inventory rows:
 quantities move `current_stock` and write `usage_logs` with `reason: 'pos_sale'`.

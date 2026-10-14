@@ -103,6 +103,18 @@ type Payload = {
    * "nothing went wrong".
    */
   agentErrors?: string[];
+  /**
+   * A one-off history pull rather than the five-minute cycle.
+   *
+   * A backfill posts one window per month, each covering nights long past and
+   * carrying only the feeds asked for. Letting those writes land on
+   * last_sync_at and last_sync_summary would make a healthy bar look dead for
+   * as long as the backfill ran, and would leave the status describing a
+   * window from last March once it finished. Absent on every normal sync and
+   * on every agent older than the release that added it, so absence means
+   * "an ordinary sync", never "unknown".
+   */
+  backfill?: boolean;
 };
 
 // Shapes written to Supabase. Collected into arrays and sent as one upsert per
@@ -808,16 +820,21 @@ export async function POST(req: NextRequest) {
   // and carries on so one bad day cannot block the rest, but "carries on" also
   // meant the only trace was a server log nobody reads. The POS settings panel
   // now shows the last sync and anything that went wrong on it.
-  await recordSyncOutcome(resolvedOrgId, posConfig, result.errors, {
-    zReports: result.zReports,
-    ewReports: result.ewReports,
-    shiftsProtected: result.shiftsProtected,
-    itemAudit: result.itemAudit,
-    stockMoved: result.stockMoved,
-    unresolvedItems: result.unresolvedItems,
-    hoursRecorded: result.hoursRecorded,
-    serversRecorded: result.serversRecorded,
-  });
+  // A backfill deliberately does not touch the sync status — see Payload.backfill.
+  // The data it carries is written exactly as any other ingest writes it; only
+  // the status line is left for the live sync to own.
+  if (!data.backfill) {
+    await recordSyncOutcome(resolvedOrgId, posConfig, result.errors, {
+      zReports: result.zReports,
+      ewReports: result.ewReports,
+      shiftsProtected: result.shiftsProtected,
+      itemAudit: result.itemAudit,
+      stockMoved: result.stockMoved,
+      unresolvedItems: result.unresolvedItems,
+      hoursRecorded: result.hoursRecorded,
+      serversRecorded: result.serversRecorded,
+    });
+  }
 
   if (result.errors.length) {
     console.error(`[2touch/ingest] org=${resolvedOrgId} FAILED`, result.errors);

@@ -405,6 +405,59 @@ install anything.
 green in Rail, with nothing anywhere reporting that it is behind. Steps 1–4 make
 a release available; the Scheduled Task is what delivers it.
 
+### Backfilling history
+
+The ordinary sync carries a rolling two-day window, so a feed that was only
+mapped recently has no history behind it — `ProfileMigration` adds the mapping,
+not the nights it missed. `--backfill` pulls a fixed range and posts it a window
+at a time:
+
+```powershell
+.ail-2touch-agent.exe --backfill --from 2025-10-01 --to 2026-10-13 --feeds hourly,server
+```
+
+| Flag | Meaning |
+|---|---|
+| `--from YYYY-MM-DD` | first night to pull, inclusive |
+| `--to YYYY-MM-DD` | first night NOT to pull, exclusive; defaults to today |
+| `--feeds` | **required** — `hourly`, `server`, `z`, `ew`, `items` |
+| `--chunk-days N` | nights per request, default 30 |
+
+Run it on the POS box: only that machine can reach the 2Touch database.
+
+**`--feeds` has no default on purpose.** Backfilling `items` writes `usage_logs`
+with `reason: 'pos_sale'` and moves `current_stock` for every night in range, so
+a year of item audit restates a year of inventory. That has to be asked for, not
+arrived at by forgetting a flag. An unrecognised feed name is an error rather
+than a silent omission, because a typo that quietly pulled less than asked looks
+exactly like a POS with no history.
+
+It is **not** `--once --days 365`. That would be one request carrying a year of
+trade, which exceeds both the ingest route's body limit and its thirty-second
+budget, and would arrive as a single all-or-nothing push. `--backfill` cuts the
+range into consecutive windows — a tiling, not an overlap, so no night is counted
+twice — and works oldest first, so an interrupted run leaves a contiguous history
+with the gap at the recent end, which the rolling sync then closes on its own.
+
+A window that fails does not stop the others. The summary at the end lists the
+exact flags to re-run just those:
+
+```
+  [7/13] 2026-04-01 → 2026-05-01 … FAILED — push: Rail ingest → 503
+  ...
+These windows did not land and can be re-run on their own:
+  --from 2026-04-01 --to 2026-05-01
+```
+
+A backfill marks its payload so the ingest leaves `last_sync_at` and
+`last_sync_summary` alone. Without that, a long run would make a healthy bar
+look dead for as long as it took, and finish with the status describing a window
+from last March.
+
+Feeds with no table mapped on the box are refused before anything is queried —
+otherwise a pre-1.3 config, which has no hourly or per-server mapping at all,
+would return zero rows and read as "the POS kept no history".
+
 ### Rolling back
 
 ```powershell

@@ -34,7 +34,8 @@ public class RailClient(IHttpClientFactory factory, IOptions<AgentConfig> cfg, I
         CancellationToken ct,
         IReadOnlyList<HourlySalesRow>? hourlySales = null,
         IReadOnlyList<ServerSalesRow>? serverSales = null,
-        IReadOnlyList<string>? agentErrors = null)
+        IReadOnlyList<string>? agentErrors = null,
+        bool backfill = false)
     {
         if (string.IsNullOrWhiteSpace(_rail.OrgId) || _rail.OrgId.StartsWith("REPLACE", StringComparison.Ordinal))
             throw new InvalidOperationException("Rail.OrgId is not configured — run the setup wizard (double-click the exe) or paste a pairing code from Rail → Settings → POS Integration → 2TouchPOS.");
@@ -43,7 +44,7 @@ public class RailClient(IHttpClientFactory factory, IOptions<AgentConfig> cfg, I
 
         var http = factory.CreateClient("rail");
         var result = await SendAsync(
-            http, _rail, zReports, ewReports, itemAudit, ct, hourlySales, serverSales, agentErrors);
+            http, _rail, zReports, ewReports, itemAudit, ct, hourlySales, serverSales, agentErrors, backfill);
 
         if (!result.Ok)
             throw new HttpRequestException($"Rail ingest → {result.StatusCode}: {result.Body}");
@@ -70,7 +71,8 @@ public class RailClient(IHttpClientFactory factory, IOptions<AgentConfig> cfg, I
         CancellationToken ct,
         IReadOnlyList<HourlySalesRow>? hourlySales = null,
         IReadOnlyList<ServerSalesRow>? serverSales = null,
-        IReadOnlyList<string>? agentErrors = null)
+        IReadOnlyList<string>? agentErrors = null,
+        bool backfill = false)
     {
         var payload = new IngestPayload(
             org_id: rail.OrgId,
@@ -83,7 +85,10 @@ public class RailClient(IHttpClientFactory factory, IOptions<AgentConfig> cfg, I
             serverSales: serverSales,
             // Omitted entirely when null, so the signed bytes of a clean cycle
             // are byte-for-byte what they were before this field existed.
-            agentErrors: agentErrors is { Count: > 0 } ? agentErrors : null);
+            agentErrors: agentErrors is { Count: > 0 } ? agentErrors : null,
+            // Same rule: omitted on a normal sync, so those signed bytes are
+            // unchanged from before this field existed.
+            backfill: backfill ? true : null);
 
         var body = JsonSerializer.Serialize(payload, JsonOpts);
         var signature = Sign(body, rail.AuthToken);
