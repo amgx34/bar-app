@@ -112,6 +112,22 @@ all three are load-bearing:
   a bar closed for two days is genuinely indistinguishable from a dead feed here.
   An **absent** `last_sync_summary` means "cannot say", never "moved nothing" —
   old agents must not light up every dashboard.
+
+**`pos_config` is one JSON blob with two writers per request, and the second one
+wins.** The ingest records the agent's version right after authentication and the
+sync outcome at the end. Both build the whole column with a spread, so a writer
+handed the copy read at the top of the request puts every earlier field back the
+way it was — `recordSyncOutcome` silently reverted the `agent_version`
+`recordAgentVersion` had just stored. The bar showed 1.2.0 for a month with a
+1.4.0 agent checking in every five minutes, and it was self-perpetuating: each
+sync saw a difference, wrote the new version, and undid it again. Nothing looked
+wrong, because everything else about the sync worked.
+
+Each writer now returns the state it stored and the route threads that forward,
+so the next write builds on the last. The builders live in `lib/pos/pos-config.ts`,
+pure and tested, and `pos-config.test.ts` pins the ordering in both directions.
+Any future writer of this column must take the latest config and return what it
+wrote — never spread whatever was read first.
 - `appsettings.json` sets `Logging:EventLog:LogLevel`. Microsoft's EventLog
   provider caps itself at Warning regardless of `LogLevel:Default`, because that
   rule is per-provider. Left alone, every `✓ Sync complete — Z:2 EW:16` the agent
