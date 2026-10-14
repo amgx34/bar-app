@@ -192,4 +192,68 @@ public sealed class SyncService(SqlReader sql, RailClient rail, IOptions<AgentCo
             z.Count, ew.Count, audit.Count, hourly?.Count ?? 0, server?.Count ?? 0);
         return new SyncResult(true, z.Count, ew.Count, audit.Count);
     }
+
+    /// <summary>
+    /// Pulls one historical window and posts it.
+    ///
+    /// Separate from <see cref="RunOnceAsync"/> because almost nothing it does
+    /// is the same: a fixed window rather than a rolling one, a chosen subset of
+    /// feeds rather than everything configured, and a payload marked so the
+    /// route leaves the live sync status alone. Folding both into one method
+    /// would mean a pile of flags on the path that runs every five minutes in
+    /// every bar, to serve the one that runs by hand once.
+    /// </summary>
+    public async Task<BackfillChunkResult> BackfillChunkAsync(
+        Backfill.Window window,
+        IReadOnlyList<BackfillFeed> feeds,
+        CancellationToken ct)
+    {
+        // The queries express their lower bound as "days back from today", so
+        // the window start becomes a distance. The upper bound is passed
+        // straight through.
+        var days = (int)(DateTime.Today - window.From.ToDateTime(TimeOnly.MinValue)).TotalDays;
+
+        List<HourlySalesRow>? hourly = null;
+        List<ServerSalesRow>? server = null;
+        var errors = new List<string>();
+
+        await using var conn = await sql.OpenAsync(ct);
+
+        if (feeds.Contains(BackfillFeed.Hourly) && Enabled(_cfg.Tables.HourlySales))
+        {
+            try { hourly = await sql.QueryHourlySalesAsync(conn, days, ct, window.To); }
+            catch (Exception e) { errors.Add($"hourly: {e.Message}"); }
+        }
+
+        if (feeds.Contains(BackfillFeed.Server) && Enabled(_cfg.Tables.ServerSales))
+        {
+            try { server = await sql.QueryServerSalesAsync(conn, days, ct, window.To); }
+            catch (Exception e) { errors.Add($"server: {e.Message}"); }
+        }
+
+        var rows = (hourly?.Count ?? 0) + (server?.Count ?? 0);
+
+        // Posted even when empty, so a window with no trade is recorded as
+        // checked rather than skipped — a bar genuinely closed for a fortnight
+        // and a feed that returned nothing must not look the same to whoever
+        // reads the summary at the end.
+        if (errors.Count == 0)
+        {
+            try
+            {
+                await rail.PushAsync(
+                    [], [], [], ct,
+                    hourlySales: hourly,
+                    serverSales: server,
+                    agentErrors: null,
+                    backfill: true);
+            }
+            catch (Exception e)
+            {
+                errors.Add($"push: {e.Message}");
+            }
+        }
+
+        return new BackfillChunkResult(window, rows, errors);
+    }
 }

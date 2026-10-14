@@ -92,8 +92,9 @@ It redirects to `/login` or `/setup`, and resolves the active org from the
   own `pos_config.agent_token`. Per-org secret, never a shared one.
 - `GET /api/cron/2touch` — Vercel Cron (`vercel.json`, daily 13:00 UTC) email fallback
   for bars not running the agent. Gated on `CRON_SECRET`.
-- `GET /api/agent/manifest` — what version of the POS agent is current, polled by
-  `rail-update.exe` on each POS box. Unauthenticated by design.
+- `GET /api/agent/manifest` — what version of the POS agent is current. Read by
+  `rail-update.exe` **when that updater runs**, which is not the same as polling:
+  see below. Unauthenticated by design.
 
 **A sync that moved nothing is not a healthy sync.** The agent catches a failing
 feed per-feed so one broken mapping cannot cost the bar its other three — but it
@@ -118,6 +119,22 @@ all three are load-bearing:
   `ServiceBase.AutoLog` writes directly — which are not ours and pass through no
   filter, so their presence proves nothing about the agent.
 
+**`pos_config` is one JSON blob with two writers per request, and the second one
+wins.** The ingest records the agent's version right after authentication and the
+sync outcome at the end. Both build the whole column with a spread, so a writer
+handed the copy read at the top of the request puts every earlier field back the
+way it was — `recordSyncOutcome` silently reverted the `agent_version`
+`recordAgentVersion` had just stored. The bar showed 1.2.0 for a month with a
+1.4.0 agent checking in every five minutes, and it was self-perpetuating: each
+sync saw a difference, wrote the new version, and undid it again. Nothing looked
+wrong, because everything else about the sync worked.
+
+Each writer now returns the state it stored and the route threads that forward,
+so the next write builds on the last. The builders live in `lib/pos/pos-config.ts`,
+pure and tested, and `pos-config.test.ts` pins the ordering in both directions.
+Any future writer of this column must take the latest config and return what it
+wrote — never spread whatever was read first.
+
 **`rail-update.exe` replaces the binary and nothing else.** The schema mapping
 lives in each box's `appsettings.local.json`, so a feed added in a new release
 reaches an existing bar only through `ProfileMigration`, which recognises a
@@ -127,6 +144,175 @@ been byte-identical since 1.0.2 and so is also what every 1.1.x–1.2.x box carr
 Boxes in that second range matched nothing for a release and reported no hourly or
 per-server trade, permanently. A migration may fill a blank feed; it may never
 replace a non-empty one, which is somebody's answer.
+
+**Nothing on a POS box checks for a new release on its own.** The service carries
+no update logic at all, and `rail-update.exe` reads the manifest only in the
+moment someone runs it. Publishing a release — bumping `AGENT_LATEST_VERSION`,
+`AGENT_DOWNLOAD_URL` and `AGENT_SHA256` on Vercel — makes it *available*; it does
+not move a single box. A bar sat on 1.2.0 for the whole of 1.3.x and 1.4.0 that
+way, green strip and all, syncing in every five minutes and missing the very
+release that would have fixed its own feed mapping, because the only thing that
+could have pulled it was a trip to the bar nobody made. The dashboard cannot show
+this: a box that is behind looks identical to a box that is current, since being
+behind is not an error and the agent never knew there was anything to report.
+
+What closes the gap is a Scheduled Task, registered by `ScheduledTask` in
+`Setup/ScheduledTask.cs` — daily at 03:30 as SYSTEM, running `rail-update.exe
+--yes`. The setup wizard registers it on every install and the uninstaller
+removes it; `rail-update.exe --install-task` does it on a box installed before
+this existed, which is the only way those boxes ever get it. Registration is a
+deliberate act rather than something the agent arranges for itself: an unattended
+binary swap is safe here only because `Updater.ApplyAsync` verifies the checksum
+before touching anything, keeps the old exe as `.bak`, and rolls back a build
+that will not start — but it is still a swap. The argument vector handed to
+`schtasks.exe` is pure and tested (`ScheduledTaskTests`) for the same reason
+`ServiceControl.Install` encodes `sc.exe`'s `key= value` quirk: a task built with
+an unquoted path or a locale-formatted `/ST` registers cleanly and then never
+runs, which is indistinguishable from having no task at all.
+
+**The path that task names is a permanent grant of SYSTEM.** It must therefore
+be the installed copy under `C:\rail-agent` and never `Environment.ProcessPath`,
+which is the folder the operator happened to extract the download into — usually
+Downloads, which every user on the box can write. `--install-task` resolves the
+installed path regardless of where it was run from, and `ScheduledTask.Install`
+refuses when the target file or **any directory above it** grants write, delete,
+create, chown or chmod rights to a principal that is not already an
+administrator (`GrantsWriteToNonAdmins`, tested against constructed ACLs). The
+check lives inside `Install` rather than its callers so a future caller cannot
+quietly skip it, and it fails closed: an ACL that cannot be read is refused, not
+assumed safe. Deny rules are ignored on purpose — a Deny only removes access, so
+counting one as a grant would reject a correctly hardened directory.
+
+**`C:\rail-agent` is not safe by default, and creating it does not make it so.**
+The volume root carries `NT AUTHORITY\Authenticated Users:(OI)(CI)(IO)(M)` — an
+inherit-only Modify that lands as plain Modify on every file created underneath.
+The agent binary runs as a LocalSystem service, so on a stock install any user
+who can log into the POS box can replace it and be SYSTEM at the next service
+start. That was true of every box installed before `Hardening` existed, with no
+scheduled task involved. `Hardening.BuildSecureAcl` severs inheritance
+(`SetAccessRuleProtection(true, false)` — protect, and do **not** copy the
+inherited rules in, since they are the problem) and grants Administrators and
+SYSTEM full control with Users read-and-execute. Setup applies it; `--harden`
+fixes a box in the field, and `--install-task` does it automatically when it
+finds the directory writable, so one visit fixes both.
+
+Two things the ACL walk must get right, each of which silently broke it once:
+
+- **Files and directories are different risks.** `AppendData` on a *file* appends
+  to the binary; on a *directory* it only means "create subdirectories" and
+  cannot touch a file inside. It is also precisely what `C:\` grants everyone
+  (`(AD)`), so treating it as dangerous on directories refused every install on
+  every machine.
+- **An `InheritOnly` ACE grants nothing on the object carrying it.** Skipping it
+  is why `FindUnsafePath` stops flagging `C:\` itself for every path on the box.
+  Children are evaluated on their own effective rules, so nothing is lost.
+
+**A DACL is only half an ACL — the owner keeps implicit `WRITE_DAC`.** A
+directory locked to administrators but still *owned* by a standard user is not
+locked at all: the owner re-grants themselves Full Control and the rules say
+nothing about it. This is reachable rather than theoretical, because `C:\` lets
+any authenticated user create folders — a standard user can pre-create
+`C:\rail-agent` before setup ever runs, and `File.Copy(overwrite: true)` writes
+into an existing file while preserving *that file's* owner and DACL, so setup
+would install the agent into a binary the attacker still owns. So
+`BuildSecureAcl` sets the owner to Administrators, `TryHarden` resets every
+existing child to inherit from the secured parent, and `FindUnsafePath` treats an
+untrusted or unreadable owner as unsafe on the file and on every directory above
+it. Setting the owner needs elevation, which is why `TryHarden` fails outright
+rather than half-applying when run unelevated — a hardening step that reported
+success without changing the owner is the exact bug this paragraph exists for.
+
+**The walk must not follow junctions.** `SearchOption.AllDirectories` does, and
+an elevated ACL rewrite that follows one retargets onto whatever it points at —
+a standard user has Modify here until hardening runs, so they can plant
+`C:\rail-agent\x → C:\Windows\System32` and wait for an administrator to run
+setup. `WalkForReset` recurses by hand, skips any entry carrying
+`FileAttributes.ReparsePoint` without descending *or* setting an ACL on the link
+itself (which would follow it just as surely), and enumerates with
+`AttributesToSkip = 0` so a planted file cannot hide behind the hidden or system
+attribute. `TryHarden` refuses the whole operation when it finds one, rather than
+pressing on: setup never creates a reparse point there, so one is the signature
+of a pre-staged directory and is worth a human looking at it.
+
+**Securing a directory before reading it is what closes the race.** Scanning a
+tree and then writing to the paths found is check-then-use: a directory deeper
+in still carries the attacker's ACL, so they can swap an entry between the look
+and the write even after the root is locked. `SecureTree` therefore applies the
+ACL to a directory *first* and only then enumerates it — once that write lands,
+no non-administrator can add, rename or delete inside, so what the walk sees next
+cannot be swapped under it. `PlanSecureOrder` exists so that ordering is a tested
+property rather than an accident of how the recursion was written. Never flatten
+this into "scan, then apply".
+
+`SecureTree` secures **the directory it is given**, not merely the entries inside
+it, and does not descend into one it failed to lock. A refactor once dropped the
+root's own `SetAccessControl`, and because every child is set to *inherit*, the
+whole tree then carried the volume root's `Authenticated Users: Modify` — so
+`TryHarden` returned true having made the directory no safer, and arguably worse
+for any file that previously had a protective explicit ACL. Every hardening test
+was either pure or a refusal path that returns before applying, so none of them
+noticed. `SecureTree` returns what it *attempted* for that reason: asserting the
+root is `attempted[0]` catches this without needing an elevated test host, which
+is the only reason the gap existed.
+
+**A hard link has no reparse point to spot.** It is a second name for the same
+file, so an ACL written at one path lands on every other — including a system
+file linked into the install directory before hardening ran, which a standard
+user can do with `mklink /H` and no privilege at all. `CountHardLinks` asks the
+kernel through `GetFileInformationByHandle`; anything other than exactly one
+name is refused, and `-1` means "could not tell", which is also a refusal. The
+authoritative check runs inside `SecureTree` at write time, once the parent is
+locked and the file can no longer be swapped; the pass in `TryHarden` is only
+there to give a better error earlier.
+
+**Never launch a Windows tool by bare name.** `CreateProcess` resolves it against
+the calling process's own directory first, and every one of these launches is
+elevated, from the install directory, which a standard user can write to until
+hardening has succeeded. `new ProcessStartInfo("sc.exe")` therefore meant that
+dropping `C:\rail-agent\sc.exe` got you administrator the next time an operator
+touched anything. The first version of the hard-link check shelled out to
+`fsutil` and so was a cleaner exploit than the attack it was looking for.
+`SystemPaths.Executable` anchors every one to System32, and
+`SystemPathsTests.No_production_code_launches_a_bare_executable_name` scans the
+sources so the rule survives the next person who adds a call.
+
+`BY_HANDLE_FILE_INFORMATION` writes its FILETIMEs as pairs of `uint`. A `long`
+there takes 8-byte alignment on x64 and shifts every field after it, so
+`NumberOfLinks` reads as garbage and the check passes or fails at random — which
+is how it first behaved.
+
+What hardening must NOT do is delete files it does not recognise. The install
+directory legitimately holds things this code has no manifest for — uncollected
+diagnostic reports, and `rail-2touch-agent.exe.bak`, which is the only thing
+`--rollback` has to restore. Tidying away "unexpected" files would delete the
+recovery path for a bad release.
+
+**History is not backfilled by mapping a feed.** `ProfileMigration` adds a feed
+to an existing box's config; it cannot add the nights that passed while the feed
+was unmapped, because the ordinary sync carries a rolling two-day window.
+`--backfill --from --to --feeds` pulls a fixed range and posts it one window at
+a time (`lib`-free, `Services/Backfill.cs`, pure and tested). It is deliberately
+not `--once --days 365`: that is one request carrying a year of trade, past both
+the ingest route's body limit and its 30-second budget, and all-or-nothing.
+
+Three rules it inherits rather than reinvents. Windows **tile** — each upper
+bound is exclusive and is exactly the next lower bound — so no night is counted
+twice. They run **oldest first**, so an interrupted backfill leaves a contiguous
+history with the hole at the recent end, which the rolling sync then closes on
+its own. And `--feeds` has **no default**: backfilling `items` writes
+`usage_logs` with `reason: 'pos_sale'` and moves `current_stock` for every night
+in range, so a year of item audit restates a year of inventory. An unrecognised
+feed name is an error, never a silent omission.
+
+The upper bound is applied to the **business date**, not the raw timestamp. With
+a 4am cutoff a 1am ticket belongs to the night before, and a bound on the raw
+column files it in the neighbouring window — chunk boundaries being exactly
+where that shows up. A backfill payload also carries `backfill: true`, and the
+ingest then leaves `last_sync_at` and `last_sync_summary` alone: those describe
+the live five-minute cycle, and a long run would otherwise make a healthy bar
+look dead throughout and finish with the status describing last March. Feeds
+with no table mapped are refused before anything is queried, since zero rows
+from an unmapped feed reads as "the POS kept no history".
 
 **POS sales deplete stock.** The item audit no longer just creates inventory rows:
 quantities move `current_stock` and write `usage_logs` with `reason: 'pos_sale'`.

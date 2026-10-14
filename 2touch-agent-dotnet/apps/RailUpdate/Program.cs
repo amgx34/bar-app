@@ -7,6 +7,9 @@ using RailAgent.Setup;
 //   --check         report only, change nothing. Exit 10 = update available.
 //   --yes           install without asking (for a Scheduled Task)
 //   --rollback      put the previous version back
+//   --install-task  schedule a daily update check, so this box keeps itself current
+//   --remove-task   remove that scheduled check
+//   --harden        take write access to the install directory away from non-admins
 //
 // A separate executable because Windows locks a running image: the agent
 // service cannot overwrite its own binary. See Setup/Updater.cs.
@@ -16,6 +19,9 @@ try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch { /* keep the 
 var check = Has("--check");
 var assumeYes = Has("--yes") || Has("-y");
 var rollback = Has("--rollback");
+var installTask = Has("--install-task");
+var removeTask = Has("--remove-task");
+var harden = Has("--harden");
 var interactive = args.Length == 0;
 
 var agentExe = AgentVersion.AgentExePath;
@@ -38,6 +44,98 @@ if (rollback)
     else ConsoleUi.Fail("Nothing was rolled back.");
     Pause();
     return rolledBack ? 0 : 1;
+}
+
+// Task registration is handled before the version check: it is maintenance of
+// the mechanism rather than a use of it, and it must still work on a box whose
+// agent cannot reach Rail — which is exactly the box that has fallen behind.
+if (installTask || removeTask || harden)
+{
+    if (!Elevation.IsAdministrator())
+    {
+        ConsoleUi.Fail("Changing permissions or a SYSTEM scheduled task needs Administrator.");
+        ConsoleUi.Info("Right-click rail-update.exe and choose \"Run as administrator\".");
+        Pause();
+        return 1;
+    }
+
+    ConsoleUi.Blank();
+
+    if (harden && !installTask)
+    {
+        var dir = SetupWizard.InstallDirectory.TrimEnd('\\');
+        if (Hardening.TryHarden(dir, out var hardenError))
+        {
+            ConsoleUi.Ok($"{dir} is now writable only by administrators and SYSTEM.");
+            ConsoleUi.Info("Users can still run the agent and read its logs.");
+        }
+        else
+        {
+            ConsoleUi.Fail($"Could not secure {dir}: {hardenError}");
+        }
+        Pause();
+        return hardenError is null ? 0 : 1;
+    }
+
+    if (removeTask)
+    {
+        var removed = ScheduledTask.Remove();
+        if (removed.Ok) ConsoleUi.Ok($"Scheduled task '{ScheduledTask.TaskName}' removed.");
+        else ConsoleUi.Fail($"Could not remove the task: {removed.Output.Trim()}");
+        Pause();
+        return removed.Ok ? 0 : 1;
+    }
+
+    // Deliberately NOT Environment.ProcessPath. An operator fixing a box in the
+    // field runs this from wherever they extracted the download — usually their
+    // own Downloads folder — and a SYSTEM task pointing there is a standing
+    // offer of SYSTEM to any user who can write that file. The task may only
+    // ever name the installed copy, whose directory Install() then checks.
+    var installedUpdater = Path.Combine(
+        SetupWizard.InstallDirectory.TrimEnd('\\'), "rail-update.exe");
+
+    if (!File.Exists(installedUpdater))
+    {
+        ConsoleUi.Fail($"No installed updater found at {installedUpdater}.");
+        ConsoleUi.Info("The scheduled task has to run the installed copy, not this one.");
+        ConsoleUi.Info($"Copy rail-update.exe into {SetupWizard.InstallDirectory} and run it from there.");
+        Pause();
+        return 1;
+    }
+
+    // Every box installed before hardening existed has an install directory that
+    // inherited Modify for Authenticated Users from C:\. Those are exactly the
+    // boxes this flag is for, so fixing it here is the difference between one
+    // trip and two. Announced rather than silent: changing ACLs on a live box
+    // should appear in whatever the operator pastes back.
+    var installDir = SetupWizard.InstallDirectory.TrimEnd('\\');
+    if (ScheduledTask.FindUnsafePath(installedUpdater) is not null)
+    {
+        ConsoleUi.Warn($"{installDir} can currently be modified by non-administrators.");
+        ConsoleUi.Info("That alone lets any user here replace the agent, which runs as SYSTEM. Fixing it first.");
+
+        if (Hardening.TryHarden(installDir, out var hardenError))
+            ConsoleUi.Ok($"{installDir} locked to administrators and SYSTEM.");
+        else
+            ConsoleUi.Fail($"Could not secure {installDir}: {hardenError}");
+
+        ConsoleUi.Blank();
+    }
+
+    var installed = ScheduledTask.Install(installedUpdater);
+    if (installed.Ok)
+    {
+        ConsoleUi.Ok($"This box will check for updates daily at {ScheduledTask.DefaultTime:HH\\:mm}.");
+        ConsoleUi.Info($"Task: '{ScheduledTask.TaskName}' → {installedUpdater} --yes");
+        ConsoleUi.Info("Run it now with: schtasks /Run /TN \"" + ScheduledTask.TaskName + "\"");
+    }
+    else
+    {
+        ConsoleUi.Fail($"Could not schedule the update check: {installed.Output.Trim()}");
+    }
+
+    Pause();
+    return installed.Ok ? 0 : 1;
 }
 
 ConsoleUi.Blank();

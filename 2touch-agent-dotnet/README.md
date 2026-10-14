@@ -355,9 +355,108 @@ before touching anything**, stops the service, keeps the old binary as
 new build does not come up cleanly it rolls back automatically. Nothing is
 deleted until the replacement has proven it starts.
 
-To automate it, register a Scheduled Task running `rail-update.exe --yes` as
-SYSTEM. `--check` exits `10` when an update is available, for monitoring that
-should not install anything.
+Setup registers that Scheduled Task automatically, so a box installed with the
+current wizard checks daily at 03:30 as SYSTEM and needs no visit. On a box
+installed before that existed — which is every box already in the field — run it
+once **from the install directory**, not from the folder you extracted:
+
+```powershell
+cd C:\rail-agent
+.\rail-update.exe --install-task     # daily 03:30, as SYSTEM, --yes
+.\rail-update.exe --remove-task      # stop checking
+schtasks /Run /TN "Rail 2Touch agent update"   # don't wait for 03:30
+```
+
+Both need Administrator. The uninstaller removes the task, so it never outlives
+the binary it points at.
+
+The install directory is not a style preference here. The task runs as SYSTEM
+every night, so the path it names is a standing grant of SYSTEM to anyone who
+can write that file — and a copy sitting in an operator's Downloads folder is
+writable by every user on the box. `--install-task` therefore always registers
+`C:\rail-agent\rail-update.exe` regardless of where you ran it from, refuses if
+no copy is installed there, and refuses again if that directory or any directory
+above it grants write access to a non-administrator.
+
+### Install directory permissions
+
+A folder created under `C:\` inherits **Modify for Authenticated Users** from the
+volume root. The agent runs as a LocalSystem service, so on a stock install any
+user who can log into the POS box can replace `rail-2touch-agent.exe` and be
+SYSTEM at the next service start — no scheduled task involved, and true of every
+box installed before this was added.
+
+Setup now locks the directory down automatically. For a box already in the field:
+
+```powershell
+.\rail-update.exe --harden     # admins + SYSTEM may change it; users may only run it
+```
+
+`--install-task` does this for you when it finds the directory writable, so one
+visit fixes both. To confirm, `icacls C:\rail-agent` should show Administrators
+and SYSTEM with `(F)`, `BUILTIN\Users` with `(RX)`, and **no** Authenticated
+Users entry.
+
+`--check` exits `10` when an update is available, for monitoring that should not
+install anything.
+
+**Publishing a release does not move any box by itself.** Until something runs
+`rail-update.exe`, a bar stays on the version it has — syncing normally, showing
+green in Rail, with nothing anywhere reporting that it is behind. Steps 1–4 make
+a release available; the Scheduled Task is what delivers it.
+
+### Backfilling history
+
+The ordinary sync carries a rolling two-day window, so a feed that was only
+mapped recently has no history behind it — `ProfileMigration` adds the mapping,
+not the nights it missed. `--backfill` pulls a fixed range and posts it a window
+at a time:
+
+```powershell
+.ail-2touch-agent.exe --backfill --from 2025-10-01 --to 2026-10-13 --feeds hourly,server
+```
+
+| Flag | Meaning |
+|---|---|
+| `--from YYYY-MM-DD` | first night to pull, inclusive |
+| `--to YYYY-MM-DD` | first night NOT to pull, exclusive; defaults to today |
+| `--feeds` | **required** — `hourly`, `server`, `z`, `ew`, `items` |
+| `--chunk-days N` | nights per request, default 30 |
+
+Run it on the POS box: only that machine can reach the 2Touch database.
+
+**`--feeds` has no default on purpose.** Backfilling `items` writes `usage_logs`
+with `reason: 'pos_sale'` and moves `current_stock` for every night in range, so
+a year of item audit restates a year of inventory. That has to be asked for, not
+arrived at by forgetting a flag. An unrecognised feed name is an error rather
+than a silent omission, because a typo that quietly pulled less than asked looks
+exactly like a POS with no history.
+
+It is **not** `--once --days 365`. That would be one request carrying a year of
+trade, which exceeds both the ingest route's body limit and its thirty-second
+budget, and would arrive as a single all-or-nothing push. `--backfill` cuts the
+range into consecutive windows — a tiling, not an overlap, so no night is counted
+twice — and works oldest first, so an interrupted run leaves a contiguous history
+with the gap at the recent end, which the rolling sync then closes on its own.
+
+A window that fails does not stop the others. The summary at the end lists the
+exact flags to re-run just those:
+
+```
+  [7/13] 2026-04-01 → 2026-05-01 … FAILED — push: Rail ingest → 503
+  ...
+These windows did not land and can be re-run on their own:
+  --from 2026-04-01 --to 2026-05-01
+```
+
+A backfill marks its payload so the ingest leaves `last_sync_at` and
+`last_sync_summary` alone. Without that, a long run would make a healthy bar
+look dead for as long as it took, and finish with the status describing a window
+from last March.
+
+Feeds with no table mapped on the box are refused before anything is queried —
+otherwise a pre-1.3 config, which has no hourly or per-server mapping at all,
+would return zero rows and read as "the POS kept no history".
 
 ### Rolling back
 

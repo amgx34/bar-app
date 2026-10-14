@@ -66,6 +66,18 @@ public static class Uninstaller
             return 1;
         }
 
+        // ── Scheduled update check ────────────────────────────────────────────
+        // Before the service, and in every path including --keep-config: the
+        // task runs an exe this uninstall is about to remove, and a task left
+        // pointing at a deleted binary fails nightly in Task Scheduler forever.
+        ConsoleUi.Blank();
+        if (ScheduledTask.Exists())
+        {
+            var removed = ScheduledTask.Remove();
+            if (removed.Ok) ConsoleUi.Ok($"Scheduled task '{ScheduledTask.TaskName}' removed.");
+            else ConsoleUi.Warn($"Could not remove the scheduled update task: {removed.Output.Trim()}");
+        }
+
         // ── Service ───────────────────────────────────────────────────────────
         ConsoleUi.Blank();
         if (ServiceControl.Exists())
@@ -263,7 +275,7 @@ public static class Uninstaller
     {
         try
         {
-            var psi = new ProcessStartInfo("cmd.exe")
+            var psi = new ProcessStartInfo(SystemPaths.Executable("cmd.exe"))
             {
                 // ping as a portable sleep: timeout.exe fails without a console.
                 Arguments = $"/c ping 127.0.0.1 -n 4 > nul & rd /s /q \"{installDir}\"",

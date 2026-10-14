@@ -21,6 +21,7 @@ import { resolveSales, toRpcComponents, type BundleRecipe, type InventoryRef } f
 import { buildTokenTable, parseVariant } from '@/lib/pos/variants';
 import { partitionShifts, shiftKey } from '@/lib/payroll/manual-hours';
 import type { SyncSummary } from '@/lib/pos/sync-health';
+import { parseAgentVersion, applyAgentVersion, applySyncOutcome } from '@/lib/pos/pos-config';
 import { normaliseHourlyRows, groupByNight } from '@/lib/pos/hourly-sales';
 import { normaliseServerRows, groupServerRowsByNight } from '@/lib/pos/server-sales';
 
@@ -102,6 +103,18 @@ type Payload = {
    * "nothing went wrong".
    */
   agentErrors?: string[];
+  /**
+   * A one-off history pull rather than the five-minute cycle.
+   *
+   * A backfill posts one window per month, each covering nights long past and
+   * carrying only the feeds asked for. Letting those writes land on
+   * last_sync_at and last_sync_summary would make a healthy bar look dead for
+   * as long as the backfill ran, and would leave the status describing a
+   * window from last March once it finished. Absent on every normal sync and
+   * on every agent older than the release that added it, so absence means
+   * "an ordinary sync", never "unknown".
+   */
+  backfill?: boolean;
 };
 
 // Shapes written to Supabase. Collected into arrays and sent as one upsert per
@@ -193,15 +206,10 @@ async function recordSyncOutcome(
   const { error } = await supabase
     .from('organizations')
     .update({
-      pos_config: {
-        ...posConfig,
-        last_sync_at: new Date().toISOString(),
-        last_sync_errors: errors.slice(0, 5).map((e) => e.slice(0, 300)),
-        // What the sync actually moved. Without it the status line can only say
-        // "it ran", which does not distinguish a healthy night from an agent
-        // dutifully posting empty payloads every five minutes.
-        last_sync_summary: summary ?? null,
-      },
+      // Built from the config this was handed, which must be the latest known
+      // state rather than the copy read at the top of the request — see
+      // recordAgentVersion.
+      pos_config: applySyncOutcome(posConfig, errors, summary ?? null, new Date().toISOString()),
     })
     .eq('id', orgId);
 
@@ -220,22 +228,31 @@ async function recordAgentVersion(
   orgId: string,
   posConfig: Record<string, unknown>,
   userAgent: string | null,
-): Promise<void> {
-  // "rail-2touch-agent/1.2.0 (dotnet)" → "1.2.0"
-  const version = userAgent?.match(/rail-2touch-agent\/([\d.]+)/)?.[1] ?? null;
-  if (!version || posConfig.agent_version === version) return;
+): Promise<Record<string, unknown>> {
+  const version = parseAgentVersion(userAgent);
+  if (!version || posConfig.agent_version === version) return posConfig;
+
+  const next = applyAgentVersion(posConfig, version, new Date().toISOString());
 
   const supabase = createAdminClient();
   const { error } = await supabase
     .from('organizations')
-    .update({
-      pos_config: { ...posConfig, agent_version: version, agent_seen_at: new Date().toISOString() },
-    })
+    .update({ pos_config: next })
     .eq('id', orgId);
 
   // Non-fatal by design: failing an entire night's ingest because a version
   // string could not be filed would be a poor trade.
-  if (error) console.warn('[2touch] could not record agent version:', error.message);
+  if (error) {
+    console.warn('[2touch] could not record agent version:', error.message);
+    return posConfig;
+  }
+
+  // Returned, not discarded. pos_config is one JSON blob and recordSyncOutcome
+  // writes it again at the end of this same request — from whatever object it
+  // is handed. Hand it the stale read and it spreads the old agent_version back
+  // over the one just stored, so the version never changes however many times
+  // the agent reports it.
+  return next;
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
@@ -254,13 +271,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { valid, orgId: resolvedOrgId, posConfig, barSettings } = await resolveOrgAndVerify(body, sig, orgId);
+  const { valid, orgId: resolvedOrgId, posConfig: storedConfig, barSettings } =
+    await resolveOrgAndVerify(body, sig, orgId);
+
+  // Mutable because pos_config is one JSON blob written twice in this request.
+  // Each writer returns the state it stored and the next builds on that, so a
+  // later write cannot spread a stale copy back over an earlier one.
+  let posConfig = storedConfig;
   if (!valid || !resolvedOrgId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   // After authentication, so an unauthenticated caller cannot write anything.
-  await recordAgentVersion(resolvedOrgId, posConfig, req.headers.get('x-rail-agent'));
+  // Reassigned, so the sync outcome written at the end of this request builds
+  // on the version just stored instead of reverting it.
+  posConfig = await recordAgentVersion(resolvedOrgId, posConfig, req.headers.get('x-rail-agent'));
 
   const data     = JSON.parse(body) as Payload;
   const supabase = createAdminClient();
@@ -795,16 +820,21 @@ export async function POST(req: NextRequest) {
   // and carries on so one bad day cannot block the rest, but "carries on" also
   // meant the only trace was a server log nobody reads. The POS settings panel
   // now shows the last sync and anything that went wrong on it.
-  await recordSyncOutcome(resolvedOrgId, posConfig, result.errors, {
-    zReports: result.zReports,
-    ewReports: result.ewReports,
-    shiftsProtected: result.shiftsProtected,
-    itemAudit: result.itemAudit,
-    stockMoved: result.stockMoved,
-    unresolvedItems: result.unresolvedItems,
-    hoursRecorded: result.hoursRecorded,
-    serversRecorded: result.serversRecorded,
-  });
+  // A backfill deliberately does not touch the sync status — see Payload.backfill.
+  // The data it carries is written exactly as any other ingest writes it; only
+  // the status line is left for the live sync to own.
+  if (!data.backfill) {
+    await recordSyncOutcome(resolvedOrgId, posConfig, result.errors, {
+      zReports: result.zReports,
+      ewReports: result.ewReports,
+      shiftsProtected: result.shiftsProtected,
+      itemAudit: result.itemAudit,
+      stockMoved: result.stockMoved,
+      unresolvedItems: result.unresolvedItems,
+      hoursRecorded: result.hoursRecorded,
+      serversRecorded: result.serversRecorded,
+    });
+  }
 
   if (result.errors.length) {
     console.error(`[2touch/ingest] org=${resolvedOrgId} FAILED`, result.errors);

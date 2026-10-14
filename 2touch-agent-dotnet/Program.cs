@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -14,6 +15,11 @@ using RailAgent.Setup;
 //   --test                connect + query only, print samples, send nothing
 //   --once                one full sync (query + push), then exit
 //   --days N              override the lookback window for --test / --once
+//   --backfill            pull a fixed historical range and post it in chunks
+//     --from YYYY-MM-DD   first night to pull (inclusive)
+//     --to   YYYY-MM-DD   first night NOT to pull (exclusive; defaults to today)
+//     --feeds hourly,server   REQUIRED — which feeds to pull
+//     --chunk-days N      nights per request (default 30)
 //   --version             print the version and exit
 //
 // Setup, diagnostics, updates and removal moved to their own executables:
@@ -87,6 +93,13 @@ if (!isService)
 
 var isTest = Has("--test");
 var isOnce = Has("--once");
+var isBackfill = Has("--backfill");
+
+static string? Arg(string[] a, string flag)
+{
+    var i = Array.IndexOf(a, flag);
+    return i >= 0 && i + 1 < a.Length ? a[i + 1] : null;
+}
 
 int? daysOverride = null;
 var daysIdx = Array.IndexOf(args, "--days");
@@ -119,6 +132,126 @@ builder.Services.AddHttpClient("rail", c => c.Timeout = TimeSpan.FromSeconds(60)
 builder.Services.AddSingleton<SqlReader>();
 builder.Services.AddSingleton<RailClient>();
 builder.Services.AddSingleton<SyncService>();
+
+// Backfill: a fixed historical range, posted one window at a time.
+//
+// Not --once with a very large --days. That would be one request carrying a
+// year of trade, which exceeds both the ingest route's body limit and its
+// thirty-second budget — and would arrive as a single all-or-nothing push.
+if (isBackfill)
+{
+    IReadOnlyList<BackfillFeed> feeds;
+    DateOnly from;
+    try
+    {
+        feeds = Backfill.ParseFeeds(Arg(args, "--feeds"));
+
+        var fromText = Arg(args, "--from")
+            ?? throw new ArgumentException("--from YYYY-MM-DD is required.");
+        from = DateOnly.ParseExact(fromText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"ERROR: {ex.Message}");
+        Console.Error.WriteLine("Example: --backfill --from 2025-10-01 --to 2026-10-13 --feeds hourly,server");
+        return 1;
+    }
+
+    var toText = Arg(args, "--to");
+    var to = toText is null
+        ? DateOnly.FromDateTime(DateTime.Today)
+        : DateOnly.ParseExact(toText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    var chunkDays = int.TryParse(Arg(args, "--chunk-days"), out var cd) ? cd : Backfill.DefaultChunkDays;
+    var windows = Backfill.Chunks(from, to, chunkDays);
+
+    if (windows.Count == 0)
+    {
+        Console.Error.WriteLine($"ERROR: {from:yyyy-MM-dd} to {to:yyyy-MM-dd} is an empty range.");
+        return 1;
+    }
+
+    using var backfillHost = builder.Build();
+    var backfillSync = backfillHost.Services.GetRequiredService<SyncService>();
+    var backfillCfg = backfillHost.Services
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<AgentConfig>>().Value;
+
+    // Before anything is queried. A feed with no table mapped would return
+    // nothing and finish reporting zero rows, which reads as "the POS kept no
+    // history" rather than "this box was never told where to look" — and a box
+    // still on a pre-1.3 config has exactly no hourly or per-server mapping.
+    var unmapped = Backfill.Unconfigured(feeds, f => f switch
+    {
+        BackfillFeed.Hourly    => backfillCfg.Tables.HourlySales,
+        BackfillFeed.Server    => backfillCfg.Tables.ServerSales,
+        BackfillFeed.ZReport   => backfillCfg.Tables.ZReport,
+        BackfillFeed.EwReport  => backfillCfg.Tables.EwReport,
+        BackfillFeed.ItemAudit => backfillCfg.Tables.ItemAudit,
+        _ => null,
+    });
+
+    if (unmapped.Count > 0)
+    {
+        Console.Error.WriteLine(
+            $"ERROR: no mapping on this box for: {string.Join(", ", unmapped)}.");
+        Console.Error.WriteLine("Nothing was pulled. Those feeds have no table or view configured, so a");
+        Console.Error.WriteLine("backfill would return zero rows and tell you nothing. Run rail-setup.exe");
+        Console.Error.WriteLine("and re-run the wizard to map them, then try again.");
+        return 1;
+    }
+
+    Console.WriteLine($"Backfilling {from:yyyy-MM-dd} → {to:yyyy-MM-dd} "
+                    + $"({windows.Count} window(s) of up to {chunkDays} nights, feeds: {string.Join(", ", feeds)})");
+    Console.WriteLine();
+
+    var totalRows = 0;
+    var failed = new List<RailAgent.Models.BackfillChunkResult>();
+
+    foreach (var (window, i) in windows.Select((w, i) => (w, i)))
+    {
+        // Printed before the work, so an operator watching a long run can see
+        // which window is in flight rather than a cursor that has not moved
+        // for a minute.
+        Console.Write($"  [{i + 1}/{windows.Count}] {window.From:yyyy-MM-dd} → {window.To:yyyy-MM-dd} … ");
+
+        var chunk = await backfillSync.BackfillChunkAsync(window, feeds, CancellationToken.None);
+        totalRows += chunk.Rows;
+
+        if (chunk.Ok)
+        {
+            Console.WriteLine($"{chunk.Rows} row(s)");
+        }
+        else
+        {
+            // Carries on rather than stopping. One unreadable window out of
+            // twelve should not cost the other eleven, and the summary below
+            // says exactly which nights still need another pass.
+            Console.WriteLine($"FAILED — {string.Join("; ", chunk.Errors)}");
+            failed.Add(chunk);
+        }
+    }
+
+    Console.WriteLine();
+    Console.WriteLine($"Done. {totalRows} row(s) sent from {windows.Count - failed.Count}/{windows.Count} window(s).");
+
+    if (failed.Count > 0)
+    {
+        Console.WriteLine();
+        Console.WriteLine("These windows did not land and can be re-run on their own:");
+        foreach (var f in failed)
+            Console.WriteLine($"  --from {f.Window.From:yyyy-MM-dd} --to {f.Window.To:yyyy-MM-dd}");
+    }
+    else if (totalRows == 0)
+    {
+        // Zero rows across every window is almost never what the operator
+        // wanted, and it is the one outcome that looks identical to success.
+        Console.WriteLine();
+        Console.WriteLine("No rows were found anywhere in that range. Either the POS keeps no history");
+        Console.WriteLine("that far back, or these feeds are not mapped on this box (check rail-setup.exe → diagnose).");
+    }
+
+    return failed.Count == 0 ? 0 : 1;
+}
 
 // One-shot modes: run a single cycle and return an exit code (0 ok, 1 failed).
 if (isTest || isOnce)

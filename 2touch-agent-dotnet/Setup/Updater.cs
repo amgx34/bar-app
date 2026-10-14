@@ -130,6 +130,62 @@ public static class Updater
     public sealed record ApplyResult(bool Ok, string Message, bool RolledBack = false);
 
     /// <summary>
+    /// What the service was doing after the swap. Separate from the ApplyResult
+    /// so the judgement can be tested without a Windows Service to break.
+    /// </summary>
+    public enum RestartVerdict
+    {
+        /// <summary>Running on the new binary, nothing in the log against it.</summary>
+        Healthy,
+        /// <summary>It will not come up. Put the old binary back.</summary>
+        FailedToStart,
+        /// <summary>Swapped, but this box is not syncing. Not a success.</summary>
+        NotRunning,
+        /// <summary>No service installed, so the file was all there was to replace.</summary>
+        NoService,
+    }
+
+    /// <summary>
+    /// Whether the update can be called done.
+    ///
+    /// NoService counts: on a box with no service registered there is nothing
+    /// to run and nothing broken, and the binary was replaced correctly.
+    /// </summary>
+    public static bool IsSuccess(this RestartVerdict v)
+        => v is RestartVerdict.Healthy or RestartVerdict.NoService;
+
+    /// <summary>
+    /// Only a build that will not start earns a rollback. Restoring an older
+    /// binary because somebody had deliberately stopped the service would undo
+    /// a good update for no reason.
+    /// </summary>
+    public static bool ShouldRollBack(this RestartVerdict v)
+        => v is RestartVerdict.FailedToStart;
+
+    /// <summary>
+    /// Reads the state of the service after a swap.
+    ///
+    /// <paramref name="runningNow"/> is the question the old code never asked.
+    /// sc.exe returns 0 for "the SCM accepted the request", which a service
+    /// that faults a second later also does — so a start was treated as proof
+    /// of life, and a box that came up dead reported a clean update.
+    ///
+    /// wasRunning is deliberately NOT a precondition for Healthy. The case that
+    /// produced this function was an updater that believed the service was
+    /// stopped, swapped the binary under a live process, and announced it had
+    /// been "left stopped". What the box is doing now is the only thing worth
+    /// reporting.
+    /// </summary>
+    public static RestartVerdict JudgeRestart(
+        bool serviceExists, bool wasRunning, bool startReported, bool runningNow, bool errorInLog)
+    {
+        if (!serviceExists) return RestartVerdict.NoService;
+        if (!runningNow) return wasRunning ? RestartVerdict.FailedToStart : RestartVerdict.NotRunning;
+        return errorInLog ? RestartVerdict.FailedToStart : RestartVerdict.Healthy;
+    }
+
+
+    /// <summary>
     /// Downloads, verifies and installs a build, restarting the service around
     /// the swap and rolling back if the new binary will not run.
     ///
@@ -205,28 +261,58 @@ public static class Updater
             log($"Installed {manifest.Version}.");
 
             // ── 5. Start, and prove it actually runs ─────────────────────────
-            if (!wasRunning)
+            //
+            // Started unconditionally when a service is registered, not only
+            // when it was seen running beforehand. A swap performed while this
+            // code believed the service was stopped still leaves a box that
+            // must end up syncing on the new binary, and "it was already
+            // stopped" is not a reason to walk away from one that is not.
+            var serviceExists = ServiceControl.Exists();
+            var since = DateTime.Now;
+            var started = false;
+            var summary = "";
+
+            if (serviceExists)
             {
-                return new ApplyResult(true,
-                    $"Updated to {manifest.Version}. The service was not running, so it was left stopped.");
+                log("Starting the service…");
+                started = ServiceControl.Start().Ok;
+                ServiceControl.WaitForFirstEntry(since, TimeSpan.FromSeconds(45), out summary);
             }
 
-            var since = DateTime.Now;
-            log("Starting the service…");
-            var started = ServiceControl.Start();
+            // The question the old code never asked. sc.exe returning 0 means
+            // the SCM accepted the request, which a service that faults a
+            // second later also does.
+            var entryType = ServiceControl.WaitForFirstEntry(since, TimeSpan.Zero, out _);
+            var verdict = JudgeRestart(
+                serviceExists,
+                wasRunning,
+                startReported: started,
+                runningNow: serviceExists && ServiceControl.IsRunning(),
+                errorInLog: entryType is EventLogEntryType.Error);
 
-            // A service that starts and then immediately faults reports success
-            // to sc.exe, so the Event Log is the real check — the same one the
-            // setup wizard uses after a fresh install.
-            var entryType = ServiceControl.WaitForFirstEntry(
-                since, TimeSpan.FromSeconds(45), out var summary);
-
-            var healthy = started.Ok && entryType is not EventLogEntryType.Error;
-            if (healthy)
+            if (verdict is RestartVerdict.Healthy)
             {
                 return new ApplyResult(true,
                     $"Updated to {manifest.Version} and the service is running." +
                     (string.IsNullOrWhiteSpace(summary) ? "" : $" ({summary})"));
+            }
+
+            if (verdict is RestartVerdict.NoService)
+            {
+                return new ApplyResult(true,
+                    $"Updated to {manifest.Version}. No service is registered on this box, so nothing was started.");
+            }
+
+            // Swapped, nothing broken, but the box is not syncing. Reported as a
+            // failure on purpose: this used to return success, and a bar that
+            // has silently stopped sending data is the outage the whole release
+            // exists to make visible.
+            if (verdict is RestartVerdict.NotRunning)
+            {
+                return new ApplyResult(false,
+                    $"Updated to {manifest.Version}, but '{ServiceControl.ServiceName}' is NOT running, " +
+                    "so this box is not sending data to Rail. Start it with: " +
+                    $"sc.exe start {ServiceControl.ServiceName}");
             }
 
             // ── 6. Roll back ─────────────────────────────────────────────────

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("rail-diagnose")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+35b4112028a826c5ab476b619ab95a28e5b9c804")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b7e849af58ec1b0a31cac276233e97df9e6f4e07")]
 [assembly: System.Reflection.AssemblyProductAttribute("rail-diagnose")]
 [assembly: System.Reflection.AssemblyTitleAttribute("rail-diagnose")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
