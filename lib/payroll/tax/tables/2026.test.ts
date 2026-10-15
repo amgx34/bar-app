@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TABLES_2026 } from './2026';
+import { annualTaxFromBrackets } from '../federal';
 import type { FilingStatus, TaxBracket } from '../types';
 
 const STATUSES: FilingStatus[] = ['single', 'married_jointly', 'head_of_household'];
@@ -108,7 +109,42 @@ describe('transcription status', () => {
     expect(TABLES_2026.placeholder).toBe(markers > 0);
   });
 
-  // Replace with real tests when transcription happens: the publication's
-  // worked examples reproduced through annualTaxFromBrackets (a later task).
-  it.todo('reproduces Pub 15-T 2026 worked examples for every filing status');
+  // The only real proof a transcription is right: reproduce a figure the IRS
+  // printed. The structural tests above pass on any self-consistent table.
+  // Skipped while placeholder; it arms the moment real figures land. Armed but
+  // unfilled it FAILS on purpose, so flipping `placeholder` cannot go green
+  // without someone supplying the publication's example.
+  //
+  // TRANSCRIBE: pick a worked example from the Pub 15-T 2026 percentage-method
+  // tables (one per filing status ideally), copy its adjusted annual wage and
+  // the tentative annual tax the publication prints. Do not compute either.
+  const WORKED: {
+    status: FilingStatus;
+    step2: boolean;
+    adjustedAnnualWage: number | null; // TRANSCRIBE: published input
+    expectedAnnualTax: number | null;  // TRANSCRIBE: published answer
+  }[] = [
+    { status: 'single',            step2: false, adjustedAnnualWage: null, expectedAnnualTax: null },
+    { status: 'married_jointly',   step2: false, adjustedAnnualWage: null, expectedAnnualTax: null },
+    { status: 'head_of_household', step2: false, adjustedAnnualWage: null, expectedAnnualTax: null },
+  ];
+
+  for (const w of WORKED) {
+    it.skipIf(TABLES_2026.placeholder)(
+      `reproduces the Pub 15-T worked example: ${w.status}${w.step2 ? ' / step 2' : ''}`,
+      () => {
+        if (w.adjustedAnnualWage === null || w.expectedAnnualTax === null) {
+          throw new Error(
+            'Tables are marked transcribed but the Pub 15-T worked example is not filled in. ' +
+            'Fill the TRANSCRIBE fields in 2026.test.ts from the publication.',
+          );
+        }
+        const table = w.step2
+          ? TABLES_2026.federal.step2[w.status]
+          : TABLES_2026.federal.standard[w.status];
+        // Pub 15-T prints whole dollars; allow a dollar of its rounding.
+        expect(annualTaxFromBrackets(table, w.adjustedAnnualWage)).toBeCloseTo(w.expectedAnnualTax, 0);
+      },
+    );
+  }
 });
