@@ -31,7 +31,7 @@ export function computeWithholding(input: {
 }): Withholding {
   const { profile, config } = input;
 
-  if (!config.enabled) return none('not_taxed', ['Tax withholding is off for this bar.']);
+  if (!config.enabled) return none('disabled', ['Tax withholding is off for this bar.']);
 
   // Unclassified is NOT a contractor. Same zero, different meaning: one is a
   // decision somebody made, the other is a question nobody has answered.
@@ -100,6 +100,8 @@ export function computeWithholding(input: {
     );
   }
 
+  // `uncollected` has no additionalMedicare field on purpose: it is a shortfall
+  // of the Medicare ordering step, so it is folded into `medicare`.
   return {
     status,
     federalIncome:      taken.federalIncome,

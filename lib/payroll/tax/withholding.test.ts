@@ -60,6 +60,9 @@ describe('status', () => {
 
   it('withholds nothing at all when tax is disabled for the org', () => {
     const r = run({ config: { ...CONFIG, enabled: false } });
+    // Not 'not_taxed': that means "contractor", and a bar that has not turned
+    // tax on does not employ only contractors.
+    expect(r.status).toBe('disabled');
     expect(r.total).toBe(0);
   });
 });
@@ -109,8 +112,13 @@ describe('state', () => {
 
 describe('shortfall', () => {
   it('never withholds more than is available', () => {
+    const full = run();
     const r = run({ availableToWithhold: 50 });
-    expect(r.total).toBeLessThanOrEqual(50);
+    // Conservation: nothing is lost or invented. An implementation that
+    // withheld nothing would fail the first line; one that took more than 50
+    // would fail the second.
+    expect(r.total).toBeCloseTo(50, 6);
+    expect(r.total + r.uncollected.total).toBeCloseTo(full.total, 6);
   });
 
   it('takes FICA before federal income before state', () => {

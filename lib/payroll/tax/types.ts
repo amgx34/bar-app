@@ -67,11 +67,23 @@ export type OrgTaxConfig = {
   stateRate:    number;
 };
 
+/**
+ * Four outcomes, three of which produce the same zero. They are kept distinct
+ * because each answers a different question and the UI treats them differently:
+ *  - `withheld`     taxes were computed and taken.
+ *  - `exempt`       the employee claimed W-4 exemption: no federal income tax,
+ *                   FICA still withheld.
+ *  - `not_taxed`    a decision about a person: a 1099 contractor.
+ *  - `unclassified` a question nobody has answered: no W-2/1099 set.
+ *  - `disabled`     a decision about the bar: tax is not switched on. Reporting
+ *                   this as `not_taxed` would read as "everyone is a contractor".
+ */
 export type WithholdingStatus =
   | 'withheld'
   | 'exempt'
   | 'not_taxed'
-  | 'unclassified';
+  | 'unclassified'
+  | 'disabled';
 
 export type Withholding = {
   status: WithholdingStatus;
