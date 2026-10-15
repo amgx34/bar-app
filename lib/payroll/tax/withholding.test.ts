@@ -1,6 +1,7 @@
 // lib/payroll/tax/withholding.test.ts
 import { describe, it, expect } from 'vitest';
 import { computeWithholding } from './withholding';
+import { TABLES_2026 } from './tables/2026';
 import type { EmployeeTaxProfile, OrgTaxConfig } from './types';
 
 const W2: EmployeeTaxProfile = {
@@ -168,35 +169,93 @@ describe('shortfall', () => {
     expect(r.additionalMedicare).toBeCloseTo(full.additionalMedicare / 2, 6);
   });
 
-  it('splits a mid-federal shortfall across every tax field', () => {
-    // ytd just under the Additional Medicare threshold so that field is
-    // non-zero too. Available runs out half-way through federal, with all of
-    // FICA taken, so Medicare, federal and state are each exercised.
-    const base = { ytdWages: 199_000, grossForPeriod: 5000 };
-    const full = run({ ...base, availableToWithhold: 5000 });
-    const ficaOwed = full.socialSecurity + full.medicare + full.additionalMedicare;
-    expect(full.additionalMedicare).toBeGreaterThan(0);
-    expect(full.federalIncome).toBeGreaterThan(0);
-    expect(full.state).toBeGreaterThan(0);
+  // Social Security and Additional Medicare cannot both be non-zero in one case:
+  // the wage base sits below the Additional Medicare threshold, so anyone far
+  // enough into the year to owe the latter has already passed the former. Two
+  // cases, each deriving its ytd from the tables so it keeps meaning what it
+  // says when the placeholder figures are replaced.
+  const T = TABLES_2026.fica;
+  const sum = (r: ReturnType<typeof run>) =>
+    r.socialSecurity + r.medicare + r.additionalMedicare + r.federalIncome + r.state;
+  const uncollectedSum = (r: ReturnType<typeof run>) =>
+    r.uncollected.socialSecurity + r.uncollected.medicare +
+    r.uncollected.federalIncome + r.uncollected.state;
 
-    const r = run({ ...base, availableToWithhold: ficaOwed + full.federalIncome / 2 });
+  it('splits a shortfall across SS, Medicare, federal and state (ytd 0, SS non-zero)', () => {
+    const full = run({ ytdWages: 0 });
+    expect(full.socialSecurity).toBeGreaterThan(0);
+    expect(full.additionalMedicare).toBe(0);
+    const ficaOwed = full.socialSecurity + full.medicare;
 
+    // Runs out half-way through federal: FICA whole, state untouched.
+    const r = run({ ytdWages: 0, availableToWithhold: ficaOwed + full.federalIncome / 2 });
     expect(r.socialSecurity).toBeCloseTo(full.socialSecurity, 6);
     expect(r.medicare).toBeCloseTo(full.medicare, 6);
-    expect(r.additionalMedicare).toBeCloseTo(full.additionalMedicare, 6);
     expect(r.federalIncome).toBeCloseTo(full.federalIncome / 2, 6);
     expect(r.state).toBe(0);
-
     expect(r.uncollected.socialSecurity).toBeCloseTo(0, 6);
     expect(r.uncollected.medicare).toBeCloseTo(0, 6);
     expect(r.uncollected.federalIncome).toBeCloseTo(full.federalIncome / 2, 6);
     expect(r.uncollected.state).toBeCloseTo(full.state, 6);
+    expect(r.total).toBeCloseTo(sum(r), 6);
+    expect(r.uncollected.total).toBeCloseTo(uncollectedSum(r), 6);
 
-    expect(r.total).toBeCloseTo(
-      r.socialSecurity + r.medicare + r.additionalMedicare + r.federalIncome + r.state, 6);
-    expect(r.uncollected.total).toBeCloseTo(
-      r.uncollected.socialSecurity + r.uncollected.medicare +
-      r.uncollected.federalIncome + r.uncollected.state, 6);
+    // Runs out half-way through Medicare: SS whole, everything after it short.
+    const m = run({ ytdWages: 0, availableToWithhold: full.socialSecurity + full.medicare / 2 });
+    expect(m.socialSecurity).toBeCloseTo(full.socialSecurity, 6);
+    expect(m.medicare).toBeCloseTo(full.medicare / 2, 6);
+    expect(m.federalIncome).toBe(0);
+    expect(m.state).toBe(0);
+    expect(m.uncollected.socialSecurity).toBeCloseTo(0, 6);
+    expect(m.uncollected.medicare).toBeCloseTo(full.medicare / 2, 6);
+    expect(m.uncollected.federalIncome).toBeCloseTo(full.federalIncome, 6);
+    expect(m.uncollected.state).toBeCloseTo(full.state, 6);
+    expect(m.total).toBeCloseTo(sum(m), 6);
+  });
+
+  it('counts state in total when state is actually taken', () => {
+    const full = run();
+    expect(full.state).toBeGreaterThan(0);
+    const available = full.total - full.state / 2;
+    const r = run({ availableToWithhold: available });
+    expect(r.state).toBeCloseTo(full.state / 2, 6);
+    expect(r.federalIncome).toBeCloseTo(full.federalIncome, 6);
+    expect(r.total).toBeCloseTo(available, 6);
+    expect(r.total).toBeCloseTo(sum(r), 6);
+    expect(r.uncollected.state).toBeCloseTo(full.state / 2, 6);
+    expect(r.uncollected.total).toBeCloseTo(full.state / 2, 6);
+  });
+
+  it('splits a shortfall when Additional Medicare is non-zero (ytd past the threshold, SS spent)', () => {
+    const ytdWages = T.additionalMedicareThreshold - 1000;
+    const base = { ytdWages, grossForPeriod: 5000 };
+    const full = run({ ...base, availableToWithhold: 5000 });
+    // Guard the premise: if the tables change so this stops being true the
+    // test must fail loudly instead of passing on zeros.
+    expect(ytdWages).toBeGreaterThanOrEqual(T.socialSecurityWageBase);
+    expect(full.socialSecurity).toBe(0);
+    expect(full.additionalMedicare).toBeGreaterThan(0);
+    expect(full.federalIncome).toBeGreaterThan(0);
+    expect(full.state).toBeGreaterThan(0);
+
+    const r = run({
+      ...base,
+      availableToWithhold: full.medicare + full.additionalMedicare + full.federalIncome / 2,
+    });
+    expect(r.medicare).toBeCloseTo(full.medicare, 6);
+    expect(r.additionalMedicare).toBeCloseTo(full.additionalMedicare, 6);
+    expect(r.federalIncome).toBeCloseTo(full.federalIncome / 2, 6);
+    expect(r.state).toBe(0);
+    expect(r.uncollected.medicare).toBeCloseTo(0, 6);
+    expect(r.uncollected.federalIncome).toBeCloseTo(full.federalIncome / 2, 6);
+    expect(r.uncollected.state).toBeCloseTo(full.state, 6);
+    expect(r.total).toBeCloseTo(sum(r), 6);
+
+    // Short inside Medicare: plain Medicare first, Additional takes the rest.
+    const m = run({ ...base, availableToWithhold: full.medicare + full.additionalMedicare / 2 });
+    expect(m.medicare).toBeCloseTo(full.medicare, 6);
+    expect(m.additionalMedicare).toBeCloseTo(full.additionalMedicare / 2, 6);
+    expect(m.federalIncome).toBe(0);
   });
 
   it('records what could not be taken, per tax', () => {

@@ -234,8 +234,9 @@ gross: cash tips an employee already walked out with cannot be withheld from.
 `not_taxed` (a contractor), `unclassified` (nobody has said) and `disabled`
 (the bar has not switched tax on; ruling R12) produce the same zero and mean
 different things. `disabled` is not `not_taxed`: that would read as "everyone
-here is a contractor". The review screen treats them differently: one
-is a decision, the other is a question that should be answered before payroll is
+here is a contractor". The review screen treats them differently: `not_taxed`
+and `disabled` are decisions (about a person, and about the bar), while
+`unclassified` is a question that should be answered before payroll is
 approved.
 
 ## Transcribing the tables
