@@ -26,6 +26,11 @@ export function computeFica(input: {
   // No cap, and no employer match on the additional rate.
   const medicare = gross * tables.fica.medicareRate;
 
+  // Both bounds are needed, and each guards a different silent failure. The
+  // `min` stops a period that starts already above the threshold from being
+  // taxed for more than its own gross. The `max` stops a period that ends
+  // below the threshold from producing a negative amount, which would reduce
+  // withholding instead of being a no-op.
   const aboveThreshold = Math.max(
     0,
     Math.min(gross, ytd + gross - tables.fica.additionalMedicareThreshold),
