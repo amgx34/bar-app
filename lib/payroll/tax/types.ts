@@ -68,7 +68,7 @@ export type OrgTaxConfig = {
 };
 
 /**
- * Four outcomes, three of which produce the same zero. They are kept distinct
+ * Five outcomes, three of which produce the same zero. They are kept distinct
  * because each answers a different question and the UI treats them differently:
  *  - `withheld`     taxes were computed and taken.
  *  - `exempt`       the employee claimed W-4 exemption: no federal income tax,

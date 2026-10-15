@@ -168,6 +168,37 @@ describe('shortfall', () => {
     expect(r.additionalMedicare).toBeCloseTo(full.additionalMedicare / 2, 6);
   });
 
+  it('splits a mid-federal shortfall across every tax field', () => {
+    // ytd just under the Additional Medicare threshold so that field is
+    // non-zero too. Available runs out half-way through federal, with all of
+    // FICA taken, so Medicare, federal and state are each exercised.
+    const base = { ytdWages: 199_000, grossForPeriod: 5000 };
+    const full = run({ ...base, availableToWithhold: 5000 });
+    const ficaOwed = full.socialSecurity + full.medicare + full.additionalMedicare;
+    expect(full.additionalMedicare).toBeGreaterThan(0);
+    expect(full.federalIncome).toBeGreaterThan(0);
+    expect(full.state).toBeGreaterThan(0);
+
+    const r = run({ ...base, availableToWithhold: ficaOwed + full.federalIncome / 2 });
+
+    expect(r.socialSecurity).toBeCloseTo(full.socialSecurity, 6);
+    expect(r.medicare).toBeCloseTo(full.medicare, 6);
+    expect(r.additionalMedicare).toBeCloseTo(full.additionalMedicare, 6);
+    expect(r.federalIncome).toBeCloseTo(full.federalIncome / 2, 6);
+    expect(r.state).toBe(0);
+
+    expect(r.uncollected.socialSecurity).toBeCloseTo(0, 6);
+    expect(r.uncollected.medicare).toBeCloseTo(0, 6);
+    expect(r.uncollected.federalIncome).toBeCloseTo(full.federalIncome / 2, 6);
+    expect(r.uncollected.state).toBeCloseTo(full.state, 6);
+
+    expect(r.total).toBeCloseTo(
+      r.socialSecurity + r.medicare + r.additionalMedicare + r.federalIncome + r.state, 6);
+    expect(r.uncollected.total).toBeCloseTo(
+      r.uncollected.socialSecurity + r.uncollected.medicare +
+      r.uncollected.federalIncome + r.uncollected.state, 6);
+  });
+
   it('records what could not be taken, per tax', () => {
     const full = run();
     const r = run({ availableToWithhold: 0 });

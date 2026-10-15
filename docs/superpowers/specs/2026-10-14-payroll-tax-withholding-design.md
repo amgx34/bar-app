@@ -180,7 +180,7 @@ computeWithholding(input: {
 }): Withholding
 
 type Withholding = {
-  status: 'withheld' | 'exempt' | 'not_taxed' | 'unclassified',
+  status: 'withheld' | 'exempt' | 'not_taxed' | 'unclassified' | 'disabled',
   federalIncome:      number,
   socialSecurity:     number,
   medicare:           number,
@@ -231,8 +231,10 @@ gross: cash tips an employee already walked out with cannot be withheld from.
 
 ### Statuses are explicit
 
-`not_taxed` (a contractor) and `unclassified` (nobody has said) produce the same
-zero and mean different things. The review screen treats them differently: one
+`not_taxed` (a contractor), `unclassified` (nobody has said) and `disabled`
+(the bar has not switched tax on; ruling R12) produce the same zero and mean
+different things. `disabled` is not `not_taxed`: that would read as "everyone
+here is a contractor". The review screen treats them differently: one
 is a decision, the other is a question that should be answered before payroll is
 approved.
 
