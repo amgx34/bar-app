@@ -23,6 +23,16 @@ export type TaxBracket = {
  */
 export type TaxTables = {
   year: number;
+  /**
+   * True when the figures in this table were NOT transcribed from the IRS
+   * publication and are stand-ins. It travels with the data, rather than
+   * living in a side export, so that whoever receives the tables from
+   * `tablesFor()` can see they are fake: a table nobody transcribed must not
+   * silently decide what comes out of a paycheck. The engine computes from
+   * any table (so it stays testable); refusing to display or snapshot a
+   * withholding derived from a placeholder table belongs at the UI boundary.
+   */
+  placeholder: boolean;
   federal: {
     standard: Record<FilingStatus, TaxBracket[]>;
     step2:    Record<FilingStatus, TaxBracket[]>;

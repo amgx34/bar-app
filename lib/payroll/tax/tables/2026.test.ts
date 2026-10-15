@@ -1,6 +1,8 @@
 // lib/payroll/tax/tables/2026.test.ts
 import { describe, it, expect } from 'vitest';
-import { TABLES_2026, TABLES_2026_ARE_PLACEHOLDERS } from './2026';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { TABLES_2026 } from './2026';
 import type { FilingStatus, TaxBracket } from '../types';
 
 const STATUSES: FilingStatus[] = ['single', 'married_jointly', 'head_of_household'];
@@ -57,8 +59,14 @@ describe('2026 federal tables', () => {
     describe(`step2 / ${status}`, () => {
       checkBrackets(status, TABLES_2026.federal.step2[status]);
     });
-    it(`${status}: has a standard deduction amount`, () => {
-      expect(TABLES_2026.federal.standardDeduction[status]).toBeGreaterThan(0);
+    // Plausibility bound, not a claim about the real figure: Worksheet 1A line
+    // 1g has been in the low-to-mid five figures for years. A slipped decimal
+    // or a stray 0 lands outside it. Skipped while placeholder, whose $1
+    // deliberately fails it; this is where a wrong transcription gets caught.
+    it.skipIf(TABLES_2026.placeholder)(`${status}: standard deduction is plausible`, () => {
+      const d = TABLES_2026.federal.standardDeduction[status];
+      expect(d).toBeGreaterThanOrEqual(5_000);
+      expect(d).toBeLessThanOrEqual(40_000);
     });
   }
 });
@@ -66,7 +74,15 @@ describe('2026 federal tables', () => {
 describe('2026 FICA constants', () => {
   it('social security is 6.2% up to a wage base', () => {
     expect(TABLES_2026.fica.socialSecurityRate).toBeCloseTo(0.062, 5);
-    expect(TABLES_2026.fica.socialSecurityWageBase).toBeGreaterThan(100_000);
+  });
+
+  // The wage base has been indexed up from 160,200 (2023) and is not going to
+  // be below 150k or above 250k in 2026. Skipped while placeholder (100,001
+  // fails it on purpose); it bites on the real transcription.
+  it.skipIf(TABLES_2026.placeholder)('social security wage base is plausible', () => {
+    const base = TABLES_2026.fica.socialSecurityWageBase;
+    expect(base).toBeGreaterThanOrEqual(150_000);
+    expect(base).toBeLessThanOrEqual(250_000);
   });
 
   it('medicare is 1.45% with an additional 0.9% above a threshold', () => {
@@ -77,16 +93,22 @@ describe('2026 FICA constants', () => {
 });
 
 describe('transcription status', () => {
-  // The structural tests above pass against placeholder figures, because the
-  // placeholders are built to be self-consistent. They therefore cannot tell
-  // "transcribed" from "stand-in". This flag is the only thing that can, and
-  // it is pinned here so flipping it is a deliberate, reviewed act.
-  it('records that the figures are still placeholders', () => {
-    expect(TABLES_2026_ARE_PLACEHOLDERS).toBe(true);
+  // The structural tests pass on self-consistent placeholders, so they cannot
+  // tell "transcribed" from "stand-in". The `placeholder` field is meant to,
+  // but a field is just a claim. Tie it to the file's content so the claim
+  // and the figures cannot drift apart in either direction: a PLACEHOLDER
+  // marker left behind cannot sit under placeholder:false, and flipping the
+  // field to true cannot hide a fully transcribed file.
+  const source = readFileSync(join(__dirname, '2026.ts'), 'utf8');
+  const markers = source
+    .split(String.fromCharCode(10))
+    .filter((line) => /\/\/\s*PLACEHOLDER/.test(line)).length;
+
+  it('is marked placeholder exactly when PLACEHOLDER markers remain in 2026.ts', () => {
+    expect(TABLES_2026.placeholder).toBe(markers > 0);
   });
 
   // Replace with real tests when transcription happens: the publication's
   // worked examples reproduced through annualTaxFromBrackets (a later task).
   it.todo('reproduces Pub 15-T 2026 worked examples for every filing status');
-  it.todo('TABLES_2026_ARE_PLACEHOLDERS is false and no PLACEHOLDER marker remains');
 });
