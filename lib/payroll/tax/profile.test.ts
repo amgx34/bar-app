@@ -77,4 +77,39 @@ describe('taxProfileFromEmployee', () => {
     expect(p.exempt).toBeNull();
     expect(p.multipleJobs).toBeNull();
   });
+
+  // Catches: Number(v) with no null check, which turns Supabase's real NULL into
+  // an answered 0 / false. The {} test above cannot catch it: Number(undefined)
+  // is NaN, but Number(null) is 0.
+  it('reads explicit NULL columns as unanswered, not 0 or false', () => {
+    const p = taxProfileFromEmployee({
+      tax_classification: null,
+      w4_filing_status: null,
+      w4_multiple_jobs: null,
+      w4_dependents_amount: null,
+      w4_other_income: null,
+      w4_deductions: null,
+      w4_extra_withholding: null,
+      w4_exempt: null,
+    });
+    expect(p.classification).toBeNull();
+    expect(p.filingStatus).toBeNull();
+    expect(p.multipleJobs).toBeNull();
+    expect(p.dependentsAmount).toBeNull();
+    expect(p.otherIncome).toBeNull();
+    expect(p.deductions).toBeNull();
+    expect(p.extraWithholding).toBeNull();
+    expect(p.exempt).toBeNull();
+  });
+
+  // Catches: a gate that special-cases strings and drops (or nulls) a numeric 0.
+  it('keeps a numeric zero as 0', () => {
+    expect(taxProfileFromEmployee({ w4_dependents_amount: 0 }).dependentsAmount).toBe(0);
+  });
+
+  // Catches: a loosened type gate; Number(true) is 1 and Number('  ') is 0.
+  it('reads a boolean or whitespace-only value in a numeric column as null', () => {
+    expect(taxProfileFromEmployee({ w4_deductions: true }).deductions).toBeNull();
+    expect(taxProfileFromEmployee({ w4_deductions: '  ' }).deductions).toBeNull();
+  });
 });
