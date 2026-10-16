@@ -28,9 +28,15 @@ export type TaxTables = {
    * publication and are stand-ins. It travels with the data, rather than
    * living in a side export, so that whoever receives the tables from
    * `tablesFor()` can see they are fake: a table nobody transcribed must not
-   * silently decide what comes out of a paycheck. The engine computes from
-   * any table (so it stays testable); refusing to display or snapshot a
-   * withholding derived from a placeholder table belongs at the UI boundary.
+   * silently decide what comes out of a paycheck.
+   *
+   * NOTHING READS THIS FLAG YET. The engine computes from any table, so as
+   * things stand a placeholder year's figures flow straight through
+   * `computeWithholding` to every caller with no refusal anywhere: no guard
+   * exists in this directory or above it. The obligation is outstanding —
+   * the settings screen and the review screen must each refuse to display,
+   * snapshot or pay from a withholding whose table has `placeholder: true`,
+   * and until they do, any number shown to a manager may be invented.
    */
   placeholder: boolean;
   federal: {
@@ -93,12 +99,20 @@ export type Withholding = {
   additionalMedicare: number;
   state:              number;
   total:              number;
+  /**
+   * What was owed but could not be taken, per tax. Split the same way the
+   * taken side is split — Additional Medicare has its own field because it is
+   * a distinct, employee-only tax on its own W-2/Form 8959 line, so folding
+   * its shortfall into `medicare` would misattribute it on the very report
+   * these figures exist to feed. `total` is the sum of all five.
+   */
   uncollected: {
-    federalIncome:  number;
-    socialSecurity: number;
-    medicare:       number;
-    state:          number;
-    total:          number;
+    federalIncome:      number;
+    socialSecurity:     number;
+    medicare:           number;
+    additionalMedicare: number;
+    state:              number;
+    total:              number;
   };
   notes: string[];
 };

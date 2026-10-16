@@ -9,7 +9,10 @@ function none(status: WithholdingStatus, notes: string[] = []): Withholding {
     status,
     federalIncome: 0, socialSecurity: 0, medicare: 0,
     additionalMedicare: 0, state: 0, total: 0,
-    uncollected: { federalIncome: 0, socialSecurity: 0, medicare: 0, state: 0, total: 0 },
+    uncollected: {
+      federalIncome: 0, socialSecurity: 0, medicare: 0,
+      additionalMedicare: 0, state: 0, total: 0,
+    },
     notes,
   };
 }
@@ -84,14 +87,26 @@ export function computeWithholding(input: {
     remaining -= take;
   }
 
-  // Additional Medicare rides with Medicare through the shortfall ordering,
-  // then is reported separately because it is a different line on a W-2.
+  // Additional Medicare rides with Medicare as ONE step of the shortfall
+  // ordering above (they share a W-2 box only on the employer's side; for the
+  // employee they are different lines), then both the taken and the uncollected
+  // side are split back out: plain Medicare is satisfied first, Additional
+  // Medicare takes whatever is left of that step, and so carries whatever is
+  // left short. The split must happen on both sides or the figures disagree
+  // about which tax went short — and the shortfall exists to be reported per
+  // tax, Additional Medicare on its own (Form 8959) line.
   const plainMedicare = Math.min(taken.medicare, fica.medicare);
   const addlMedicare  = taken.medicare - plainMedicare;
+  const plainMedicareShort = fica.medicare - plainMedicare;
+  const addlMedicareShort  = fica.additionalMedicare - addlMedicare;
 
   const total = taken.socialSecurity + taken.medicare + taken.federalIncome + taken.state;
+  // Summed from the split components rather than from `short.medicare`, so the
+  // total stays the sum of the fields actually reported even if the split above
+  // is ever changed.
   const uncollectedTotal =
-    short.socialSecurity + short.medicare + short.federalIncome + short.state;
+    short.socialSecurity + plainMedicareShort + addlMedicareShort +
+    short.federalIncome + short.state;
 
   const notes: string[] = [];
   if (uncollectedTotal > 0.005) {
@@ -100,8 +115,6 @@ export function computeWithholding(input: {
     );
   }
 
-  // `uncollected` has no additionalMedicare field on purpose: it is a shortfall
-  // of the Medicare ordering step, so it is folded into `medicare`.
   return {
     status,
     federalIncome:      taken.federalIncome,
@@ -111,11 +124,12 @@ export function computeWithholding(input: {
     state:              taken.state,
     total,
     uncollected: {
-      federalIncome:  short.federalIncome,
-      socialSecurity: short.socialSecurity,
-      medicare:       short.medicare,
-      state:          short.state,
-      total:          uncollectedTotal,
+      federalIncome:      short.federalIncome,
+      socialSecurity:     short.socialSecurity,
+      medicare:           plainMedicareShort,
+      additionalMedicare: addlMedicareShort,
+      state:              short.state,
+      total:              uncollectedTotal,
     },
     notes,
   };
