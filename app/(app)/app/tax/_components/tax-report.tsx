@@ -55,8 +55,10 @@ export default function TaxReport({ orgName }: { orgName: string }) {
   function printReport() {
     if (!data) return;
     const stateInfo  = US_STATES.find(s => s.code === state);
-    const totalLabor = data.totalWages + data.employerFICA + data.futatEstimate;
-    const grossProfit = data.totalSales + data.totalTips - totalLabor - salesTaxOwed;
+    // Labor cost and profit both include FICA, so they are unknown (not partial) without it.
+    const totalLabor = data.employerFICA === null ? null : data.totalWages + data.employerFICA + data.futatEstimate;
+    const grossProfit = totalLabor === null ? null : data.totalSales + data.totalTips - totalLabor - salesTaxOwed;
+    const money = (n: number | null) => (n === null ? 'n/a' : fmtMoney(n));
 
     const quartersHtml = data.quarterlyBreakdown.map(q => {
       const qTaxable = taxInclusive && rateDecimal > 0 ? q.sales / (1 + rateDecimal) : q.sales;
@@ -68,7 +70,7 @@ export default function TaxReport({ orgName }: { orgName: string }) {
           <td style="text-align:right">${fmtMoney(q.tips)}</td>
           ${rateDecimal > 0 ? `<td style="text-align:right">${fmtMoney(qTaxable)}</td><td style="text-align:right">${fmtMoney(qTax)}</td>` : ''}
           <td style="text-align:right">${fmtMoney(q.wages)}</td>
-          <td style="text-align:right">${fmtMoney(q.employerFICA)}</td>
+          <td style="text-align:right">${money(q.employerFICA)}</td>
         </tr>`;
     }).join('');
 
@@ -77,10 +79,10 @@ export default function TaxReport({ orgName }: { orgName: string }) {
         <td>${e.name}</td>
         <td style="text-align:right">${fmtMoney(e.totalWages)}</td>
         <td style="text-align:right">${fmtMoney(e.totalTips)}</td>
-        <td style="text-align:right">${fmtMoney(e.ssWages)}</td>
-        <td style="text-align:right">${fmtMoney(e.ssTaxEmployee)}</td>
-        <td style="text-align:right">${fmtMoney(e.medicareTaxEmployee)}</td>
-        <td style="text-align:right">${fmtMoney(e.employerFICA)}</td>
+        <td style="text-align:right">${money(e.ssWages)}</td>
+        <td style="text-align:right">${money(e.ssTaxEmployee)}</td>
+        <td style="text-align:right">${money(e.medicareTaxEmployee)}</td>
+        <td style="text-align:right">${money(e.employerFICA)}</td>
       </tr>`).join('');
 
     const qHeaders = rateDecimal > 0
@@ -120,15 +122,15 @@ export default function TaxReport({ orgName }: { orgName: string }) {
         <div class="row"><span class="row-label">Regular Wages</span><span class="row-value">${fmtMoney(data.totalRegularPay)}</span></div>
         <div class="row"><span class="row-label">Overtime Pay</span><span class="row-value">${fmtMoney(data.totalOvertimePay)}</span></div>
         <div class="row"><span class="row-label">Total Tips Distributed</span><span class="row-value">${fmtMoney(data.totalTipsPaid)}</span></div>
-        <div class="row"><span class="row-label">Employer FICA (6.2% SS + 1.45% Medicare)</span><span class="row-value">${fmtMoney(data.employerFICA)}</span></div>
+        <div class="row"><span class="row-label">Employer FICA (Social Security + Medicare match)</span><span class="row-value">${money(data.employerFICA)}</span></div>
         <div class="row"><span class="row-label">FUTA Estimate (0.6% × $7k/emp)</span><span class="row-value">${fmtMoney(data.futatEstimate)}</span></div>
-        <div class="row total-row"><span>Total Labor Cost</span><span>${fmtMoney(totalLabor)}</span></div>
+        <div class="row total-row"><span>Total Labor Cost</span><span>${money(totalLabor)}</span></div>
       </div>
 
       <div class="section">
         <h2>Summary</h2>
         ${rateDecimal > 0 ? `<div class="row"><span class="row-label">Sales Tax Owed to State</span><span class="row-value" style="color:#c44">${fmtMoney(salesTaxOwed)}</span></div>` : ''}
-        <div class="row"><span class="row-label">Est. Gross Profit (Revenue − Labor${rateDecimal > 0 ? ' − Sales Tax' : ''})</span><span class="row-value">${fmtMoney(grossProfit)}</span></div>
+        <div class="row"><span class="row-label">Est. Gross Profit (Revenue − Labor${rateDecimal > 0 ? ' − Sales Tax' : ''})</span><span class="row-value">${money(grossProfit)}</span></div>
         <div class="row"><span class="row-label">Employees on Payroll</span><span class="row-value">${data.employeeCount}</span></div>
         <div class="row"><span class="row-label">W-2 Forms Required</span><span class="row-value">${data.employeeCount} (all paid employees)</span></div>
         ${stateInfo ? `<div class="row"><span class="row-label">State Income Tax</span><span class="row-value">${stateInfo.noIncomeTax ? 'None (' + stateInfo.name + ' has no state income tax)' : 'Applicable — consult tax professional for ' + stateInfo.name}</span></div>` : ''}
@@ -155,7 +157,7 @@ export default function TaxReport({ orgName }: { orgName: string }) {
       <div class="footnote">
         <strong>Notes &amp; Assumptions:</strong><br>
         ${rateDecimal > 0 ? `• Sales tax rate ${(rateDecimal * 100).toFixed(3)}% applied to ${taxInclusive ? 'tax-backed-out' : 'gross'} Z report sales. This is the state base rate${stateInfo ? ' for ' + stateInfo.name : ''} — add your county/city rate. Some states exempt alcohol from sales tax or apply a different rate; verify locally.<br>` : '• No sales tax rate entered — sales tax not calculated.<br>'}
-        • Employer FICA = 6.2% Social Security (on first $168,600) + 1.45% Medicare per employee.<br>
+        • ${data.ficaUnavailableReason ? 'FICA: ' + data.ficaUnavailableReason : 'Employer FICA = employer match of Social Security (up to the ' + data.ficaYear + ' wage base) + Medicare per employee, from the ' + data.ficaYear + ' payroll tax tables. Additional Medicare is employee-only and not included.'}<br>
         • FUTA estimate uses effective rate of 0.6% on first $7,000 per employee after state credit.<br>
         • Tips distributed are treated as wages for FICA purposes.<br>
         • Federal income tax withheld, COGS, rent, and other costs are not tracked by Rail.<br>
@@ -297,7 +299,7 @@ export default function TaxReport({ orgName }: { orgName: string }) {
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Labor Cost</span>
               <CircleDollarSign className="h-4 w-4 text-cyan-700 dark:text-cyan-300" />
             </div>
-            <p className="text-2xl font-bold tabular-nums">{fmtMoney(data.totalWages + data.employerFICA + data.futatEstimate)}</p>
+            <p className="text-2xl font-bold tabular-nums">{data.employerFICA === null ? 'n/a' : fmtMoney(data.totalWages + data.employerFICA + data.futatEstimate)}</p>
             <p className="text-xs text-muted-foreground mt-0.5">wages + employer FICA + FUTA</p>
           </div>
 
@@ -306,9 +308,16 @@ export default function TaxReport({ orgName }: { orgName: string }) {
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Employer FICA</span>
               <Users className="h-4 w-4 text-violet-700 dark:text-violet-300" />
             </div>
-            <p className="text-2xl font-bold tabular-nums">{fmtMoney(data.employerFICA)}</p>
+            <p className="text-2xl font-bold tabular-nums">{data.employerFICA === null ? 'n/a' : fmtMoney(data.employerFICA)}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{data.employeeCount} employees · FUTA ~{fmtMoney(data.futatEstimate)}</p>
           </div>
+        </div>
+      )}
+
+      {data?.ficaUnavailableReason && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-5 py-4 text-xs text-amber-300/80 leading-relaxed">
+          <span className="font-semibold text-amber-300">FICA not shown:</span>{' '}
+          {data.ficaUnavailableReason}
         </div>
       )}
 
