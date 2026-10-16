@@ -82,7 +82,17 @@ const FUTA_EFFECTIVE_RATE = 0.006;
  */
 function resolveTables(year: number): { tables: TaxTables | null; reason: string | null } {
   try {
-    return { tables: tablesFor(year), reason: null };
+    const tables = tablesFor(year);
+    // A placeholder table has invented figures (e.g. a wage base far below the
+    // real one). Showing FICA from it would put wrong numbers on a page that
+    // used to show right ones, so it is refused exactly like a missing year.
+    if (tables.placeholder) {
+      return {
+        tables: null,
+        reason: `The ${year} payroll tax tables are placeholders awaiting transcription from the IRS publication, so Social Security and Medicare figures are not shown. Sales, tips and wages are unaffected.`,
+      };
+    }
+    return { tables, reason: null };
   } catch {
     return {
       tables: null,
@@ -166,17 +176,12 @@ export async function getTaxReportData(startDate: string, endDate: string): Prom
   const quarterlyBreakdown: QuarterRow[] = [...quarterMap.entries()].map(([label, { sales, tips }]) => {
     // Rough wages per quarter = total wages / number of quarters
     const qWages = payrollEntries.length > 0 ? totalWages / (quarterMap.size || 1) : 0;
-    return {
-      label,
-      sales,
-      tips,
-      wages: qWages,
-      employerFICA: tables
-        ? (({ socialSecurity, medicare }) => socialSecurity + medicare)(
-            computeFica({ grossForPeriod: qWages, ytdWages: 0, tables }),
-          )
-        : null,
-    };
+    // The wage base is per EMPLOYEE, so it cannot be applied to a quarter's
+    // pooled wages (that caps a big payroll while nobody is near the base).
+    // Wages are spread evenly across quarters, so each quarter carries an equal
+    // share of the per-employee-capped total, and the rows sum to the headline.
+    const qFICA = employerFICA === null ? null : employerFICA / (quarterMap.size || 1);
+    return { label, sales, tips, wages: qWages, employerFICA: qFICA };
   });
 
   return {
