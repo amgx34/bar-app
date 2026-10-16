@@ -35,9 +35,11 @@ const TIP_MODE_LABELS: Record<string, string> = {
 
 interface EmployeesTabProps {
   employees: Employee[];
+  /** Owner or manager may edit an employee's tax profile. */
+  canEditTax?: boolean;
 }
 
-export default function EmployeesTab({ employees: initialEmployees }: EmployeesTabProps) {
+export default function EmployeesTab({ employees: initialEmployees, canEditTax = false }: EmployeesTabProps) {
   const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -184,6 +186,13 @@ export default function EmployeesTab({ employees: initialEmployees }: EmployeesT
                   >
                     <TableCell className="pl-4 font-medium whitespace-normal">
                       {employee.name}
+                      {/* A null classification is a question nobody has answered,
+                          deliberately not the same as a 1099 (a decision). */}
+                      {canEditTax && !employee.tax_classification && (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                          Unclassified
+                        </span>
+                      )}
                       {/* Same two facts as the hidden columns, stacked. */}
                       <span className="mt-1 flex flex-wrap items-center gap-1.5 sm:hidden">
                         <span className="text-xs font-normal capitalize text-muted-foreground">
@@ -270,6 +279,7 @@ export default function EmployeesTab({ employees: initialEmployees }: EmployeesT
       {(editingEmployee || isAddingNew) && (
         <EmployeeSetupDialog
           employee={editingEmployee ?? undefined}
+          canEditTax={canEditTax}
           onClose={() => {
             setEditingEmployee(null);
             setIsAddingNew(false);

@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Employee, TipMode, saveEmployee } from '../actions';
+import { saveEmployeeTaxProfile } from '../tax-settings-actions';
+import { employeeTaxFieldsFromForm, type EmployeeTaxForm } from '@/lib/payroll/tax/ui';
 import type { PayType } from '@/lib/payroll/tip-pool';
 import {
   Dialog,
@@ -44,12 +46,15 @@ interface EmployeeSetupDialogProps {
   employee?: Employee;
   onClose: () => void;
   onSave: (employee: Employee) => void;
+  /** Owner or manager. Without it the tax fields are not shown and not written. */
+  canEditTax?: boolean;
 }
 
 export default function EmployeeSetupDialog({
   employee,
   onClose,
   onSave,
+  canEditTax = false,
 }: EmployeeSetupDialogProps) {
   const isNew = !employee;
 
@@ -65,6 +70,17 @@ export default function EmployeeSetupDialog({
     hourlyRate: employee?.hourly_rate?.toString() ?? '',
     tipMode: employee?.tip_mode ?? 'pool',
     payType: employee?.pay_type ?? 'percentage',
+  });
+  const str = (v: unknown) => (v === null || v === undefined ? '' : String(v));
+  const [tax, setTax] = useState<EmployeeTaxForm>({
+    classification: employee?.tax_classification ?? '',
+    filingStatus: employee?.w4_filing_status ?? '',
+    multipleJobs: employee?.w4_multiple_jobs ?? false,
+    dependentsAmount: str(employee?.w4_dependents_amount),
+    otherIncome: str(employee?.w4_other_income),
+    deductions: str(employee?.w4_deductions),
+    extraWithholding: str(employee?.w4_extra_withholding),
+    exempt: employee?.w4_exempt ?? false,
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -94,9 +110,15 @@ export default function EmployeeSetupDialog({
       return;
     }
 
+    const taxResult = canEditTax ? employeeTaxFieldsFromForm(tax) : null;
+    if (taxResult && !taxResult.ok) {
+      toast.error(taxResult.error);
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const saved = await saveEmployee({
+      let saved = await saveEmployee({
         id: employee?.id,
         name: isNew ? formData.name.trim() : employee!.name,
         role: formData.role,
@@ -108,6 +130,17 @@ export default function EmployeeSetupDialog({
         tip_mode: formData.tipMode,
         pay_type: formData.payType,
       });
+      if (taxResult && taxResult.ok) {
+        try {
+          await saveEmployeeTaxProfile(saved.id, taxResult.fields);
+          saved = { ...saved, ...taxResult.fields };
+        } catch (err) {
+          // The employee row is already saved; say which half failed.
+          toast.error(
+            `Saved, but tax details were not: ${err instanceof Error ? err.message : 'unknown error'}`,
+          );
+        }
+      }
       toast.success(isNew ? `${saved.name} added` : 'Changes saved');
       onSave(saved);
     } catch (err) {
@@ -256,6 +289,95 @@ export default function EmployeeSetupDialog({
                         : 'Paid their hourly rate plus their share of the tips. This is the default.'}
                     </p>
                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {canEditTax && (
+            <div className="space-y-3 border-t pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="taxClassification">Tax classification</Label>
+                <Select
+                  value={tax.classification || 'unclassified'}
+                  onValueChange={(v) =>
+                    setTax({ ...tax, classification: v === 'unclassified' ? '' : (v as string) })
+                  }
+                >
+                  <SelectTrigger id="taxClassification">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unclassified">Unclassified</SelectItem>
+                    <SelectItem value="w2">W-2 employee</SelectItem>
+                    <SelectItem value="contractor_1099">1099 contractor</SelectItem>
+                  </SelectContent>
+                </Select>
+                {!tax.classification && (
+                  <p className="text-xs text-muted-foreground">
+                    Not answered yet. This is not the same as a 1099 contractor.
+                  </p>
+                )}
+              </div>
+
+              {tax.classification === 'w2' && (
+                <div className="space-y-3 rounded-lg bg-muted/40 p-3">
+                  <p className="text-xs font-medium">Form W-4</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="w4Status">Filing status (Step 1)</Label>
+                    <Select
+                      value={tax.filingStatus || 'none'}
+                      onValueChange={(v) =>
+                        setTax({ ...tax, filingStatus: v === 'none' ? '' : (v as string) })
+                      }
+                    >
+                      <SelectTrigger id="w4Status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Not set</SelectItem>
+                        <SelectItem value="single">Single or married filing separately</SelectItem>
+                        <SelectItem value="married_jointly">Married filing jointly</SelectItem>
+                        <SelectItem value="head_of_household">Head of household</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={tax.multipleJobs}
+                      onChange={(e) => setTax({ ...tax, multipleJobs: e.target.checked })}
+                    />
+                    Multiple jobs or spouse works (Step 2 checked)
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {([
+                      ['dependentsAmount', 'Dependents (Step 3, $)'],
+                      ['otherIncome', 'Other income (4a, $)'],
+                      ['deductions', 'Deductions (4b, $)'],
+                      ['extraWithholding', 'Extra withholding (4c, $)'],
+                    ] as const).map(([key, label]) => (
+                      <div key={key} className="space-y-1">
+                        <Label htmlFor={`w4-${key}`} className="text-xs">{label}</Label>
+                        <Input
+                          id={`w4-${key}`}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={tax[key]}
+                          onChange={(e) => setTax({ ...tax, [key]: e.target.value })}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={tax.exempt}
+                      onChange={(e) => setTax({ ...tax, exempt: e.target.checked })}
+                    />
+                    Claims exemption from federal income tax
+                  </label>
                 </div>
               )}
             </div>

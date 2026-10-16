@@ -56,6 +56,16 @@ export interface Employee {
   tip_mode: TipMode;
   /** 'hourly' means paid a wage instead of a tip cut. Barbacks only, in practice. */
   pay_type?: BarbackPayType | null;
+  /** NULL is unclassified: a question nobody has answered, not a 1099. */
+  tax_classification?: string | null;
+  w4_filing_status?: string | null;
+  w4_multiple_jobs?: boolean | null;
+  // NUMERIC columns can arrive as strings from postgres; the form reads them via Number().
+  w4_dependents_amount?: number | string | null;
+  w4_other_income?: number | string | null;
+  w4_deductions?: number | string | null;
+  w4_extra_withholding?: number | string | null;
+  w4_exempt?: boolean | null;
 }
 
 export interface SaveEmployeePayload {
