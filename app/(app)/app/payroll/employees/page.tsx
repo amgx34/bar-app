@@ -7,7 +7,7 @@ import { loadEmployees, toLocalDateStr } from '../_shared';
 import { listPendingClaims } from '../claim-actions';
 import { getCurrentOrg } from '@/lib/org';
 import { canManagePayroll } from '@/lib/permissions';
-import { taxConfigFromSettings } from '@/lib/payroll/tax/settings';
+import { taxConfigFromSettings, hasExplicitPayFrequency } from '@/lib/payroll/tax/settings';
 import { taxYearForPeriod } from '@/lib/payroll/tax/tables';
 import { tablesStatus } from '@/lib/payroll/tax/ui';
 
@@ -44,6 +44,7 @@ export default async function PayrollEmployeesPage() {
         <TaxSetupPanel
           initial={taxConfigFromSettings((org.bar_settings ?? {}) as Record<string, unknown>)}
           tables={tables}
+          frequencyChosen={hasExplicitPayFrequency((org.bar_settings ?? {}) as Record<string, unknown>)}
         />
       )}
       <Suspense fallback={<div>Loading employees…</div>}>

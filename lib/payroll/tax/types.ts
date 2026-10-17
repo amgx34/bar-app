@@ -30,13 +30,17 @@ export type TaxTables = {
    * `tablesFor()` can see they are fake: a table nobody transcribed must not
    * silently decide what comes out of a paycheck.
    *
-   * NOTHING READS THIS FLAG YET. The engine computes from any table, so as
-   * things stand a placeholder year's figures flow straight through
-   * `computeWithholding` to every caller with no refusal anywhere: no guard
-   * exists in this directory or above it. The obligation is outstanding —
-   * the settings screen and the review screen must each refuse to display,
-   * snapshot or pay from a withholding whose table has `placeholder: true`,
-   * and until they do, any number shown to a manager may be invented.
+   * THREE READERS GUARD IT, each at a different door:
+   *  - `tablesStatus` (ui.ts) turns the flag into a usable/unusable verdict.
+   *    `orgTaxPatchError` uses it to refuse switching withholding ON, and
+   *    `computeRunWithholding` (run-withholding.ts) uses it to return
+   *    `unusable` instead of computing, so the review screen and the
+   *    snapshot never carry a figure from a placeholder table.
+   *  - `resolveTables` (app/tax/actions.ts) refuses to show FICA figures on
+   *    the tax report from a placeholder year.
+   * The engine itself (`computeWithholding`) still computes from ANY table it
+   * is handed and does not read the flag: the guard lives in those callers,
+   * so a new caller that bypasses `tablesStatus` is unguarded.
    */
   placeholder: boolean;
   federal: {

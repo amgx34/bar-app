@@ -28,22 +28,26 @@ interface TaxSetupPanelProps {
   initial: OrgTaxConfig;
   /** Resolved on the server: tablesFor() throws and must not run in render here. */
   tables: TablesStatus;
+  /** Has the owner ever picked a pay frequency? Until then the Select shows a prompt, not the 'biweekly' fill-in. */
+  frequencyChosen: boolean;
 }
 
-export default function TaxSetupPanel({ initial, tables }: TaxSetupPanelProps) {
+export default function TaxSetupPanel({ initial, tables, frequencyChosen }: TaxSetupPanelProps) {
   const [config, setConfig] = useState<OrgTaxConfig>(initial);
   const [rate, setRate] = useState(String(initial.stateRate));
   const [saving, setSaving] = useState(false);
+  const [chosen, setChosen] = useState(frequencyChosen);
 
   // Turning tax ON is refused while the tables are not real. Turning it off is
   // always allowed, so a bar that enabled it earlier can still back out.
-  const cannotEnable = !tables.usable && !config.enabled;
+  const cannotEnable = (!tables.usable || !chosen) && !config.enabled;
 
   const save = async (patch: Partial<OrgTaxConfig>) => {
     setSaving(true);
     try {
       await saveOrgTaxConfig(patch);
       setConfig((c) => ({ ...c, ...patch }));
+      if (patch.payFrequency !== undefined) setChosen(true);
       toast.success('Tax setup saved');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save tax setup');
@@ -91,7 +95,9 @@ export default function TaxSetupPanel({ initial, tables }: TaxSetupPanelProps) {
       </label>
       {cannotEnable && (
         <p className="text-xs text-muted-foreground">
-          Withholding cannot be switched on until real tax tables are in place.
+          {!tables.usable
+            ? 'Withholding cannot be switched on until real tax tables are in place.'
+            : 'Choose how often you pay before switching withholding on.'}
         </p>
       )}
 
@@ -99,11 +105,11 @@ export default function TaxSetupPanel({ initial, tables }: TaxSetupPanelProps) {
         <div className="space-y-2">
           <Label htmlFor="taxPayFrequency">Pay frequency</Label>
           <Select
-            value={config.payFrequency}
+            value={chosen ? config.payFrequency : ''}
             onValueChange={(v) => save({ payFrequency: v as PayFrequency })}
           >
             <SelectTrigger id="taxPayFrequency" disabled={saving}>
-              <SelectValue />
+              <SelectValue placeholder="Choose how often you pay" />
             </SelectTrigger>
             <SelectContent>
               {(Object.keys(FREQUENCY_LABELS) as PayFrequency[]).map((f) => (

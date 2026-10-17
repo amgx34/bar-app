@@ -143,10 +143,15 @@ const FREQS: PayFrequency[] = ['weekly', 'biweekly', 'semimonthly', 'monthly'];
 
 /**
  * Server-side gate for an org tax patch. Returns an error sentence or null.
- * Enabling tax on unusable tables is refused here, not only in the panel,
- * because the action is callable directly.
+ * Enabling tax on unusable tables, or before a pay frequency has been chosen,
+ * is refused here, not only in the panel, because the action is callable directly.
  */
-export function orgTaxPatchError(patch: Partial<OrgTaxConfig>, year: number): string | null {
+export function orgTaxPatchError(
+  patch: Partial<OrgTaxConfig>,
+  year: number,
+  /** Does the STORED setting already hold a deliberate pay frequency? */
+  frequencyAlreadyChosen: boolean,
+): string | null {
   if (typeof patch !== 'object' || patch === null) return 'Invalid tax settings';
   if (patch.enabled !== undefined && typeof patch.enabled !== 'boolean') return 'Enabled must be true or false';
   if (patch.stateEnabled !== undefined && typeof patch.stateEnabled !== 'boolean') return 'State withholding must be true or false';
@@ -159,6 +164,12 @@ export function orgTaxPatchError(patch: Partial<OrgTaxConfig>, year: number): st
     return 'State rate must be between 0 and 100';
   }
   if (patch.enabled === true) {
+    // Withholding annualises by pay frequency. An unanswered question must not
+    // become a number: weekly pay read as biweekly halves the annualised wage.
+    // The patch itself may carry the answer (validated above).
+    if (patch.payFrequency === undefined && !frequencyAlreadyChosen) {
+      return 'Cannot switch withholding on. Choose how often you pay first: withholding is annualised from it.';
+    }
     const t = tablesStatus(year);
     if (!t.usable) return `Cannot switch withholding on. ${t.message}`;
   }

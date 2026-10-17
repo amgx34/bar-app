@@ -128,35 +128,50 @@ describe('orgTaxPatchError', () => {
   // Catches: a validator that lets a truthy string through as the setting.
   it('rejects a non-boolean tipsPaidOnCheque and accepts a boolean', () => {
     tablesFor.mockReturnValue({ placeholder: false });
-    expect(orgTaxPatchError({ tipsPaidOnCheque: 'yes' as never }, 2026)).not.toBeNull();
-    expect(orgTaxPatchError({ tipsPaidOnCheque: 1 as never }, 2026)).not.toBeNull();
-    expect(orgTaxPatchError({ tipsPaidOnCheque: true }, 2026)).toBeNull();
-    expect(orgTaxPatchError({ tipsPaidOnCheque: false }, 2026)).toBeNull();
+    expect(orgTaxPatchError({ tipsPaidOnCheque: 'yes' as never }, 2026, true)).not.toBeNull();
+    expect(orgTaxPatchError({ tipsPaidOnCheque: 1 as never }, 2026, true)).not.toBeNull();
+    expect(orgTaxPatchError({ tipsPaidOnCheque: true }, 2026, true)).toBeNull();
+    expect(orgTaxPatchError({ tipsPaidOnCheque: false }, 2026, true)).toBeNull();
   });
 
   it('refuses enabling on placeholder tables (catches an action that trusts the UI)', () => {
     tablesFor.mockReturnValue({ placeholder: true });
-    expect(orgTaxPatchError({ enabled: true }, 2026)).toContain('Cannot switch withholding on');
+    expect(orgTaxPatchError({ enabled: true }, 2026, true)).toContain('Cannot switch withholding on');
   });
   it('refuses enabling on a year with no tables', () => {
     tablesFor.mockImplementation(() => { throw new Error('none'); });
-    expect(orgTaxPatchError({ enabled: true }, 2031)).toContain('Cannot switch withholding on');
+    expect(orgTaxPatchError({ enabled: true }, 2031, true)).toContain('Cannot switch withholding on');
+  });
+  // Catches: enabling with no frequency ever chosen (weekly pay would annualise
+  // at 26 and under-withhold), and a check that only looks at the patch while
+  // ignoring the stored choice.
+  it('refuses enabling until a pay frequency has been chosen, in the patch or already stored', () => {
+    tablesFor.mockReturnValue({ placeholder: false });
+    expect(orgTaxPatchError({ enabled: true }, 2026, false)).toContain('how often you pay');
+    expect(orgTaxPatchError({ enabled: true, payFrequency: 'weekly' }, 2026, false)).toBeNull();
+    expect(orgTaxPatchError({ enabled: true }, 2026, true)).toBeNull();
+  });
+  // Catches: gating non-enabling edits (or switching off) on the frequency, which would trap a bar.
+  it('does not demand a frequency to switch off or edit other settings', () => {
+    tablesFor.mockReturnValue({ placeholder: false });
+    expect(orgTaxPatchError({ enabled: false }, 2026, false)).toBeNull();
+    expect(orgTaxPatchError({ stateRate: 5 }, 2026, false)).toBeNull();
   });
   it('allows enabling on real tables', () => {
     tablesFor.mockReturnValue({ placeholder: false });
-    expect(orgTaxPatchError({ enabled: true }, 2026)).toBeNull();
+    expect(orgTaxPatchError({ enabled: true }, 2026, true)).toBeNull();
   });
   it('always allows switching off, even on placeholder tables', () => {
     tablesFor.mockReturnValue({ placeholder: true });
-    expect(orgTaxPatchError({ enabled: false }, 2026)).toBeNull();
+    expect(orgTaxPatchError({ enabled: false }, 2026, true)).toBeNull();
   });
   it('rejects bad rate, frequency and non-boolean enabled', () => {
     tablesFor.mockReturnValue({ placeholder: false });
-    expect(orgTaxPatchError({ stateRate: -1 }, 2026)).not.toBeNull();
-    expect(orgTaxPatchError({ stateRate: 101 }, 2026)).not.toBeNull();
-    expect(orgTaxPatchError({ stateRate: NaN }, 2026)).not.toBeNull();
-    expect(orgTaxPatchError({ payFrequency: 'daily' as never }, 2026)).not.toBeNull();
-    expect(orgTaxPatchError({ enabled: 'true' as never }, 2026)).not.toBeNull();
-    expect(orgTaxPatchError({ stateRate: 5.5 }, 2026)).toBeNull();
+    expect(orgTaxPatchError({ stateRate: -1 }, 2026, true)).not.toBeNull();
+    expect(orgTaxPatchError({ stateRate: 101 }, 2026, true)).not.toBeNull();
+    expect(orgTaxPatchError({ stateRate: NaN }, 2026, true)).not.toBeNull();
+    expect(orgTaxPatchError({ payFrequency: 'daily' as never }, 2026, true)).not.toBeNull();
+    expect(orgTaxPatchError({ enabled: 'true' as never }, 2026, true)).not.toBeNull();
+    expect(orgTaxPatchError({ stateRate: 5.5 }, 2026, true)).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 import { computePayroll, type PayrollEntry } from './actions';
 import { loadEmployees } from './_shared';
 import { computeWithholding } from '@/lib/payroll/tax/withholding';
-import { taxConfigFromSettings } from '@/lib/payroll/tax/settings';
+import { taxConfigFromSettings, hasExplicitPayFrequency } from '@/lib/payroll/tax/settings';
 import { taxProfileFromEmployee } from '@/lib/payroll/tax/profile';
 import { taxYearForPeriod } from '@/lib/payroll/tax/tables';
 import { tablesStatus, availableToWithholdFor } from '@/lib/payroll/tax/ui';
@@ -18,6 +18,15 @@ export async function computeRunWithholding(
 ): Promise<RunWithholding> {
   const config = taxConfigFromSettings(settings);
   if (!config.enabled) return { kind: 'off' };
+
+  // Enabling is refused without a chosen frequency, but a hand-edited row can
+  // still say enabled with none. Refuse rather than annualise a guess.
+  if (!hasExplicitPayFrequency(settings)) {
+    return {
+      kind: 'unusable',
+      message: 'Withholding is switched on but no pay frequency has been chosen. Choose how often you pay in Tax setup.',
+    };
+  }
 
   const taxYear = taxYearForPeriod(endDate);
   const status = tablesStatus(taxYear);

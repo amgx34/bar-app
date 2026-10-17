@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
-import { withTaxConfig } from '@/lib/payroll/tax/settings';
+import { withTaxConfig, hasExplicitPayFrequency } from '@/lib/payroll/tax/settings';
 import type { OrgTaxConfig } from '@/lib/payroll/tax/types';
 import { taxYearForPeriod } from '@/lib/payroll/tax/tables';
 import {
@@ -19,9 +19,6 @@ export async function saveOrgTaxConfig(patch: Partial<OrgTaxConfig>): Promise<vo
   if (!org?.id) throw new Error('Organization not found');
   if (role !== 'owner') throw new Error('Only an owner can change tax settings');
 
-  const invalid = orgTaxPatchError(patch, taxYearForPeriod(toLocalDateStr(new Date())));
-  if (invalid) throw new Error(invalid);
-
   const supabase = await createClient();
 
   // Read, then merge, then write. bar_settings is one JSON column with several
@@ -30,10 +27,17 @@ export async function saveOrgTaxConfig(patch: Partial<OrgTaxConfig>): Promise<vo
     .from('organizations').select('bar_settings').eq('id', org.id).maybeSingle();
   if (readError) throw new Error(readError.message);
 
-  const next = withTaxConfig(
-    (data?.bar_settings ?? {}) as Record<string, unknown>,
+  const current = (data?.bar_settings ?? {}) as Record<string, unknown>;
+  // Validated against the STORED settings: whether a pay frequency was ever
+  // chosen is a fact about the row, not about this patch.
+  const invalid = orgTaxPatchError(
     patch,
+    taxYearForPeriod(toLocalDateStr(new Date())),
+    hasExplicitPayFrequency(current),
   );
+  if (invalid) throw new Error(invalid);
+
+  const next = withTaxConfig(current, patch);
 
   const { error } = await supabase
     .from('organizations').update({ bar_settings: next }).eq('id', org.id);

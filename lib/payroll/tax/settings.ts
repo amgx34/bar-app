@@ -23,6 +23,19 @@ function finiteRate(v: unknown): number {
 }
 
 /**
+ * Has somebody actually said how often this bar pays?
+ *
+ * `taxConfigFromSettings` fills a blank with 'biweekly' so the type is total,
+ * which makes a guess and an answer indistinguishable once read. This asks the
+ * stored value directly. Enabling tax is refused without it
+ * (`orgTaxPatchError`) and `computeRunWithholding` refuses to compute without
+ * it, so the filled-in default is never the basis of a withholding figure.
+ */
+export function hasExplicitPayFrequency(settings: Record<string, unknown>): boolean {
+  return FREQUENCIES.includes(asObject(settings?.tax).payFrequency as PayFrequency);
+}
+
+/**
  * Reads the tax setup out of organizations.bar_settings.
  *
  * Defaults to OFF. A bar that has never configured tax must not start
@@ -37,6 +50,12 @@ export function taxConfigFromSettings(settings: Record<string, unknown>): OrgTax
 
   return {
     enabled:      tax.enabled === true,
+    // 'biweekly' here is a placeholder to keep the type total, NOT an answer.
+    // It is only reachable for a bar that has never chosen a frequency, and
+    // such a bar cannot have tax enabled (orgTaxPatchError refuses it) nor
+    // compute withholding (computeRunWithholding checks
+    // hasExplicitPayFrequency, covering a hand-edited row). Weekly pay
+    // annualised at 26 instead of 52 would silently under-withhold.
     payFrequency: FREQUENCIES.includes(freq) ? freq : 'biweekly',
     stateEnabled: tax.stateEnabled === true,
     // === true: absent or malformed is false, the loud-failure side. See OrgTaxConfig.

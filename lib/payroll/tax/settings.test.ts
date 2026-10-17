@@ -1,6 +1,6 @@
 // lib/payroll/tax/settings.test.ts
 import { describe, it, expect } from 'vitest';
-import { taxConfigFromSettings, withTaxConfig } from './settings';
+import { hasExplicitPayFrequency, taxConfigFromSettings, withTaxConfig } from './settings';
 
 describe('taxConfigFromSettings', () => {
   // Catches: an implementation that defaults enabled or stateEnabled to true.
@@ -25,6 +25,16 @@ describe('taxConfigFromSettings', () => {
   it('defaults an unrecognised pay frequency to biweekly', () => {
     const c = taxConfigFromSettings({ tax: { enabled: true, payFrequency: 'fortnightly' } });
     expect(c.payFrequency).toBe('biweekly');
+  });
+
+  // Catches: reading the filled-in 'biweekly' default as an answer (a bar that
+  // never chose, or stored junk, must not count as having chosen).
+  it('hasExplicitPayFrequency is true only for a stored, recognised frequency', () => {
+    expect(hasExplicitPayFrequency({})).toBe(false);
+    expect(hasExplicitPayFrequency({ tax: { enabled: true } })).toBe(false);
+    expect(hasExplicitPayFrequency({ tax: { payFrequency: 'fortnightly' } })).toBe(false);
+    expect(hasExplicitPayFrequency({ tax: { payFrequency: 'weekly' } })).toBe(true);
+    expect(hasExplicitPayFrequency({ tax: { payFrequency: 'biweekly' } })).toBe(true);
   });
 
   // Catches: a clamp missing either bound.

@@ -36,6 +36,14 @@ describe('computeRunWithholding', () => {
     expect(loadEmployees).not.toHaveBeenCalled();
   });
 
+  // Catches: computing withholding for an enabled bar with no chosen frequency
+  // (hand-edited row), annualising a guessed 'biweekly'.
+  it('enabled with no stored pay frequency: unusable, no payroll work', async () => {
+    const r = await computeRunWithholding({ tax: { enabled: true } }, '2026-03-02', '2026-03-08', [entry('a')]);
+    expect(r.kind).toBe('unusable');
+    expect(computePayroll).not.toHaveBeenCalled();
+  });
+
   // Catches: running the full-year payroll or returning figures from placeholder tables.
   it('unusable: carries the message and does no payroll work', async () => {
     tablesStatus.mockReturnValue({ usable: false, reason: 'placeholder', message: 'fake tables' });

@@ -134,9 +134,33 @@ tax: {
 ```
 
 `payFrequency` is configured rather than derived because periods here are
-arbitrary start/end dates and the percentage method must annualise. The engine
-checks the period length roughly matches the stated frequency and returns a note
-on a mismatch rather than silently annualising a 13-day period as biweekly.
+arbitrary start/end dates and the percentage method must annualise.
+
+**Amended (R24): an unanswered frequency is REFUSED, not noted.** The original
+design had the engine compare the period length to `payFrequency` and return a
+note on a mismatch. That was never built, and the gap it left was real:
+`taxConfigFromSettings` filled a blank with `'biweekly'`, so a bar paying weekly
+that never touched the selector annualised at 26 instead of 52, roughly halving
+the annualised wage and under-withholding federal income tax with no symptom.
+The fix is a refusal at the door rather than a note after the fact:
+
+- `orgTaxPatchError` refuses `enabled: true` unless a pay frequency is already
+  stored (`hasExplicitPayFrequency`) or the same patch supplies one.
+- `computeRunWithholding` returns `unusable` for an enabled bar with no stored
+  frequency (a hand-edited row), so no figure is computed from a guess.
+- The settings panel shows a prompt, not the default, and disables the switch
+  until a frequency is chosen.
+- The `'biweekly'` fill-in in `taxConfigFromSettings` remains only to keep the
+  type total. It is reachable only while tax is disabled or unusable, so no
+  withholding is ever computed from a guessed frequency.
+
+Refusing is stronger than noting because a note is advice a manager can scroll
+past while a wrong number still lands in the snapshot; a refusal means no number
+exists to be wrong. It matches the rest of the feature: `tablesFor` throws
+rather than falling back, tax defaults off, and `tipsPaidOnCheque` defaults to
+the loud-failure side. The residual gap is a frequency that is chosen but wrong
+for the period actually run; that is a mistaken answer, not a missing one, and
+is not detected.
 
 **`bar_settings` is a JSONB blob with multiple writers â€” the `pos_config` bug
 exactly.** Any writer must build from the latest read and return what it wrote.
@@ -148,9 +172,15 @@ what an approver agreed to, which is exactly where a frozen tax figure belongs â
 and it means changing a tax setting cannot restate an approved run, the same
 protection `usage_logs.unit_cost` gives the books.
 
-`run-diff.ts` compares withholding alongside the existing `PayBreakdown`, so a
-changed W-4 between submit and approval is something the owner is shown rather
-than something that moves underneath them.
+**Amended: `run-diff.ts` does NOT compare withholding.** The original design had
+it compare withholding so a W-4 edited between submit and approval would be
+shown to the owner. The code deliberately does not: `SnapshotEntry` defines
+staleness as HOURS or PAY having moved, and withholding is a figure derived from
+pay plus profile, so firing on it would conflate "the numbers the owner agreed
+to changed" with "a derived estimate would differ today". The consequence, stated
+plainly: a W-4 edited between submit and approve changes nothing visible, and
+the withholding frozen at submit stands. Acceptable while this phase changes no
+payment; revisit when net pay ships.
 
 The shortfall rides in the snapshot for this phase. A persistent shortfall
 ledger belongs with the net-pay change, where it starts affecting what is paid.
@@ -269,7 +299,7 @@ Pure engine, so ordinary unit tests:
 - `contractor_1099` withholds nothing; `unclassified` withholds nothing and says
   so differently.
 - Shortfall: ordering, per-tax `uncollected`, and never a negative net.
-- Period length disagreeing with `payFrequency` produces a note.
+- Enabling is refused until a pay frequency is chosen; an enabled bar with no stored frequency yields `unusable`, not a figure. (Replaces the original period-length note, see R24.)
 - `tablesFor` throws on an unknown year rather than falling back.
 - Snapshot round-trip: withholding frozen at submit survives a settings change.
 
