@@ -5,24 +5,22 @@ import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
 import { withTaxConfig } from '@/lib/payroll/tax/settings';
 import type { OrgTaxConfig } from '@/lib/payroll/tax/types';
-import type { EmployeeTaxFields } from '@/lib/payroll/tax/ui';
-
-const FREQS = ['weekly', 'biweekly', 'semimonthly', 'monthly'];
+import { taxYearForPeriod } from '@/lib/payroll/tax/tables';
+import {
+  employeeTaxFieldsFromForm,
+  orgTaxPatchError,
+  type EmployeeTaxFields,
+  type EmployeeTaxForm,
+} from '@/lib/payroll/tax/ui';
+import { toLocalDateStr } from './_shared';
 
 export async function saveOrgTaxConfig(patch: Partial<OrgTaxConfig>): Promise<void> {
   const { org, role } = await getCurrentOrg();
   if (!org?.id) throw new Error('Organization not found');
   if (role !== 'owner') throw new Error('Only an owner can change tax settings');
 
-  if (patch.payFrequency !== undefined && !FREQS.includes(patch.payFrequency)) {
-    throw new Error('Invalid pay frequency');
-  }
-  if (
-    patch.stateRate !== undefined &&
-    !(Number.isFinite(patch.stateRate) && patch.stateRate >= 0 && patch.stateRate <= 100)
-  ) {
-    throw new Error('State rate must be between 0 and 100');
-  }
+  const invalid = orgTaxPatchError(patch, taxYearForPeriod(toLocalDateStr(new Date())));
+  if (invalid) throw new Error(invalid);
 
   const supabase = await createClient();
 
@@ -46,11 +44,18 @@ export async function saveOrgTaxConfig(patch: Partial<OrgTaxConfig>): Promise<vo
 
 export async function saveEmployeeTaxProfile(
   employeeId: string,
-  fields: EmployeeTaxFields,
-): Promise<void> {
+  form: EmployeeTaxForm,
+): Promise<EmployeeTaxFields> {
   const { org, role } = await getCurrentOrg();
   if (!org?.id) throw new Error('Organization not found');
   if (role !== 'owner' && role !== 'manager') throw new Error('Not permitted');
+
+  // A server action is a public endpoint: validate here, with the same function
+  // the dialog uses. Its output is exactly the eight columns, so it is also the
+  // allowlist; nothing the client sent beyond them reaches .update().
+  const checked = employeeTaxFieldsFromForm(form);
+  if (!checked.ok) throw new Error(checked.error);
+  const fields = checked.fields;
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -61,4 +66,5 @@ export async function saveEmployeeTaxProfile(
   if (error) throw new Error(error.message);
 
   revalidatePath('/app/payroll/employees');
+  return fields;
 }

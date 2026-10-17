@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Employee, TipMode, saveEmployee } from '../actions';
 import { saveEmployeeTaxProfile } from '../tax-settings-actions';
@@ -83,6 +83,11 @@ export default function EmployeeSetupDialog({
     exempt: employee?.w4_exempt ?? false,
   });
   const [isLoading, setIsLoading] = useState(false);
+  // Set once the employee row is written but the tax call failed, so a retry
+  // saves only the tax half instead of creating a second employee.
+  const savedRef = useRef<Employee | null>(null);
+  const [taxFailed, setTaxFailed] = useState(false);
+  const closeDialog = () => (savedRef.current ? onSave(savedRef.current) : onClose());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,29 +123,37 @@ export default function EmployeeSetupDialog({
 
     setIsLoading(true);
     try {
-      let saved = await saveEmployee({
-        id: employee?.id,
-        name: isNew ? formData.name.trim() : employee!.name,
-        role: formData.role,
-        // Zero rather than NaN when the field was left empty for a
-        // tips-only person, so the column keeps a number the engine can read.
-        hourly_rate: formData.payType === 'tips_only'
-          ? (parseFloat(formData.hourlyRate) || 0)
-          : parseFloat(formData.hourlyRate),
-        tip_mode: formData.tipMode,
-        pay_type: formData.payType,
-      });
+      let saved = savedRef.current;
+      if (!saved) {
+        saved = await saveEmployee({
+          id: employee?.id,
+          name: isNew ? formData.name.trim() : employee!.name,
+          role: formData.role,
+          // Zero rather than NaN when the field was left empty for a
+          // tips-only person, so the column keeps a number the engine can read.
+          hourly_rate: formData.payType === 'tips_only'
+            ? (parseFloat(formData.hourlyRate) || 0)
+            : parseFloat(formData.hourlyRate),
+          tip_mode: formData.tipMode,
+          pay_type: formData.payType,
+        });
+      }
       if (taxResult && taxResult.ok) {
         try {
-          await saveEmployeeTaxProfile(saved.id, taxResult.fields);
-          saved = { ...saved, ...taxResult.fields };
+          const fields = await saveEmployeeTaxProfile(saved.id, tax);
+          saved = { ...saved, ...fields };
         } catch (err) {
-          // The employee row is already saved; say which half failed.
+          // Employee row is written; tax half is not. Stay open with the typed
+          // values, and do not announce success.
+          savedRef.current = saved;
+          setTaxFailed(true);
           toast.error(
-            `Saved, but tax details were not: ${err instanceof Error ? err.message : 'unknown error'}`,
+            `${saved.name} was saved, but the tax details were not (${err instanceof Error ? err.message : 'unknown error'}). Press Save again to retry, or Cancel to leave them unset.`,
           );
+          return;
         }
       }
+      savedRef.current = null;
       toast.success(isNew ? `${saved.name} added` : 'Changes saved');
       onSave(saved);
     } catch (err) {
@@ -151,7 +164,7 @@ export default function EmployeeSetupDialog({
   };
 
   return (
-    <Dialog open onOpenChange={onClose}>
+    <Dialog open onOpenChange={closeDialog}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{isNew ? 'Add Employee' : 'Edit Employee'}</DialogTitle>
@@ -384,11 +397,11 @@ export default function EmployeeSetupDialog({
           )}
 
           <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={closeDialog}>
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Saving…' : isNew ? 'Add Employee' : 'Save Changes'}
+              {isLoading ? 'Saving…' : taxFailed ? 'Retry tax details' : isNew ? 'Add Employee' : 'Save Changes'}
             </Button>
           </div>
         </form>
