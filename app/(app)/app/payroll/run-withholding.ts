@@ -44,12 +44,14 @@ export async function computeRunWithholding(
       e.employeeId,
       computeWithholding({
         grossForPeriod: e.totalCompensation,
-        // ASSUMPTION, NOT CONFIRMED WITH THE USER: only the employer-paid wage
-        // portion can be withheld from, because cash tips an employee already
-        // walked out with are gone. The alternative is `e.totalCompensation`,
-        // which is correct if tips are paid on the cheque. Confirm how tips
-        // actually reach people BEFORE net pay ships.
-        availableToWithhold: e.regularPay + e.overtimePay,
+        // Tips are paid out on the cheque at this bar (confirmed by the user),
+        // so the employer controls that money and all of it is available to
+        // withhold against: available equals gross. A bar that cashed tips out
+        // nightly would need `e.regularPay + e.overtimePay` here instead, since
+        // cash an employee already walked out with cannot be withheld from. This
+        // is a global assumption, not a per-org setting. The engine's shortfall
+        // handling stays as the safety net; it is just unreachable at 100%.
+        availableToWithhold: e.totalCompensation,
         ytdWages: ytdByEmployee.get(e.employeeId) ?? 0,
         profile: taxProfileFromEmployee(employeeRowsById.get(e.employeeId) ?? {}),
         config,

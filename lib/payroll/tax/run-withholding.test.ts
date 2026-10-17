@@ -8,6 +8,7 @@ vi.mock('@/app/(app)/app/payroll/actions', () => ({ computePayroll: (...a: unkno
 vi.mock('@/app/(app)/app/payroll/_shared', () => ({ loadEmployees: () => loadEmployees() }));
 vi.mock('@/lib/payroll/tax/ui', () => ({ tablesStatus: (y: number) => tablesStatus(y) }));
 
+import { computeWithholding } from '@/lib/payroll/tax/withholding';
 import { computeRunWithholding } from '@/app/(app)/app/payroll/run-withholding';
 
 const entry = (id: string) => ({
@@ -67,5 +68,25 @@ describe('computeRunWithholding', () => {
     const map = (r as Extract<typeof r, { kind: 'ok' }>).byEmployee;
     expect(map.get('b')!.socialSecurity).toBeGreaterThan(0);
     expect(map.get('a')!.socialSecurity).toBeLessThan(map.get('b')!.socialSecurity);
+  });
+
+  // Catches: availableToWithhold = regularPay + overtimePay (tips excluded).
+  // Tips are paid on the cheque here, so available must equal total pay. The
+  // entry has $50 of wages and $750 of tips, so the two implementations differ.
+  it('ok: all pay including tips is available to withhold', async () => {
+    const tippy = { employeeId: 'a', employeeName: 'a', totalCompensation: 800, regularPay: 50, overtimePay: 0 } as never;
+    const r = await computeRunWithholding(ON, '2026-03-02', '2026-03-08', [tippy]);
+    expect(r.kind).toBe('ok');
+    const got = (r as Extract<typeof r, { kind: 'ok' }>).byEmployee.get('a')!;
+    const base = {
+      grossForPeriod: 800, ytdWages: 0, taxYear: 2026,
+      profile: { classification: 'w2', filingStatus: 'single', multipleJobs: null, dependentsAmount: null,
+        otherIncome: null, deductions: null, extraWithholding: null, exempt: null },
+      config: { enabled: true, payFrequency: 'weekly', stateEnabled: false, stateRate: 0 },
+    } as const;
+    const full = computeWithholding({ ...base, availableToWithhold: 800 });
+    const wagesOnly = computeWithholding({ ...base, availableToWithhold: 50 });
+    expect(wagesOnly.total).not.toBe(full.total); // premise: the two differ
+    expect(got.total).toBe(full.total);
   });
 });

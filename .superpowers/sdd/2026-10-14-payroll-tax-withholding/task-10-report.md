@@ -37,3 +37,6 @@ tsc clean, npm test 872 passed, npm run build passes.
 - Finding 2: `freezeRun` takes `withWithholding`. Submit and override pass true. Approve freezes false for the diff, and re-freezes true only when the diff is stale and changes are accepted.
 - Verified: tsc clean, npm test 885 passed, build passes.
 - Not tested: the `freezeRun` flag wiring itself (server action, needs a database); only the pieces it composes are pinned.
+
+## R22 (supersedes R21)
+Tips are paid on the cheque, so `availableToWithhold` is now `e.totalCompensation`. The unconfirmed-assumption comment is replaced with the confirmed fact, the consequence (a bar cashing tips out nightly would need `regularPay + overtimePay`), and the note that this is a global assumption, not a per-org setting. Shortfall handling and its tests are untouched. New test: wages $50 / total $800, asserting the result equals the engine run with available = 800. A premise assertion checks that available = 50 gives a different total. (The first draft used $100 of wages, the premise failed because $79 is still covered, and I corrected the input.) tsc, tests and build pass.
