@@ -45,8 +45,7 @@ describe('tablesStatus against the real 2026 tables', () => {
     const real = await vi.importActual<typeof import('./tables')>('./tables');
     tablesFor.mockImplementation((y: number) => real.tablesFor(y));
     const s = tablesStatus(2026);
-    expect(s.usable).toBe(false);
-    if (!s.usable) expect(s.reason).toBe('placeholder');
+    expect(s).toMatchObject({ usable: false, reason: 'placeholder' });
   });
 });
 

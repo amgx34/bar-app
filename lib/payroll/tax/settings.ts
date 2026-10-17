@@ -61,5 +61,12 @@ export function withTaxConfig(
   patch: Partial<OrgTaxConfig>,
 ): Record<string, unknown> {
   const current = asObject(settings?.tax);
-  return { ...settings, tax: { ...current, ...patch } };
+  // Explicit allowlist: spreading the patch would let a direct caller write
+  // arbitrary keys into bar_settings.tax.
+  const next: Record<string, unknown> = { ...current };
+  if (patch.enabled !== undefined)      next.enabled = patch.enabled;
+  if (patch.payFrequency !== undefined) next.payFrequency = patch.payFrequency;
+  if (patch.stateEnabled !== undefined) next.stateEnabled = patch.stateEnabled;
+  if (patch.stateRate !== undefined)    next.stateRate = patch.stateRate;
+  return { ...settings, tax: next };
 }

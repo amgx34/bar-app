@@ -70,6 +70,15 @@ describe('taxConfigFromSettings', () => {
 });
 
 describe('withTaxConfig', () => {
+  // Catches: spreading the patch unfiltered (mass assignment into bar_settings.tax).
+  it('drops keys that are not one of the four tax settings', () => {
+    const next = withTaxConfig(
+      {},
+      { enabled: true, evil: 'x', __proto__: { polluted: 1 }, payFrequency: 'weekly' } as never,
+    );
+    expect(next.tax).toEqual({ enabled: true, payFrequency: 'weekly' });
+  });
+
   // Catches: replacing settings with { tax } alone.
   it('leaves every other setting untouched', () => {
     const next = withTaxConfig(

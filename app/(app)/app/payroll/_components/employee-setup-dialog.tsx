@@ -123,10 +123,12 @@ export default function EmployeeSetupDialog({
 
     setIsLoading(true);
     try {
-      let saved = savedRef.current;
-      if (!saved) {
-        saved = await saveEmployee({
-          id: employee?.id,
+      // Always re-save the employee half, even on a tax retry: the user may
+      // have corrected the rate or role since the failure, and skipping this
+      // would drop those edits behind a success message. After a first save the
+      // row exists, so a new employee is updated by id rather than duplicated.
+      let saved = await saveEmployee({
+          id: savedRef.current?.id ?? employee?.id,
           name: isNew ? formData.name.trim() : employee!.name,
           role: formData.role,
           // Zero rather than NaN when the field was left empty for a
@@ -137,7 +139,6 @@ export default function EmployeeSetupDialog({
           tip_mode: formData.tipMode,
           pay_type: formData.payType,
         });
-      }
       if (taxResult && taxResult.ok) {
         try {
           const fields = await saveEmployeeTaxProfile(saved.id, tax);
