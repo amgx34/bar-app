@@ -10,6 +10,7 @@ import {
 } from '@/lib/payroll/run-diff';
 import { canSeeOpenRun, type OpenRun } from '@/lib/payroll/open-run';
 import { dispatch } from '@/lib/notifications/deliver';
+import { computeRunWithholding } from './run-withholding';
 import { computePayroll, type PayrollEntry } from './actions';
 
 /**
@@ -76,6 +77,15 @@ async function freezeRun(
 ): Promise<SnapshotEntry[]> {
   const supabase = createAdminClient();
 
+  // Frozen with the run so a later tax-settings change cannot restate what an
+  // approver agreed to. Carried only when the tables are real: a placeholder
+  // year's figures must never be stored as if they were an approval.
+  const { org } = await getCurrentOrg();
+  const withholding = await computeRunWithholding(
+    (org.bar_settings ?? {}) as Record<string, unknown>,
+    periodStart, periodEnd, entries,
+  );
+
   const [{ data: shiftRows }, { data: tipDays }] = await Promise.all([
     supabase
       .from('employee_shifts')
@@ -139,6 +149,9 @@ async function freezeRun(
       tipContext: shifts
         .filter((s) => poolByDate.has(s.date))
         .map((s) => ({ date: s.date, poolTotal: poolByDate.get(s.date) as number } as TipNight)),
+      ...(withholding.kind === 'ok' && withholding.byEmployee.has(e.employeeId)
+        ? { withholding: withholding.byEmployee.get(e.employeeId) }
+        : {}),
     };
   });
 }

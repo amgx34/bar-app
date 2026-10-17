@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { diffPayrollRun, type SnapshotEntry } from './run-diff';
+import type { Withholding } from './tax/types';
 
 const e = (id: string, name: string, hours: number, pay: number): SnapshotEntry =>
   ({ employeeId: id, employeeName: name, totalHours: hours, totalCompensation: pay });
@@ -93,5 +94,53 @@ describe('diffPayrollRun', () => {
 
     expect(diffPayrollRun(before, after).isStale).toBe(false);
     expect(diffPayrollRun(before, after).changes).toHaveLength(0);
+  });
+});
+
+const wh = (total: number): Withholding => ({
+  status: 'withheld',
+  federalIncome: total, socialSecurity: 0, medicare: 0,
+  additionalMedicare: 0, state: 0, total,
+  uncollected: {
+    federalIncome: 0, socialSecurity: 0, medicare: 0,
+    additionalMedicare: 0, state: 0, total: 0,
+  },
+  notes: [],
+});
+
+describe('withholding is carried but not compared', () => {
+  const base: SnapshotEntry = {
+    employeeId: 'e1', employeeName: 'Alex', totalHours: 40, totalCompensation: 800,
+  };
+
+  // Catches: a diff that compares withholding.total (or the whole entry), which
+  // would put every open run into "somebody's numbers moved" when a tax table
+  // is re-transcribed. Pay and hours are identical, so only withholding differs.
+  it('a changed withholding total does not make a run stale', () => {
+    const diff = diffPayrollRun(
+      [{ ...base, withholding: wh(100) }],
+      [{ ...base, withholding: wh(140) }],
+    );
+    expect(diff.isStale).toBe(false);
+    expect(diff.changes).toEqual([]);
+  });
+
+  // Catches: a run approved before withholding existed (no field) going stale
+  // against a recompute that now carries one.
+  it('a snapshot with no withholding against one with it is not stale', () => {
+    const diff = diffPayrollRun([base], [{ ...base, withholding: wh(100) }]);
+    expect(diff.isStale).toBe(false);
+  });
+
+  // Catches: the field being "ignored" by disabling the comparison altogether.
+  // Withholding is identical on both sides, so only pay can have made it stale.
+  it('still goes stale when pay moves, withholding unchanged', () => {
+    const diff = diffPayrollRun(
+      [{ ...base, withholding: wh(100) }],
+      [{ ...base, totalCompensation: 900, withholding: wh(100) }],
+    );
+    expect(diff.isStale).toBe(true);
+    expect(diff.changes).toHaveLength(1);
+    expect(diff.changes[0].payAfter).toBe(900);
   });
 });
