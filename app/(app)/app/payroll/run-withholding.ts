@@ -1,28 +1,14 @@
 import { computePayroll, type PayrollEntry } from './actions';
 import { loadEmployees } from './_shared';
-import { addDays } from '@/lib/date-range';
 import { computeWithholding } from '@/lib/payroll/tax/withholding';
 import { taxConfigFromSettings } from '@/lib/payroll/tax/settings';
 import { taxProfileFromEmployee } from '@/lib/payroll/tax/profile';
 import { taxYearForPeriod } from '@/lib/payroll/tax/tables';
 import { tablesStatus } from '@/lib/payroll/tax/ui';
 import type { Withholding } from '@/lib/payroll/tax/types';
+import { ytdRange, type RunWithholding } from '@/lib/payroll/tax/run';
 
-/**
- * Withholding for a pay run, or the reason there is none.
- *
- *  - `off`      the bar has not switched tax on.
- *  - `unusable` the year's tables are placeholders or missing. Nothing is
- *               computed, so nothing can be displayed or snapshotted.
- *  - `ok`       figures, keyed by employee id.
- *
- * The single place the review screen and the snapshot both get their figures,
- * so what an approver saw is what gets frozen.
- */
-export type RunWithholding =
-  | { kind: 'off' }
-  | { kind: 'unusable'; message: string }
-  | { kind: 'ok'; byEmployee: Map<string, Withholding> };
+export type { RunWithholding };
 
 export async function computeRunWithholding(
   settings: Record<string, unknown>,
@@ -42,10 +28,10 @@ export async function computeRunWithholding(
   // over-withholds every high earner all year. The range ends the day BEFORE
   // this period, or the first day's pay would count twice. A period starting
   // on or before 1 January has no earlier wages this year.
-  const yearStart = `${taxYear}-01-01`;
-  const ytdEntries = startDate > yearStart
-    ? await computePayroll(yearStart, addDays(startDate, -1))
-    : [];
+  // FICA needs year-to-date wages: the Social Security wage base and the
+  // Additional Medicare threshold are annual. See ytdRange for the boundary.
+  const range = ytdRange(startDate, taxYear);
+  const ytdEntries = range ? await computePayroll(range.from, range.to) : [];
   const ytdByEmployee = new Map(ytdEntries.map((e) => [e.employeeId, e.totalCompensation]));
 
   const employeeRowsById = new Map(

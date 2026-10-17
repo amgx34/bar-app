@@ -11,6 +11,7 @@ import {
 import { canSeeOpenRun, type OpenRun } from '@/lib/payroll/open-run';
 import { dispatch } from '@/lib/notifications/deliver';
 import { computeRunWithholding } from './run-withholding';
+import { snapshotWithholding, type RunWithholding } from '@/lib/payroll/tax/run';
 import { computePayroll, type PayrollEntry } from './actions';
 
 /**
@@ -74,6 +75,12 @@ async function freezeRun(
   periodStart: string,
   periodEnd: string,
   entries: PayrollEntry[],
+  /**
+   * Withholding costs a full-year computePayroll plus an employee load, so only
+   * a freeze that is STORED pays for it. A freeze made just to be diffed passes
+   * false: diffPayrollRun ignores withholding entirely.
+   */
+  withWithholding: boolean,
 ): Promise<SnapshotEntry[]> {
   const supabase = createAdminClient();
 
@@ -81,10 +88,12 @@ async function freezeRun(
   // approver agreed to. Carried only when the tables are real: a placeholder
   // year's figures must never be stored as if they were an approval.
   const { org } = await getCurrentOrg();
-  const withholding = await computeRunWithholding(
-    (org.bar_settings ?? {}) as Record<string, unknown>,
-    periodStart, periodEnd, entries,
-  );
+  const withholding: RunWithholding = withWithholding
+    ? await computeRunWithholding(
+        (org.bar_settings ?? {}) as Record<string, unknown>,
+        periodStart, periodEnd, entries,
+      )
+    : { kind: 'off' };
 
   const [{ data: shiftRows }, { data: tipDays }] = await Promise.all([
     supabase
@@ -149,9 +158,7 @@ async function freezeRun(
       tipContext: shifts
         .filter((s) => poolByDate.has(s.date))
         .map((s) => ({ date: s.date, poolTotal: poolByDate.get(s.date) as number } as TipNight)),
-      ...(withholding.kind === 'ok' && withholding.byEmployee.has(e.employeeId)
-        ? { withholding: withholding.byEmployee.get(e.employeeId) }
-        : {}),
+      ...snapshotWithholding(withholding, e.employeeId),
     };
   });
 }
@@ -202,7 +209,7 @@ export async function submitPayrollForApproval(
     return { ok: false, error: 'Nothing to submit — this period has no payroll entries' };
   }
 
-  const snapshot = await freezeRun(org.id, periodStart, periodEnd, entries);
+  const snapshot = await freezeRun(org.id, periodStart, periodEnd, entries, true);
   const supabase = createAdminClient();
 
   const { error } = await supabase
@@ -331,13 +338,18 @@ export async function approvePayrollRun(
   // Frozen, not merely mapped: when the diff is stale this same value REPLACES
   // the stored snapshot, and a replacement without the detail would leave an
   // approved period the portal can only show totals for.
-  const current = await freezeRun(
-    org.id, periodStart, periodEnd, await computePayroll(periodStart, periodEnd),
-  );
+  const fresh = await computePayroll(periodStart, periodEnd);
+  // Frozen WITHOUT withholding for the comparison: the diff ignores it, and
+  // computing it is a full-year payroll run. Re-frozen with it below only if
+  // this value is about to replace the stored snapshot.
+  let current = await freezeRun(org.id, periodStart, periodEnd, fresh, false);
   const diff = diffPayrollRun(run.snapshot ?? [], current);
 
   if (diff.isStale && !options.acceptChanges) {
     return { ok: false, error: 'The figures have changed since submission', stale: diff };
+  }
+  if (diff.isStale) {
+    current = await freezeRun(org.id, periodStart, periodEnd, fresh, true);
   }
 
   const supabase = createAdminClient();
@@ -448,7 +460,7 @@ export async function overrideApprovalGate(
       period_end:      periodEnd,
       status:          'approved',
       snapshot:        await freezeRun(
-        org.id, periodStart, periodEnd, await computePayroll(periodStart, periodEnd),
+        org.id, periodStart, periodEnd, await computePayroll(periodStart, periodEnd), true,
       ),
       submitted_by:    user.id,
       submitted_at:    new Date().toISOString(),
