@@ -6,7 +6,10 @@ const tablesStatus = vi.fn();
 
 vi.mock('@/app/(app)/app/payroll/actions', () => ({ computePayroll: (...a: unknown[]) => computePayroll(...a) }));
 vi.mock('@/app/(app)/app/payroll/_shared', () => ({ loadEmployees: () => loadEmployees() }));
-vi.mock('@/lib/payroll/tax/ui', () => ({ tablesStatus: (y: number) => tablesStatus(y) }));
+vi.mock('@/lib/payroll/tax/ui', async (orig) => ({
+  ...(await orig<typeof import('@/lib/payroll/tax/ui')>()),
+  tablesStatus: (y: number) => tablesStatus(y),
+}));
 
 import { computeWithholding } from '@/lib/payroll/tax/withholding';
 import { computeRunWithholding } from '@/app/(app)/app/payroll/run-withholding';
@@ -70,23 +73,37 @@ describe('computeRunWithholding', () => {
     expect(map.get('a')!.socialSecurity).toBeLessThan(map.get('b')!.socialSecurity);
   });
 
-  // Catches: availableToWithhold = regularPay + overtimePay (tips excluded).
-  // Tips are paid on the cheque here, so available must equal total pay. The
-  // entry has $50 of wages and $750 of tips, so the two implementations differ.
-  it('ok: all pay including tips is available to withhold', async () => {
-    const tippy = { employeeId: 'a', employeeName: 'a', totalCompensation: 800, regularPay: 50, overtimePay: 0 } as never;
-    const r = await computeRunWithholding(ON, '2026-03-02', '2026-03-08', [tippy]);
+  const tippy = { employeeId: 'a', employeeName: 'a', totalCompensation: 800, regularPay: 50, overtimePay: 0 } as never;
+  const direct = (config: Record<string, unknown>, available: number) => computeWithholding({
+    grossForPeriod: 800, availableToWithhold: available, ytdWages: 0, taxYear: 2026,
+    profile: {
+      classification: 'w2', filingStatus: 'single', multipleJobs: null, dependentsAmount: null,
+      otherIncome: null, deductions: null, extraWithholding: null, exempt: null,
+    },
+    config: config as never,
+  });
+  const cfg = (tipsPaidOnCheque: boolean) => ({
+    enabled: true, payFrequency: 'weekly', stateEnabled: false, stateRate: 0, tipsPaidOnCheque,
+  });
+
+  // Catches: run-withholding ignoring the setting and always using wages only.
+  // $50 wages + $750 tips: with tips on the cheque all $800 is available.
+  it('ok: tipsPaidOnCheque true makes all pay available to withhold', async () => {
+    const r = await computeRunWithholding({ tax: cfg(true) }, '2026-03-02', '2026-03-08', [tippy]);
     expect(r.kind).toBe('ok');
     const got = (r as Extract<typeof r, { kind: 'ok' }>).byEmployee.get('a')!;
-    const base = {
-      grossForPeriod: 800, ytdWages: 0, taxYear: 2026,
-      profile: { classification: 'w2', filingStatus: 'single', multipleJobs: null, dependentsAmount: null,
-        otherIncome: null, deductions: null, extraWithholding: null, exempt: null },
-      config: { enabled: true, payFrequency: 'weekly', stateEnabled: false, stateRate: 0 },
-    } as const;
-    const full = computeWithholding({ ...base, availableToWithhold: 800 });
-    const wagesOnly = computeWithholding({ ...base, availableToWithhold: 50 });
+    const full = direct(cfg(true), 800);
+    const wagesOnly = direct(cfg(false), 50);
     expect(wagesOnly.total).not.toBe(full.total); // premise: the two differ
     expect(got.total).toBe(full.total);
+  });
+
+  // Catches: run-withholding ignoring the setting and always using total pay.
+  it('ok: tipsPaidOnCheque false limits withholding to wages', async () => {
+    const r = await computeRunWithholding({ tax: cfg(false) }, '2026-03-02', '2026-03-08', [tippy]);
+    expect(r.kind).toBe('ok');
+    const got = (r as Extract<typeof r, { kind: 'ok' }>).byEmployee.get('a')!;
+    expect(got.total).toBe(direct(cfg(false), 50).total);
+    expect(got.uncollected.total).toBeGreaterThan(0);
   });
 });

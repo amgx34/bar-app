@@ -150,6 +150,7 @@ export function orgTaxPatchError(patch: Partial<OrgTaxConfig>, year: number): st
   if (typeof patch !== 'object' || patch === null) return 'Invalid tax settings';
   if (patch.enabled !== undefined && typeof patch.enabled !== 'boolean') return 'Enabled must be true or false';
   if (patch.stateEnabled !== undefined && typeof patch.stateEnabled !== 'boolean') return 'State withholding must be true or false';
+  if (patch.tipsPaidOnCheque !== undefined && typeof patch.tipsPaidOnCheque !== 'boolean') return 'Tips paid on cheque must be true or false';
   if (patch.payFrequency !== undefined && !FREQS.includes(patch.payFrequency)) return 'Invalid pay frequency';
   if (
     patch.stateRate !== undefined &&
@@ -162,4 +163,21 @@ export function orgTaxPatchError(patch: Partial<OrgTaxConfig>, year: number): st
     if (!t.usable) return `Cannot switch withholding on. ${t.message}`;
   }
   return null;
+}
+
+/**
+ * How much of a person's pay tax can actually be taken from.
+ *
+ * Tips paid on the cheque are the employer's to withhold against, so all pay is
+ * available. Tips cashed out nightly are already in the employee's pocket, so
+ * only wages are. This decides how much of somebody's pay is reachable by tax,
+ * which is why it is a tested function and not a ternary in a page.
+ */
+export function availableToWithholdFor(
+  entry: { totalCompensation: number; regularPay: number; overtimePay: number },
+  config: Pick<OrgTaxConfig, 'tipsPaidOnCheque'>,
+): number {
+  return config.tipsPaidOnCheque
+    ? entry.totalCompensation
+    : entry.regularPay + entry.overtimePay;
 }

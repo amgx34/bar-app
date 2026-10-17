@@ -8,7 +8,7 @@ const tablesFor = {
 };
 vi.mock('./tables', () => ({ tablesFor: (y: number) => impl(y) }));
 
-import { tablesStatus, employeeTaxFieldsFromForm, orgTaxPatchError, type EmployeeTaxForm } from './ui';
+import { tablesStatus, availableToWithholdFor, employeeTaxFieldsFromForm, orgTaxPatchError, type EmployeeTaxForm } from './ui';
 
 const form = (o: Partial<EmployeeTaxForm> = {}): EmployeeTaxForm => ({
   classification: 'w2', filingStatus: 'single', multipleJobs: false,
@@ -109,7 +109,31 @@ describe('employeeTaxFieldsFromForm', () => {
   });
 });
 
+describe('availableToWithholdFor', () => {
+  const entry = { totalCompensation: 800, regularPay: 600, overtimePay: 50 };
+
+  // Catches: ignoring the setting and always returning wages only.
+  it('is total pay when tips are paid on the cheque', () => {
+    expect(availableToWithholdFor(entry, { tipsPaidOnCheque: true })).toBe(800);
+  });
+
+  // Catches: ignoring the setting and always returning total pay; also dropping
+  // overtime from the wage sum (650, not 600 or 800).
+  it('is regular plus overtime when tips are cashed out', () => {
+    expect(availableToWithholdFor(entry, { tipsPaidOnCheque: false })).toBe(650);
+  });
+});
+
 describe('orgTaxPatchError', () => {
+  // Catches: a validator that lets a truthy string through as the setting.
+  it('rejects a non-boolean tipsPaidOnCheque and accepts a boolean', () => {
+    tablesFor.mockReturnValue({ placeholder: false });
+    expect(orgTaxPatchError({ tipsPaidOnCheque: 'yes' as never }, 2026)).not.toBeNull();
+    expect(orgTaxPatchError({ tipsPaidOnCheque: 1 as never }, 2026)).not.toBeNull();
+    expect(orgTaxPatchError({ tipsPaidOnCheque: true }, 2026)).toBeNull();
+    expect(orgTaxPatchError({ tipsPaidOnCheque: false }, 2026)).toBeNull();
+  });
+
   it('refuses enabling on placeholder tables (catches an action that trusts the UI)', () => {
     tablesFor.mockReturnValue({ placeholder: true });
     expect(orgTaxPatchError({ enabled: true }, 2026)).toContain('Cannot switch withholding on');

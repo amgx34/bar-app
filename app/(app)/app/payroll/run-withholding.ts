@@ -4,7 +4,7 @@ import { computeWithholding } from '@/lib/payroll/tax/withholding';
 import { taxConfigFromSettings } from '@/lib/payroll/tax/settings';
 import { taxProfileFromEmployee } from '@/lib/payroll/tax/profile';
 import { taxYearForPeriod } from '@/lib/payroll/tax/tables';
-import { tablesStatus } from '@/lib/payroll/tax/ui';
+import { tablesStatus, availableToWithholdFor } from '@/lib/payroll/tax/ui';
 import type { Withholding } from '@/lib/payroll/tax/types';
 import { ytdRange, type RunWithholding } from '@/lib/payroll/tax/run';
 
@@ -44,14 +44,8 @@ export async function computeRunWithholding(
       e.employeeId,
       computeWithholding({
         grossForPeriod: e.totalCompensation,
-        // Tips are paid out on the cheque at this bar (confirmed by the user),
-        // so the employer controls that money and all of it is available to
-        // withhold against: available equals gross. A bar that cashed tips out
-        // nightly would need `e.regularPay + e.overtimePay` here instead, since
-        // cash an employee already walked out with cannot be withheld from. This
-        // is a global assumption, not a per-org setting. The engine's shortfall
-        // handling stays as the safety net; it is just unreachable at 100%.
-        availableToWithhold: e.totalCompensation,
+        // Per-org setting (default: tips cashed out nightly, the safe side).
+        availableToWithhold: availableToWithholdFor(e, config),
         ytdWages: ytdByEmployee.get(e.employeeId) ?? 0,
         profile: taxProfileFromEmployee(employeeRowsById.get(e.employeeId) ?? {}),
         config,

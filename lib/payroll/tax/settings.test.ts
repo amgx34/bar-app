@@ -17,6 +17,7 @@ describe('taxConfigFromSettings', () => {
     });
     expect(c).toEqual({
       enabled: true, payFrequency: 'weekly', stateEnabled: true, stateRate: 4.5,
+      tipsPaidOnCheque: false,
     });
   });
 
@@ -62,6 +63,15 @@ describe('taxConfigFromSettings', () => {
     expect(taxConfigFromSettings({ tax: { stateEnabled: 'yes' } }).stateEnabled).toBe(false);
   });
 
+  // Catches: defaulting tipsPaidOnCheque to true (the silent-failure side), or
+  // coercing truthy junk to true.
+  it('tipsPaidOnCheque is false unless exactly true, and round-trips true', () => {
+    expect(taxConfigFromSettings({}).tipsPaidOnCheque).toBe(false);
+    expect(taxConfigFromSettings({ tax: { tipsPaidOnCheque: 'true' } }).tipsPaidOnCheque).toBe(false);
+    expect(taxConfigFromSettings({ tax: { tipsPaidOnCheque: 1 } }).tipsPaidOnCheque).toBe(false);
+    expect(taxConfigFromSettings({ tax: { tipsPaidOnCheque: true } }).tipsPaidOnCheque).toBe(true);
+  });
+
   // Catches: reading properties off a string / throwing on null.
   it('survives a non-object tax key', () => {
     expect(taxConfigFromSettings({ tax: 'nonsense' }).enabled).toBe(false);
@@ -71,12 +81,31 @@ describe('taxConfigFromSettings', () => {
 
 describe('withTaxConfig', () => {
   // Catches: spreading the patch unfiltered (mass assignment into bar_settings.tax).
-  it('drops keys that are not one of the four tax settings', () => {
+  it('drops keys that are not one of the five tax settings', () => {
     const next = withTaxConfig(
       {},
       { enabled: true, evil: 'x', __proto__: { polluted: 1 }, payFrequency: 'weekly' } as never,
     );
     expect(next.tax).toEqual({ enabled: true, payFrequency: 'weekly' });
+  });
+
+  // Catches: an allowlist that forgot the new key, so the setting silently never saves.
+  it('lets tipsPaidOnCheque through, and a single-key patch keeps the other four', () => {
+    const next = withTaxConfig(
+      { tax: { enabled: true, payFrequency: 'weekly', stateEnabled: true, stateRate: 4 } },
+      { tipsPaidOnCheque: true },
+    );
+    expect(next.tax).toEqual({
+      enabled: true, payFrequency: 'weekly', stateEnabled: true, stateRate: 4,
+      tipsPaidOnCheque: true,
+    });
+  });
+
+  // Catches: treating false as "no patch" (a truthiness check), which would make
+  // switching the setting back off impossible.
+  it('persists tipsPaidOnCheque: false over a stored true', () => {
+    const next = withTaxConfig({ tax: { tipsPaidOnCheque: true } }, { tipsPaidOnCheque: false });
+    expect((next.tax as Record<string, unknown>).tipsPaidOnCheque).toBe(false);
   });
 
   // Catches: replacing settings with { tax } alone.

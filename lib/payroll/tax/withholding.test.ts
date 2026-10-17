@@ -20,6 +20,7 @@ const CONFIG: OrgTaxConfig = {
   payFrequency: 'biweekly',
   stateEnabled: true,
   stateRate: 5,
+  tipsPaidOnCheque: false,
 };
 
 const run = (over: Partial<Parameters<typeof computeWithholding>[0]> = {}) =>

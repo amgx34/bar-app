@@ -71,6 +71,18 @@ export type OrgTaxConfig = {
   payFrequency: PayFrequency;
   stateEnabled: boolean;
   stateRate:    number;
+  /**
+   * True when tips are paid out on the paycheque, so the employer controls that
+   * money and all of a person's pay is available to withhold from. False when
+   * tips are cashed out nightly and are already gone by payday.
+   *
+   * DEFAULTS FALSE, deliberately. Wrongly assuming "cashed out" understates what
+   * is available and raises a spurious shortfall: loud, visible, somebody asks.
+   * Wrongly assuming "on the cheque" overstates it and MISSES a shortfall:
+   * silent, and it would overdraw once net pay ships. Fail loudly, the same
+   * principle as tablesFor throwing instead of falling back.
+   */
+  tipsPaidOnCheque: boolean;
 };
 
 /**

@@ -116,6 +116,30 @@ export default function TaxSetupPanel({ initial, tables }: TaxSetupPanelProps) {
         </div>
 
         <div className="space-y-2">
+          <Label>How do tips reach your staff?</Label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name="taxTipsPaid"
+              checked={!config.tipsPaidOnCheque}
+              disabled={saving}
+              onChange={() => save({ tipsPaidOnCheque: false })}
+            />
+            Tips are cashed out nightly
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name="taxTipsPaid"
+              checked={config.tipsPaidOnCheque}
+              disabled={saving}
+              onChange={() => save({ tipsPaidOnCheque: true })}
+            />
+            Tips are paid out on paychecks
+          </label>
+        </div>
+
+        <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"

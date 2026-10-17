@@ -39,6 +39,8 @@ export function taxConfigFromSettings(settings: Record<string, unknown>): OrgTax
     enabled:      tax.enabled === true,
     payFrequency: FREQUENCIES.includes(freq) ? freq : 'biweekly',
     stateEnabled: tax.stateEnabled === true,
+    // === true: absent or malformed is false, the loud-failure side. See OrgTaxConfig.
+    tipsPaidOnCheque: tax.tipsPaidOnCheque === true,
     // The finite check must come BEFORE the clamp, not be replaced by it:
     // Math.max(0, NaN) is NaN and Math.min(100, NaN) is NaN, so the clamp
     // alone passes a corrupted value straight through. NaN then compares false
@@ -68,5 +70,6 @@ export function withTaxConfig(
   if (patch.payFrequency !== undefined) next.payFrequency = patch.payFrequency;
   if (patch.stateEnabled !== undefined) next.stateEnabled = patch.stateEnabled;
   if (patch.stateRate !== undefined)    next.stateRate = patch.stateRate;
+  if (patch.tipsPaidOnCheque !== undefined) next.tipsPaidOnCheque = patch.tipsPaidOnCheque;
   return { ...settings, tax: next };
 }
