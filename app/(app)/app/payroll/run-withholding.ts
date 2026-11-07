@@ -6,7 +6,7 @@ import { taxProfileFromEmployee } from '@/lib/payroll/tax/profile';
 import { taxYearForPeriod } from '@/lib/payroll/tax/tables';
 import { tablesStatus, availableToWithholdFor } from '@/lib/payroll/tax/ui';
 import type { Withholding } from '@/lib/payroll/tax/types';
-import { ytdRange, type RunWithholding } from '@/lib/payroll/tax/run';
+import { ytdRange, periodFrequencyMismatch, type RunWithholding } from '@/lib/payroll/tax/run';
 
 export type { RunWithholding };
 
@@ -28,17 +28,18 @@ export async function computeRunWithholding(
     };
   }
 
+  // Before any figure: a period that is not one paycheck would be annualised
+  // at the wrong multiple and frozen into the snapshot on submit.
+  const mismatch = periodFrequencyMismatch(startDate, endDate, config.payFrequency);
+  if (mismatch) return { kind: 'unusable', message: mismatch };
+
   const taxYear = taxYearForPeriod(endDate);
   const status = tablesStatus(taxYear);
   if (!status.usable) return { kind: 'unusable', message: status.message };
 
   // FICA needs year-to-date wages: the Social Security wage base and the
   // Additional Medicare threshold are annual, so a period figure alone
-  // over-withholds every high earner all year. The range ends the day BEFORE
-  // this period, or the first day's pay would count twice. A period starting
-  // on or before 1 January has no earlier wages this year.
-  // FICA needs year-to-date wages: the Social Security wage base and the
-  // Additional Medicare threshold are annual. See ytdRange for the boundary.
+  // over-withholds every high earner all year. See ytdRange for the boundary.
   const range = ytdRange(startDate, taxYear);
   const ytdEntries = range ? await computePayroll(range.from, range.to) : [];
   const ytdByEmployee = new Map(ytdEntries.map((e) => [e.employeeId, e.totalCompensation]));

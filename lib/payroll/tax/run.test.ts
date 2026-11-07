@@ -1,5 +1,35 @@
 import { describe, it, expect } from 'vitest';
-import { ytdRange, snapshotWithholding, type RunWithholding } from './run';
+import { ytdRange, snapshotWithholding, periodFrequencyMismatch, type RunWithholding } from './run';
+
+describe('periodFrequencyMismatch', () => {
+  // Catches: the default one-week review being taxed as a biweekly cheque,
+  // which annualises a week's pay at x26 and under-withholds by ~80%.
+  it('refuses a one-week period when pay is biweekly', () => {
+    const m = periodFrequencyMismatch('2026-11-02', '2026-11-08', 'biweekly');
+    expect(m).toMatch(/7 days/);
+    expect(m).toMatch(/every two weeks/);
+  });
+  it('refuses a two-week period when pay is weekly', () => {
+    expect(periodFrequencyMismatch('2026-10-26', '2026-11-08', 'weekly')).not.toBeNull();
+  });
+  it('accepts the matching lengths', () => {
+    expect(periodFrequencyMismatch('2026-11-02', '2026-11-08', 'weekly')).toBeNull();
+    expect(periodFrequencyMismatch('2026-10-26', '2026-11-08', 'biweekly')).toBeNull();
+    expect(periodFrequencyMismatch('2026-11-01', '2026-11-15', 'semimonthly')).toBeNull(); // 15 days
+    expect(periodFrequencyMismatch('2026-02-16', '2026-02-28', 'semimonthly')).toBeNull(); // 13 days
+    expect(periodFrequencyMismatch('2026-10-16', '2026-10-31', 'semimonthly')).toBeNull(); // 16 days
+    expect(periodFrequencyMismatch('2026-02-01', '2026-02-28', 'monthly')).toBeNull();     // 28 days
+    expect(periodFrequencyMismatch('2026-10-01', '2026-10-31', 'monthly')).toBeNull();     // 31 days
+  });
+  // Catches: an off-by-one counting days exclusively (Mon..Sun read as 6).
+  it('counts both ends of the range', () => {
+    expect(periodFrequencyMismatch('2026-11-02', '2026-11-07', 'weekly')).toMatch(/6 days/);
+  });
+  it('refuses a week when pay is monthly, and a month when pay is semimonthly', () => {
+    expect(periodFrequencyMismatch('2026-11-02', '2026-11-08', 'monthly')).not.toBeNull();
+    expect(periodFrequencyMismatch('2026-10-01', '2026-10-31', 'semimonthly')).not.toBeNull();
+  });
+});
 import type { Withholding } from './types';
 
 const wh = (total: number): Withholding => ({
