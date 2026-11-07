@@ -193,6 +193,11 @@ export default function EmployeesTab({ employees: initialEmployees, canEditTax =
                           Unclassified
                         </span>
                       )}
+                      {canEditTax && employee.tax_classification && (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                          {employee.tax_classification === 'w2' ? 'W-2' : '1099'}
+                        </span>
+                      )}
                       {/* Same two facts as the hidden columns, stacked. */}
                       <span className="mt-1 flex flex-wrap items-center gap-1.5 sm:hidden">
                         <span className="text-xs font-normal capitalize text-muted-foreground">
