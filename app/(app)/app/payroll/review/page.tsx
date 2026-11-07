@@ -9,6 +9,8 @@ import { PayrollReviewClient } from './_components/payroll-review-client';
 import { ApprovalPanel } from './_components/approval-panel';
 import { getPayrollRun, getPayrollRunDiff } from '../approval-actions';
 import { canSubmitPayroll, canApprovePayroll } from '@/lib/permissions';
+import { computeRunWithholding } from '../run-withholding';
+import type { Withholding } from '@/lib/payroll/tax/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +41,10 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
   );
 
   const entries = await computePayroll(startDate, endDate);
+  const withholding = await computeRunWithholding(
+    (org.bar_settings ?? {}) as Record<string, unknown>,
+    startDate, endDate, entries,
+  );
 
   // The diff is only meaningful once something has been submitted, and only
   // an approver can act on it — so it costs a second computePayroll() run
@@ -182,6 +188,8 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
           />
         </div>
 
+        <WithholdingNotice state={withholding} />
+
         {/* Unconfigured employees warning */}
         {unconfigured.length > 0 && (
           <div className="flex items-start gap-3 rounded-xl border border-amber-300/50 bg-amber-50 dark:bg-amber-950/40 px-4 py-3">
@@ -272,6 +280,10 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
                       highlight
                     />
                   </div>
+
+                  {withholding.kind === 'ok' && (
+                    <WithholdingRow w={withholding.byEmployee.get(entry.employeeId)} />
+                  )}
 
                   {!isConfigured && (
                     <div className="px-5 py-2 bg-amber-50 dark:bg-amber-950/40 border-t border-amber-200">
@@ -375,6 +387,100 @@ function PayCell({
         {value}
       </p>
       <p className="text-[10px] text-muted-foreground">{sub}</p>
+    </div>
+  );
+}
+
+// ── Withholding ───────────────────────────────────────────────────────────────
+
+function WithholdingNotice({ state }: { state: Awaited<ReturnType<typeof computeRunWithholding>> }) {
+  if (state.kind === 'off') {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Tax withholding is switched off for this bar.
+      </p>
+    );
+  }
+  if (state.kind === 'unusable') {
+    return (
+      <div className="flex items-start gap-3 rounded-xl border border-amber-300/50 bg-amber-50 dark:bg-amber-950/40 px-4 py-3">
+        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+        <div className="text-sm">
+          <p className="font-medium text-amber-800 dark:text-amber-200">Withholding is not shown for this period.</p>
+          <p className="text-amber-700 dark:text-amber-300 text-xs mt-0.5">{state.message}</p>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <p className="text-xs text-muted-foreground">
+      Tax shown is calculated but not yet deducted — payouts still pay gross.
+    </p>
+  );
+}
+
+function WithholdingRow({ w }: { w: Withholding | undefined }) {
+  // No entry for this employee means nothing was computed: say so rather than
+  // render a zero that reads as "nothing owed".
+  if (!w) return null;
+
+  let body: React.ReactNode;
+  switch (w.status) {
+    case 'unclassified':
+      body = (
+        <span className="rounded-full bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:text-amber-200">
+          Needs W-2 / 1099
+        </span>
+      );
+      break;
+    case 'not_taxed':
+      body = <span className="text-[11px] text-muted-foreground">Contractor</span>;
+      break;
+    case 'disabled':
+      body = <span className="text-[11px] text-muted-foreground">Tax withholding is off</span>;
+      break;
+    default:
+      body = (
+        <details className="text-right">
+          <summary className="cursor-pointer text-sm font-semibold tabular-nums">
+            {w.status === 'exempt' ? 'Exempt from federal income tax · ' : ''}
+            {fmtMoney(w.total)}
+          </summary>
+          <dl className="mt-1 grid grid-cols-[auto_auto] justify-end gap-x-4 text-[11px] tabular-nums text-muted-foreground">
+            <dt>Federal income</dt><dd>{fmtMoney(w.federalIncome)}</dd>
+            <dt>Social Security</dt><dd>{fmtMoney(w.socialSecurity)}</dd>
+            <dt>Medicare</dt><dd>{fmtMoney(w.medicare)}</dd>
+            <dt>Additional Medicare</dt><dd>{fmtMoney(w.additionalMedicare)}</dd>
+            <dt>State</dt><dd>{fmtMoney(w.state)}</dd>
+          </dl>
+        </details>
+      );
+  }
+
+  const u = w.uncollected;
+  return (
+    <div className="border-t">
+      <div className="flex items-start justify-between gap-3 px-5 py-2">
+        <span className="text-[10px] text-muted-foreground uppercase tracking-wide pt-1">Withholding</span>
+        {body}
+      </div>
+      {u.total > 0 && (
+        <div className="px-5 py-2 bg-amber-50 dark:bg-amber-950/40 border-t border-amber-200">
+          <p className="text-[11px] text-amber-700 dark:text-amber-300 flex items-start gap-1">
+            <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+            <span>
+              {fmtMoney(u.total)} owed could not be withheld from this pay:
+              {' '}{[
+                u.federalIncome > 0 && `federal income ${fmtMoney(u.federalIncome)}`,
+                u.socialSecurity > 0 && `Social Security ${fmtMoney(u.socialSecurity)}`,
+                u.medicare > 0 && `Medicare ${fmtMoney(u.medicare)}`,
+                u.additionalMedicare > 0 && `Additional Medicare ${fmtMoney(u.additionalMedicare)}`,
+                u.state > 0 && `state ${fmtMoney(u.state)}`,
+              ].filter(Boolean).join(', ')}.
+            </span>
+          </p>
+        </div>
+      )}
     </div>
   );
 }

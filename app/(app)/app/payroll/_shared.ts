@@ -44,7 +44,19 @@ export function defaultWeek(): { start: string; end: string } {
   return { start: toLocalDateStr(monday), end: toLocalDateStr(sunday) };
 }
 
-export type PayrollEmployee = Record<string, unknown> & { id: string; name: string };
+export type PayrollEmployee = Record<string, unknown> & {
+  id: string;
+  name: string;
+  // Come back via select('*'). Declared so TypeScript can see them.
+  tax_classification?: string | null;
+  w4_filing_status?: string | null;
+  w4_multiple_jobs?: boolean | null;
+  w4_dependents_amount?: number | string | null;
+  w4_other_income?: number | string | null;
+  w4_deductions?: number | string | null;
+  w4_extra_withholding?: number | string | null;
+  w4_exempt?: boolean | null;
+};
 
 /** Every employee at the caller's bar. Needed by three of the four routes. */
 export async function loadEmployees(): Promise<PayrollEmployee[]> {
