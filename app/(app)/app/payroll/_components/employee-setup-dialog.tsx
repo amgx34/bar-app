@@ -166,7 +166,7 @@ export default function EmployeeSetupDialog({
 
   return (
     <Dialog open onOpenChange={closeDialog}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isNew ? 'Add Employee' : 'Edit Employee'}</DialogTitle>
           {!isNew && (
