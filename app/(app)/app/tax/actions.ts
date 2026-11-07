@@ -6,6 +6,8 @@ import { computePayroll } from '../payroll/actions';
 import type { PayrollEntry } from '../payroll/actions';
 import { tablesFor, taxYearForPeriod } from '@/lib/payroll/tax/tables';
 import { computeFica } from '@/lib/payroll/tax/fica';
+import { employerOwesPayrollTax } from '@/lib/payroll/tax/profile';
+import { loadEmployees } from '../payroll/_shared';
 import type { TaxTables } from '@/lib/payroll/tax/types';
 
 export type YearlyPayrollData = {
@@ -105,7 +107,7 @@ export async function getTaxReportData(startDate: string, endDate: string): Prom
   const { org } = await getCurrentOrg();
   const supabase = await createClient();
 
-  const [{ data: zDays }, payrollEntries] = await Promise.all([
+  const [{ data: zDays }, payrollEntries, employeeRows] = await Promise.all([
     supabase
       .from('z_report_days')
       .select('report_date, total_sales, cash_tips, cc_tips')
@@ -114,7 +116,14 @@ export async function getTaxReportData(startDate: string, endDate: string): Prom
       .lte('report_date', endDate)
       .order('report_date'),
     computePayroll(startDate, endDate),
+    loadEmployees(),
   ]);
+
+  // A 1099 contractor's pay carries no employer FICA or FUTA. The withholding
+  // engine already skips them; without this the report charged the bar for
+  // them, so the two screens disagreed about the same person.
+  const rowsById = new Map(employeeRows.map((r) => [r.id, r as Record<string, unknown>]));
+  const taxable = (employeeId: string) => employerOwesPayrollTax(rowsById.get(employeeId) ?? {});
 
   const days = zDays ?? [];
   const totalSales = days.reduce((s, d) => s + (d.total_sales ?? 0), 0);
@@ -141,6 +150,9 @@ export async function getTaxReportData(startDate: string, endDate: string): Prom
     if (!tables) {
       return { ...base, ssWages: null, ssTaxEmployee: null, medicareTaxEmployee: null, employerFICA: null };
     }
+    if (!taxable(e.employeeId)) {
+      return { ...base, ssWages: 0, ssTaxEmployee: 0, medicareTaxEmployee: 0, employerFICA: 0 };
+    }
     // `wages` is already the whole range, so it is the "period" and ytd is 0:
     // the annual wage base then applies to it directly. Do not pass a running
     // total here as well; that would apply the cap twice.
@@ -160,7 +172,8 @@ export async function getTaxReportData(startDate: string, endDate: string): Prom
   const employerFICA   = tables
     ? employeeSummaries.reduce((s, e) => s + (e.employerFICA ?? 0), 0)
     : null;
-  const futatEstimate  = payrollEntries.length * FUTA_WAGE_BASE * FUTA_EFFECTIVE_RATE;
+  const futatEstimate  =
+    payrollEntries.filter((e) => taxable(e.employeeId)).length * FUTA_WAGE_BASE * FUTA_EFFECTIVE_RATE;
 
   // Quarterly breakdown
   const quarterMap = new Map<string, { sales: number; tips: number; wages: number }>();
@@ -194,7 +207,8 @@ export async function getTaxReportData(startDate: string, endDate: string): Prom
     totalRegularPay,
     totalOvertimePay,
     totalTipsPaid,
-    employeeCount: payrollEntries.length,
+    // Feeds "W-2 Forms Required" too, and a contractor gets a 1099, not a W-2.
+    employeeCount: payrollEntries.filter((e) => taxable(e.employeeId)).length,
     employerFICA,
     futatEstimate,
     ficaYear,

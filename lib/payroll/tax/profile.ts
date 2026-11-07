@@ -20,6 +20,15 @@ function bool(v: unknown): boolean | null {
   return typeof v === 'boolean' ? v : null;
 }
 
+/**
+ * Whether the employer owes its own payroll taxes (FICA match, FUTA) on this
+ * person's pay. Only a recorded 1099 decision says no. Unclassified counts as
+ * an employee: a cost estimate should not shrink because nobody answered.
+ */
+export function employerOwesPayrollTax(row: Record<string, unknown>): boolean {
+  return taxProfileFromEmployee(row).classification !== 'contractor_1099';
+}
+
 export function taxProfileFromEmployee(row: Record<string, unknown>): EmployeeTaxProfile {
   const cls = row.tax_classification as TaxClassification;
   const status = row.w4_filing_status as FilingStatus;

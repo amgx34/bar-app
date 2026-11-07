@@ -1,6 +1,22 @@
 // lib/payroll/tax/profile.test.ts
 import { describe, it, expect } from 'vitest';
-import { taxProfileFromEmployee } from './profile';
+import { employerOwesPayrollTax, taxProfileFromEmployee } from './profile';
+
+describe('employerOwesPayrollTax', () => {
+  // Catches: a tax report charging employer FICA/FUTA on a 1099 contractor.
+  it('is false for a 1099 contractor', () => {
+    expect(employerOwesPayrollTax({ tax_classification: 'contractor_1099' })).toBe(false);
+  });
+  it('is true for a W-2 employee', () => {
+    expect(employerOwesPayrollTax({ tax_classification: 'w2' })).toBe(true);
+  });
+  // Catches: treating "nobody answered" as "contractor", which would quietly
+  // drop an employee's tax from the cost estimate.
+  it('is true while unclassified, and for a row with no column at all', () => {
+    expect(employerOwesPayrollTax({ tax_classification: null })).toBe(true);
+    expect(employerOwesPayrollTax({})).toBe(true);
+  });
+});
 
 describe('taxProfileFromEmployee', () => {
   // Catches: any field dropped, renamed, or mapped to the wrong column.
