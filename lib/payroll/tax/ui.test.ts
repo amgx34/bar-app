@@ -41,11 +41,11 @@ describe('tablesStatus', () => {
 });
 
 describe('tablesStatus against the real 2026 tables', () => {
-  it('2026 is a placeholder today', async () => {
+  it('2026 is transcribed and usable', async () => {
     const real = await vi.importActual<typeof import('./tables')>('./tables');
     tablesFor.mockImplementation((y: number) => real.tablesFor(y));
     const s = tablesStatus(2026);
-    expect(s).toMatchObject({ usable: false, reason: 'placeholder' });
+    expect(s).toMatchObject({ usable: true });
   });
 });
 
