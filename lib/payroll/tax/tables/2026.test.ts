@@ -3,8 +3,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TABLES_2026 } from './2026';
-import { annualTaxFromBrackets } from '../federal';
-import type { FilingStatus, TaxBracket } from '../types';
+import { computeFederalIncome } from '../federal';
+import type { EmployeeTaxProfile, FilingStatus, TaxBracket } from '../types';
 
 const STATUSES: FilingStatus[] = ['single', 'married_jointly', 'head_of_household'];
 
@@ -40,10 +40,15 @@ function checkBrackets(name: string, brackets: TaxBracket[]) {
     // Catches the most likely transcription slip: a base copied from the wrong
     // row. Each bracket's base must equal the previous base plus the previous
     // rate applied across the previous band.
+    //
+    // Within a dollar, not a cent: the Step 2 schedules are the joint figures
+    // halved, and the IRS rounds the halved floors (217,875 / 2 -> 108,938),
+    // so single/step2 prints 20,512 where the arithmetic gives 20,512.12. A
+    // base copied from the wrong row is off by thousands, not cents.
     for (let i = 1; i < brackets.length; i++) {
       const prev = brackets[i - 1];
       const expected = prev.base + prev.rate * (brackets[i].floor - prev.floor);
-      expect(brackets[i].base).toBeCloseTo(expected, 2);
+      expect(Math.abs(brackets[i].base - expected)).toBeLessThan(1);
     }
   });
 }
@@ -109,42 +114,53 @@ describe('transcription status', () => {
     expect(TABLES_2026.placeholder).toBe(markers > 0);
   });
 
-  // The only real proof a transcription is right: reproduce a figure the IRS
-  // printed. The structural tests above pass on any self-consistent table.
-  // Skipped while placeholder; it arms the moment real figures land. Armed but
-  // unfilled it FAILS on purpose, so flipping `placeholder` cannot go green
-  // without someone supplying the publication's example.
-  //
-  // TRANSCRIBE: pick a worked example from the Pub 15-T 2026 percentage-method
-  // tables (one per filing status ideally), copy its adjusted annual wage and
-  // the tentative annual tax the publication prints. Do not compute either.
-  const WORKED: {
-    status: FilingStatus;
-    step2: boolean;
-    adjustedAnnualWage: number | null; // TRANSCRIBE: published input
-    expectedAnnualTax: number | null;  // TRANSCRIBE: published answer
-  }[] = [
-    { status: 'single',            step2: false, adjustedAnnualWage: null, expectedAnnualTax: null },
-    { status: 'married_jointly',   step2: false, adjustedAnnualWage: null, expectedAnnualTax: null },
-    { status: 'head_of_household', step2: false, adjustedAnnualWage: null, expectedAnnualTax: null },
-  ];
+});
 
-  for (const w of WORKED) {
-    it.skipIf(TABLES_2026.placeholder)(
-      `reproduces the Pub 15-T worked example: ${w.status}${w.step2 ? ' / step 2' : ''}`,
-      () => {
-        if (w.adjustedAnnualWage === null || w.expectedAnnualTax === null) {
-          throw new Error(
-            'Tables are marked transcribed but the Pub 15-T worked example is not filled in. ' +
-            'Fill the TRANSCRIBE fields in 2026.test.ts from the publication.',
-          );
-        }
-        const table = w.step2
-          ? TABLES_2026.federal.step2[w.status]
-          : TABLES_2026.federal.standard[w.status];
-        // Pub 15-T prints whole dollars; allow a dollar of its rounding.
-        expect(annualTaxFromBrackets(table, w.adjustedAnnualWage)).toBeCloseTo(w.expectedAnnualTax, 0);
-      },
-    );
+// The only real proof a transcription is right: reproduce figures the IRS
+// printed. The structural tests above pass on any self-consistent table.
+//
+// Pub 15-T prints no worked example of the annual method, but it does print
+// the weekly Wage Bracket Method tables (Section 2, Forms W-4 from 2020 or
+// later), which are the same Worksheet 1A evaluated at each $10 row and
+// rounded to the dollar. Running the WHOLE worksheet (computeFederalIncome:
+// annualise, line 1g, schedule choice, de-annualise) at a row's midpoint must
+// land on the printed figure. That pins the line 1g amounts, which schedule
+// the Step 2 box selects, and every schedule's floors, bases and rates in the
+// bands these wages reach (0% through 24%).
+//
+// Copied verbatim from the 2026 weekly table; nothing here is computed. The
+// bands above ~$100k a year are in no wage-bracket table and are held only by
+// the structural tests.
+type Printed = { mfj: number; hoh: number; single: number };
+const WEEKLY_ROWS: { atLeast: number; lessThan: number; standard: Printed; step2: Printed }[] = [
+  { atLeast:   495, lessThan:   505, standard: { mfj:  0, hoh:   4, single:  19 }, step2: { mfj:  19, hoh:  29, single:  39 } },
+  { atLeast:   745, lessThan:   755, standard: { mfj: 13, hoh:  29, single:  48 }, step2: { mfj:  48, hoh:  59, single:  80 } },
+  { atLeast:   995, lessThan: 1_005, standard: { mfj: 38, hoh:  57, single:  78 }, step2: { mfj:  78, hoh: 101, single: 135 } },
+  { atLeast: 1_495, lessThan: 1_505, standard: { mfj: 96, hoh: 117, single: 160 }, step2: { mfj: 160, hoh: 216, single: 252 } },
+];
+
+const KEY: Record<FilingStatus, keyof Printed> = {
+  married_jointly: 'mfj', head_of_household: 'hoh', single: 'single',
+};
+
+describe('reproduces the Pub 15-T 2026 weekly wage-bracket table', () => {
+  for (const row of WEEKLY_ROWS) {
+    const wage = (row.atLeast + row.lessThan) / 2;
+    for (const status of STATUSES) {
+      for (const step2 of [false, true]) {
+        const printed = (step2 ? row.step2 : row.standard)[KEY[status]];
+        it(`$${row.atLeast}-$${row.lessThan} ${status}${step2 ? ' / step 2' : ''} = $${printed}`, () => {
+          const profile: EmployeeTaxProfile = {
+            classification: 'w2', filingStatus: status, multipleJobs: step2,
+            dependentsAmount: null, otherIncome: null, deductions: null,
+            extraWithholding: null, exempt: false,
+          };
+          const weekly = computeFederalIncome({
+            grossForPeriod: wage, profile, payFrequency: 'weekly', tables: TABLES_2026,
+          });
+          expect(Math.round(weekly)).toBe(printed);
+        });
+      }
+    }
   }
 });

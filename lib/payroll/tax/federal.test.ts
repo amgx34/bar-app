@@ -77,9 +77,9 @@ describe('adjustedAnnualWage', () => {
   });
 });
 
-// Purpose-built tables: the placeholder 2026 brackets are not guaranteed to make
-// these numbers deterministic, and a test that depends on a stand-in would
-// start failing (or worse, pass vacuously) the day real figures are transcribed.
+// Purpose-built tables, independent of any real year: these test the worksheet
+// mechanics, and must not move when a year's figures are transcribed or
+// corrected. The real 2026 figures are pinned in tables/2026.test.ts.
 const flat = (rate: number): TaxBracket[] => [{ floor: 0, base: 0, rate }];
 const FIXTURE: TaxTables = {
   year: 2099,
