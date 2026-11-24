@@ -1,7 +1,7 @@
 {
-  "version": 3,
+  "version": 4,
   "targets": {
-    "net9.0-windows7.0": {
+    "net9.0-windows": {
       "Azure.Core/1.38.0": {
         "type": "package",
         "dependencies": {
@@ -3272,7 +3272,7 @@
     }
   },
   "projectFileDependencyGroups": {
-    "net9.0-windows7.0": [
+    "net9.0-windows": [
       "rail-2touch-agent >= 1.4.0"
     ]
   },
@@ -3300,7 +3300,8 @@
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
-        "net9.0-windows7.0": {
+        "net9.0-windows": {
+          "framework": "net9.0-windows7.0",
           "targetAlias": "net9.0-windows",
           "projectReferences": {
             "C:\\Users\\notug\\bar-app\\2touch-agent-dotnet\\RailAgent.csproj": {
@@ -3319,10 +3320,11 @@
         "auditLevel": "low",
         "auditMode": "direct"
       },
-      "SdkAnalysisLevel": "9.0.300"
+      "SdkAnalysisLevel": "10.0.400"
     },
     "frameworks": {
-      "net9.0-windows7.0": {
+      "net9.0-windows": {
+        "framework": "net9.0-windows7.0",
         "targetAlias": "net9.0-windows",
         "imports": [
           "net461",
@@ -3340,7 +3342,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.306/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.403/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

@@ -11,6 +11,8 @@
  * moved.
  */
 
+import type { Withholding } from './tax/types';
+
 /** One night behind a period's hours. Frozen so a later correction cannot rewrite a stub. */
 export type ShiftNight = { date: string; hours: number; isOpener: boolean };
 
@@ -60,6 +62,15 @@ export type SnapshotEntry = {
   breakdown?:  PayBreakdown;
   shifts?:     ShiftNight[];
   tipContext?: TipNight[];
+
+  /**
+   * What was withheld, frozen at submit. Optional like everything else here:
+   * runs approved before withholding existed carry none, and must keep parsing.
+   *
+   * diffPayrollRun ignores it, same as breakdown/shifts/tipContext: it is a
+   * derived figure, and in this phase it does not change what anybody is paid.
+   */
+  withholding?: Withholding;
 };
 
 export type EntryChange = {
