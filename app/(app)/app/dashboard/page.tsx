@@ -19,7 +19,7 @@ import { unitsPerSale } from '@/lib/pos/pour';
 import { assessSyncHealth } from '@/lib/pos/sync-health';
 import { SyncStatusStrip } from './_components/sync-status-strip';
 import { SetupChecklist } from './_components/setup-checklist';
-import { buildChecklist } from '@/lib/onboarding/checklist';
+import { buildChecklist, shouldShowChecklist } from '@/lib/onboarding/checklist';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { hasPar, isBelowPar, parRatio } from '@/lib/inventory/par';
 
@@ -354,7 +354,14 @@ export default async function DashboardPage() {
     itemCount: items.length,
     liveZCount: nights.filter((n) => (n.report_date as string) >= liveSince).length,
   });
-  const showChecklist = !org.bar_settings?.onboarding_dismissed_at;
+  // created_at is read on its own, not through getCurrentOrg: if it errors, the bar counts as established.
+  const { data: orgAge } = await supabase.from('organizations').select('created_at').eq('id', org.id).maybeSingle();
+  const showChecklist = shouldShowChecklist({
+    dismissed: !!org.bar_settings?.onboarding_dismissed_at,
+    allDone: checklist.allDone,
+    posProvider: org.pos_provider as string | null,
+    createdAt: (orgAge?.created_at as string | undefined) ?? null,
+  });
 
   // Stock reorders live in the Stock card; only non-stock alerts stay here.
   const hasAlerts = unconfiguredEmployees.length > 0 || pendingOrders > 0 || alertsFailed;

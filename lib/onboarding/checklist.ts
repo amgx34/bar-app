@@ -23,7 +23,7 @@ export type ChecklistInput = {
 function posItem(provider: string | null, raw: Record<string, unknown> | null): ChecklistItem {
   const cfg = (raw ?? {}) as PosConfigShape;
   const title = 'Connect your POS';
-  const href = provider ? '/app/settings' : '/setup/pos';
+  const href = provider ? '/app/settings?tab=pos' : '/setup/pos';
   const errors = Array.isArray(cfg.last_sync_errors) ? cfg.last_sync_errors : [];
 
   if (!provider) return { key: 'pos', title, status: 'todo', href, why: 'Sales, tips and stock all come from your POS, so nothing else fills in until it is connected.' };
@@ -43,8 +43,8 @@ export function buildChecklist(i: ChecklistInput): Checklist {
     posItem(i.posProvider, i.posConfig),
     { key: 'night', title: 'See your first night', href: '/app/sales',
       status: i.liveZCount > 0 ? 'done' : 'todo',
-      why: i.liveZCount > 0 ? 'A recent night is in.' : 'No recent night has arrived yet. It appears after the POS closes out a day and syncs.' },
-    { key: 'team', title: 'Add your team', href: '/app/settings',
+      why: i.liveZCount > 0 ? 'A night is in.' : 'No recent night has arrived yet. It appears after the POS closes out a day and syncs.' },
+    { key: 'team', title: 'Add your team', href: '/app/settings?tab=team',
       status: i.employeeCount > 0 ? 'done' : 'todo',
       why: i.employeeCount > 0 ? 'Your team is set up.' : 'Tip splits and payroll need to know who works for you.' },
     { key: 'stock', title: 'Set up your stock', href: '/app/inventory',
@@ -53,4 +53,16 @@ export function buildChecklist(i: ChecklistInput): Checklist {
   ];
   const doneCount = items.filter((x) => x.status === 'done').length;
   return { items, doneCount, allDone: doneCount === items.length };
+}
+
+const NEW_BAR_DAYS = 30;
+
+/** Existing bars see nothing new: only a young org, or one with no POS yet, gets the card, and never once complete. */
+export function shouldShowChecklist(i: { dismissed: boolean; allDone: boolean; posProvider: string | null; createdAt: string | null; now?: Date }): boolean {
+  if (i.dismissed || i.allDone) return false;
+  if (!i.posProvider) return true;
+  // createdAt unknown (null) reads as an established bar.
+  if (!i.createdAt) return false;
+  const age = (i.now ?? new Date()).getTime() - new Date(i.createdAt).getTime();
+  return age < NEW_BAR_DAYS * 86_400_000;
 }

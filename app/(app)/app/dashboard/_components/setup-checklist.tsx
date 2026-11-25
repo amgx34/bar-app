@@ -1,3 +1,6 @@
+'use client';
+
+import { useActionState } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, Circle, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,6 +10,7 @@ import { dismissOnboarding } from '../actions';
 /** Four derived steps for a new bar. Nothing is stored except the dismissal. */
 export function SetupChecklist({ checklist, canDismiss }: { checklist: Checklist; canDismiss: boolean }) {
   const { items, doneCount, allDone } = checklist;
+  const [state, action] = useActionState(dismissOnboarding, { error: null });
   return (
     <section aria-labelledby="setup-heading">
       <Card>
@@ -39,10 +43,11 @@ export function SetupChecklist({ checklist, canDismiss }: { checklist: Checklist
             })}
           </ul>
           {canDismiss && (
-            <form action={dismissOnboarding}>
+            <form action={action}>
               <button type="submit" className="min-h-11 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
                 {allDone ? 'Hide this' : 'Hide for now'}
               </button>
+              {state.error && <p role="alert" className="text-sm text-destructive">{state.error}</p>}
             </form>
           )}
         </CardContent>

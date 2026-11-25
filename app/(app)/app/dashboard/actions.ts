@@ -19,15 +19,17 @@ export async function dismissCashTipsBanner(formData: FormData) {
 
 // Hides the setup checklist for the whole bar. Reads the latest bar_settings
 // and spreads it (see lib/onboarding/dismiss.ts), then scopes the write to the org.
-export async function dismissOnboarding() {
+export async function dismissOnboarding(_prev: { error: string | null }): Promise<{ error: string | null }> {
+  const failed = { error: 'Could not hide this. Try again.' };
   const { org, role } = await getCurrentOrg();
-  if (role !== 'owner' && role !== 'manager') return;
+  if (role !== 'owner' && role !== 'manager') return failed;
   const admin = createAdminClient();
   const { data } = await admin
     .from('organizations').select('bar_settings').eq('id', org.id).single();
   const next = applyOnboardingDismissed((data?.bar_settings ?? {}) as BarSettings, new Date().toISOString());
   const { error } = await admin
     .from('organizations').update({ bar_settings: next }).eq('id', org.id);
-  if (error) throw new Error(error.message);
+  if (error) return failed;
   revalidatePath('/app/dashboard');
+  return { error: null };
 }

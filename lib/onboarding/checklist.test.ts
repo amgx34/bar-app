@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildChecklist } from './checklist';
+import { buildChecklist, shouldShowChecklist } from './checklist';
 import { applyOnboardingDismissed } from './dismiss';
 
 const base = { posProvider: null, posConfig: {}, employeeCount: 0, itemCount: 0, liveZCount: 0 };
@@ -76,5 +76,27 @@ describe('applyOnboardingDismissed', () => {
     const out = applyOnboardingDismissed(latest, '2026-11-25T00:00:00Z');
     expect(out).toEqual({ ...latest, onboarding_dismissed_at: '2026-11-25T00:00:00Z' });
     expect(latest).not.toHaveProperty('onboarding_dismissed_at');
+  });
+});
+
+describe('checklist hrefs and visibility', () => {
+  it('sends a connected POS to the POS tab and the team to the team tab', () => {
+    const c = buildChecklist({ ...base, posProvider: '2touch', posConfig: { agent_token: 'x' } });
+    expect(byKey(c, 'pos').href).toBe('/app/settings?tab=pos');
+    expect(byKey(c, 'team').href).toBe('/app/settings?tab=team');
+    expect(byKey(buildChecklist(base), 'pos').href).toBe('/setup/pos');
+  });
+
+  const now = new Date('2026-11-25T00:00:00Z');
+  const v = { dismissed: false, allDone: false, posProvider: 'clover', createdAt: '2026-11-10T00:00:00Z', now };
+  it('shows for a young bar, hides for an old one, a finished one or a dismissed one', () => {
+    expect(shouldShowChecklist(v)).toBe(true);
+    expect(shouldShowChecklist({ ...v, createdAt: '2026-01-01T00:00:00Z' })).toBe(false);
+    expect(shouldShowChecklist({ ...v, createdAt: null })).toBe(false);
+    expect(shouldShowChecklist({ ...v, allDone: true })).toBe(false);
+    expect(shouldShowChecklist({ ...v, dismissed: true })).toBe(false);
+  });
+  it('shows for an old bar with no POS provider', () => {
+    expect(shouldShowChecklist({ ...v, posProvider: null, createdAt: '2026-01-01T00:00:00Z' })).toBe(true);
   });
 });
