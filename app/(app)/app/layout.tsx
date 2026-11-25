@@ -3,6 +3,7 @@ import { getAuthUser, getCurrentOrg } from '@/lib/org';
 import { hasAcceptedCurrentTerms } from '@/lib/terms';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/app/(app)/app/_components/app-sidebar';
+import { ownMemberships } from '@/lib/api/org-scope';
 import { AppHeader } from '@/app/(app)/app/_components/app-header';
 import { BottomNav } from '@/app/(app)/app/_components/bottom-nav';
 import { MobileFab } from '@/app/(app)/app/_components/mobile-fab';
@@ -18,7 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Run concurrently: the org lookup and the consent check are independent, and
   // awaiting them in sequence put two network round trips in front of every
   // authenticated page for no reason.
-  const [{ org }, accepted] = await Promise.all([
+  const [{ org, allMemberships }, accepted] = await Promise.all([
     getCurrentOrg(),
     user ? hasAcceptedCurrentTerms(user.id) : Promise.resolve(true),
   ]);
@@ -52,6 +53,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             posProvider={org.pos_provider}
             orgName={org.name}
             orgSlug={org.slug}
+            org={org}
+            // RLS returns teammates' rows too; the switcher lists only the caller's own bars.
+            memberships={ownMemberships(allMemberships, user?.id ?? '')}
           />
           {/* tabIndex={-1} makes this a programmatic focus target for the skip
               link and for the route-change focus move. */}
