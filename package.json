@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "predev": "node --no-warnings scripts/dev/check-dev-env.ts",
+    "supabase": "node --no-warnings scripts/dev/supabase.ts",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
