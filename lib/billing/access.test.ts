@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { accessFor, subscriptionToRow, GRACE_DAYS } from './access';
+import { accessFor, accessFromLookup, subscriptionToRow, GRACE_DAYS } from './access';
 
 const now = new Date('2026-12-10T00:00:00Z');
 const on = { enforce: true, isDemo: false };
@@ -43,5 +43,17 @@ describe('subscriptionToRow', () => {
   });
   it('unknown price gives null plan', () => {
     expect(subscriptionToRow({ items: { data: [{ price: { id: 'x' } }] } }, {}).plan).toBeNull();
+  });
+});
+
+describe('accessFromLookup', () => {
+  it('fails open when the lookup errored, even with enforcement on', () => {
+    expect(accessFromLookup({ row: null, failed: true }, now, on)).toMatchObject({ allowed: true, state: 'not_enforced' });
+  });
+  it('a clean lookup with no row is still blocked under enforcement', () => {
+    expect(accessFromLookup({ row: null, failed: false }, now, on)).toMatchObject({ allowed: false, state: 'none' });
+  });
+  it('a clean lookup defers to accessFor', () => {
+    expect(accessFromLookup({ row: row('active'), failed: false }, now, on)).toMatchObject({ allowed: true, state: 'active' });
   });
 });

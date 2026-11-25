@@ -49,6 +49,16 @@ export function accessFor(
   return { allowed: false, state: 'none' };
 }
 
+/** A failed lookup (missing table, database blip) is unknown, not "no subscription": fail open. */
+export function accessFromLookup(
+  lookup: { row: BillingRow | null; failed: boolean },
+  now: Date,
+  opts: { enforce: boolean; isDemo: boolean },
+): Access {
+  if (lookup.failed) return { allowed: true, state: 'not_enforced' };
+  return accessFor(lookup.row, now, opts);
+}
+
 type StripeSub = {
   id?: string;
   customer?: string | { id: string };
