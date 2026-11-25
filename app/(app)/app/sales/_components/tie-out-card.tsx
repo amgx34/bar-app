@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,14 +18,16 @@ const money = (n: number) =>
  * Did the drawer tie out? One night, owner and manager only (the page gates it).
  * Night level: nothing here names who ran the drawer.
  */
-export function TieOutCard({ date }: { date: string }) {
+export function TieOutCard({ date, live = false }: { date: string; live?: boolean }) {
   const [night, setNight] = useState<{ date: string; data: NightCash } | null>(null);
   const [failed, setFailed] = useState(false);
   const [amount, setAmount] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
+    if (live) return; // nothing to load until close
     let cancelled = false;
     getNightCash(date)
       .then((data) => {
@@ -35,13 +38,13 @@ export function TieOutCard({ date }: { date: string }) {
       })
       .catch(() => { if (!cancelled) setFailed(true); });
     return () => { cancelled = true; };
-  }, [date]);
+  }, [date, live, reload]);
 
   const data = night?.date === date ? night.data : null;
 
   function save() {
     const value = Number(amount);
-    if (amount.trim() === '' || !Number.isFinite(value) || value < 0) {
+    if (!/^\d*\.?\d+$|^\d+\.$/.test(amount.trim()) || !Number.isFinite(value) || value < 0) {
       setError('Enter the cash counted in the drawer, or 0 if it was empty');
       return;
     }
@@ -51,8 +54,8 @@ export function TieOutCard({ date }: { date: string }) {
         const updated = await logCountedCash({ reportDate: date, countedCash: value });
         setNight({ date, data: updated });
         toast.success('Count saved');
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not save that count');
+      } catch {
+        setError('Your count was not saved. Check your connection and try again.');
       }
     });
   }
@@ -68,10 +71,16 @@ export function TieOutCard({ date }: { date: string }) {
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
-        {failed && <p className="text-sm text-muted-foreground">Could not load this night. Reload to try again.</p>}
-        {!data && !failed && <p className="text-sm text-muted-foreground">Loading</p>}
+        {live && <p className="text-sm text-muted-foreground">Available after close. The night is still moving, so a count now would not mean anything.</p>}
+        {!live && failed && (
+          <p className="text-sm text-muted-foreground">
+            Could not load this night.{' '}
+            <Button variant="outline" size="sm" className="ml-1 h-11" onClick={() => { setFailed(false); setReload((n) => n + 1); }}>Try again</Button>
+          </p>
+        )}
+        {!live && !data && !failed && <p className="text-sm text-muted-foreground">Loading</p>}
 
-        {data && result && (
+        {!live && data && result && (
           <>
             {/* Live region so the gap is announced when a count is saved. */}
             <div aria-live="polite" role="status">
@@ -79,6 +88,15 @@ export function TieOutCard({ date }: { date: string }) {
                 <p className="text-sm">
                   Cannot tie out. Your POS did not send the cash and card split
                   {data.hasZReport ? ' for this night.' : ', and it has not sent this night at all yet.'}
+                  {' '}Ask your POS provider to turn on the cash and card split, or check the{' '}
+                  <Link href="/app/settings?tab=pos" className="underline underline-offset-2">POS Integration tab</Link>.
+                </p>
+              )}
+              {result.state === 'cannot-tie-out' && result.reason === 'tips-not-entered' && (
+                <p className="text-sm">
+                  Enter cash tips for this night first. Until then the drawer figure would read short by
+                  the tips already paid out.{' '}
+                  <Link href="/app/payroll" className="underline underline-offset-2">Enter cash tips</Link>.
                 </p>
               )}
               {result.state === 'cannot-tie-out' && result.reason === 'no-count' && (
@@ -109,20 +127,22 @@ export function TieOutCard({ date }: { date: string }) {
               <p className="text-xs text-muted-foreground">
                 Counting the drawer is not switched on for this bar yet.
               </p>
-            ) : result.reason !== 'no-cash-split' && data.hasZReport ? (
-              <div className="flex items-end gap-2">
-                <div className="flex-1 space-y-1.5">
+            ) : result.reason !== 'no-cash-split' && result.reason !== 'tips-not-entered' && data.hasZReport ? (
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="min-w-[10rem] flex-1 space-y-1.5">
                   <Label htmlFor="counted-cash">Cash counted in the drawer ($)</Label>
                   <Input
-                    id="counted-cash" type="number" min="0" step="0.01" inputMode="decimal"
+                    id="counted-cash" type="text" inputMode="decimal" pattern="[0-9]*\.?[0-9]*"
+                    className="h-11" aria-invalid={error ? true : undefined}
+                    aria-describedby={error ? 'counted-cash-error' : undefined}
                     placeholder="0.00" value={amount} disabled={isPending}
                     onChange={(e) => setAmount(e.target.value)}
                   />
                 </div>
-                <Button onClick={save} disabled={isPending}>{isPending ? 'Saving…' : 'Save count'}</Button>
+                <Button className="h-11 w-full sm:w-auto" onClick={save} disabled={isPending}>{isPending ? 'Saving…' : 'Save count'}</Button>
               </div>
             ) : null}
-            <FormStatus status={error ? 'error' : 'idle'} message={error} />
+            <div id="counted-cash-error"><FormStatus status={error ? 'error' : 'idle'} message={error} /></div>
           </>
         )}
       </CardContent>

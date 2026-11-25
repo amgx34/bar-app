@@ -145,7 +145,7 @@ export function NightView({
         </Card>
       )}
 
-      {tieOutDate && <TieOutCard date={tieOutDate} />}
+      {tieOutDate && <TieOutCard date={tieOutDate} live={live} />}
     </>
   );
 }

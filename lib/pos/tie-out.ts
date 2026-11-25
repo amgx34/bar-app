@@ -9,6 +9,8 @@ export type TieOutInput = {
   cashSales: number | null;
   cardSales?: number | null;
   cashTips: number;
+  /** True once a person entered the jar count. Omitted means "treat the figure as real". */
+  cashTipsCounted?: boolean;
   ccTips: number;
   countedCash: number | null;
   tipsPaidOut?: number | null;
@@ -16,7 +18,7 @@ export type TieOutInput = {
 
 export type TieOut = {
   state: 'balanced' | 'over' | 'short' | 'cannot-tie-out';
-  reason: 'no-cash-split' | 'no-count' | null;
+  reason: 'no-cash-split' | 'no-count' | 'tips-not-entered' | null;
   expected: number | null;
   /** Counted less expected, in dollars. Positive is over. Null unless tied out. */
   gap: number | null;
@@ -35,6 +37,11 @@ export function tieOut(i: TieOutInput): TieOut {
 
   if (i.cashSales === null) {
     return { state: 'cannot-tie-out', reason: 'no-cash-split', expected: null, gap: null, ...common };
+  }
+  // 2Touch reports 0 cash tips for nearly every bar, but those tips left the
+  // drawer, so expected would be too high and a right count would read short.
+  if (i.cashTipsCounted === false && i.cashTips === 0) {
+    return { state: 'cannot-tie-out', reason: 'tips-not-entered', expected: null, gap: null, ...common };
   }
   const expected = cents(i.cashSales - i.cashTips);
   if (i.countedCash === null) {
