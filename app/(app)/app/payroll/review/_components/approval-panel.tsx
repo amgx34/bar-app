@@ -20,12 +20,12 @@ function money(n: number) {
  * it, an approval means "someone clicked yes at some point", which is not a
  * control at all.
  */
-function StaleDiff({ diff }: { diff: RunDiff }) {
+function StaleDiff({ diff, approved }: { diff: RunDiff; approved?: boolean }) {
   return (
     <div className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
       <p className="text-sm font-semibold flex items-center gap-2 text-amber-800 dark:text-amber-200">
         <AlertTriangle className="h-4 w-4" />
-        The figures changed after this was submitted
+        {approved ? 'Records have changed since this was approved' : 'The figures changed after this was submitted'}
       </p>
 
       <div className="space-y-1.5">
@@ -51,10 +51,16 @@ function StaleDiff({ diff }: { diff: RunDiff }) {
       </p>
 
       <p className="text-xs text-muted-foreground">
-        Approving accepts the new figures. Send it back if they need checking first.
+        {approved
+          ? 'The figures on this page are the approved ones and have not changed. The ACH file is built from current records, so check it against the approved total before sending.'
+          : 'Approving accepts the new figures. Send it back if they need checking first.'}
       </p>
     </div>
   );
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 const STATUS_STYLES = {
@@ -64,7 +70,7 @@ const STATUS_STYLES = {
 } as const;
 
 export function ApprovalPanel({
-  run, diff, startDate, endDate, canSubmit, canApprove,
+  run, diff, startDate, endDate, canSubmit, canApprove, approvedBy, approvedTotal, staleSinceApproval,
 }: {
   run:       PayrollRun | null;
   diff:      RunDiff | null;
@@ -72,6 +78,9 @@ export function ApprovalPanel({
   endDate:   string;
   canSubmit: boolean;
   canApprove: boolean;
+  approvedBy?: string | null;
+  approvedTotal?: number | null;
+  staleSinceApproval?: RunDiff | null;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -96,9 +105,11 @@ export function ApprovalPanel({
         <div>
           <h3 className="text-sm font-semibold">Approval</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {run
-              ? `Submitted ${new Date(run.submitted_at).toLocaleDateString()}`
-              : 'This period has not been submitted for approval.'}
+            {run?.status === 'approved' && run.reviewed_at
+              ? `Approved by ${approvedBy ?? 'an owner'} on ${fmtDate(run.reviewed_at)}`
+              : run
+                ? `Submitted ${fmtDate(run.submitted_at)}`
+                : 'This period has not been submitted for approval.'}
           </p>
         </div>
 
@@ -126,7 +137,18 @@ export function ApprovalPanel({
         <StaleDiff diff={diff} />
       )}
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {run?.status === 'approved' && approvedTotal != null && (
+        <p className="text-sm">
+          Approved total <span className="font-semibold tabular-nums">{money(approvedTotal)}</span>
+          <span className="text-muted-foreground"> gross, as frozen when it was approved.</span>
+        </p>
+      )}
+
+      {run?.status === 'approved' && staleSinceApproval?.isStale && (
+        <StaleDiff diff={staleSinceApproval} approved />
+      )}
+
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
       <div className="flex flex-wrap gap-2">
         {/* Submit / resubmit */}
@@ -168,6 +190,7 @@ export function ApprovalPanel({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={2}
+            aria-label="What needs changing?"
             placeholder="What needs changing?"
             className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
           />
@@ -191,7 +214,7 @@ export function ApprovalPanel({
 
       {run?.status === 'approved' && (
         <p className="text-xs text-muted-foreground">
-          ACH export is unlocked for this period.
+          ACH export is unlocked for this period.{staleSinceApproval && !staleSinceApproval.isStale && ' Current records match the approved figures.'}
         </p>
       )}
     </div>

@@ -247,6 +247,30 @@ export async function submitPayrollForApproval(
 }
 
 /**
+ * Who signed a run off, for the approved-state panel. Null when unknown: the
+ * panel then says "an owner" rather than guessing.
+ */
+export async function getApproverName(userId: string | null): Promise<string | null> {
+  if (!userId) return null;
+  const { org } = await getCurrentOrg();
+  const admin = createAdminClient();
+
+  // Only members of THIS bar are named; a stray id never resolves to a stranger.
+  const { data: member } = await admin
+    .from('memberships')
+    .select('user_id')
+    .eq('organization_id', org.id)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (!member) return null;
+
+  const { data } = await admin.auth.admin.getUserById(userId);
+  const u = data?.user;
+  const meta = (u?.user_metadata ?? {}) as { full_name?: string; name?: string };
+  return meta.full_name ?? meta.name ?? u?.email ?? null;
+}
+
+/**
  * The newest run still waiting on somebody, for the banner in the Payroll shell.
  *
  * Keyed on STATUS, not on a period — unlike getPayrollRun above, which every
