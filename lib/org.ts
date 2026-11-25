@@ -24,6 +24,8 @@ export type BarSettings = {
   /** IANA zone, used for the nightly close. */
   timezone?: string;
   auto_reorder_enabled?: boolean;
+  /** ISO time the owner hid the dashboard setup checklist. Absent means show it. */
+  onboarding_dismissed_at?: string;
   admin_phone?:          string;
 
   // ── Tip configuration ─────────────────────────────────────────────────

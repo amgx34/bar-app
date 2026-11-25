@@ -6,17 +6,18 @@ import { toast } from 'sonner';
 import { Monitor, Leaf, Flame, ArrowRight, CheckCircle, Zap, Upload, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { selectPOSProvider } from '../actions';
+import { save2TouchConfig } from '@/app/(app)/app/settings/actions';
 
 const POS = [
   {
     value: '2touch' as const,
     name: '2TouchPOS',
-    tagline: 'Ready to use right now',
+    tagline: 'Needs the Rail connector',
     description:
       'Import nightly Z reports and employee shift files to power payroll, tip splits, and inventory. The full Rail workflow is built around 2Touch exports.',
     features: ['Z report import (text & CSV)', 'Employee shift imports', 'Auto tip pool splits', 'Full payroll calculator'],
     status: 'ready',
-    statusLabel: 'No setup required',
+    statusLabel: 'Needs the connector',
     Icon: Monitor,
     accent: 'blue',
     border: 'border-blue-500/30',
@@ -82,11 +83,19 @@ export default function POSSelector({ orgId: _ }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState<typeof POS[number]['value'] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
 
   async function handleContinue() {
     if (!selected) return;
     setLoading(true);
     try {
+      if (selected === '2touch') {
+        // Creates the agent token now, so the code exists at the step that needs it.
+        const cfg = await save2TouchConfig('');
+        setPairingCode(cfg.pairingCode);
+        setLoading(false);
+        return;
+      }
       await selectPOSProvider(selected);
       if (selected === 'clover' || selected === 'toast') {
         router.push(`/setup/pos/${selected}`);
@@ -98,6 +107,8 @@ export default function POSSelector({ orgId: _ }: Props) {
       setLoading(false);
     }
   }
+
+  if (pairingCode) return <PairingStep code={pairingCode} onDone={() => router.push('/app/dashboard')} />;
 
   return (
     <main className="relative min-h-dvh flex flex-col items-center justify-center p-6 overflow-hidden bg-sidebar text-sidebar-foreground">
@@ -203,6 +214,45 @@ export default function POSSelector({ orgId: _ }: Props) {
             <p className="text-white/25 text-xs">Select a POS above to continue</p>
           )}
         </div>
+      </div>
+    </main>
+  );
+}
+
+function PairingStep({ code, onDone }: { code: string; onDone: () => void }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+    } catch {
+      toast.error('Could not copy. Select the code and copy it by hand.');
+    }
+  }
+  return (
+    <main className="relative min-h-dvh flex items-center justify-center p-6 bg-sidebar text-sidebar-foreground">
+      <div className="w-full max-w-lg space-y-5">
+        <h1 className="text-2xl font-bold text-white">Your pairing code</h1>
+        <p className="text-sm text-white/70">
+          The Rail connector on your 2Touch computer asks for this code the first time it runs. Until it is installed
+          and paired, no sales reach Rail. The code is also in Settings under POS, so you can leave this page.
+        </p>
+        <label htmlFor="pairing-code" className="block text-xs font-medium text-white/60">Pairing code</label>
+        <textarea
+          id="pairing-code" readOnly rows={4} value={code}
+          onFocus={(e) => e.currentTarget.select()}
+          className="w-full resize-none rounded-lg border border-white/20 bg-black/30 p-3 font-mono text-xs text-white break-all"
+        />
+        <p className="text-xs text-white/60">Treat it like a password. Anyone with it can send data as your bar.</p>
+        <div className="flex flex-wrap gap-3">
+          <button type="button" onClick={copy} className="min-h-11 rounded-xl bg-white/10 px-5 font-semibold text-white hover:bg-white/15">
+            {copied ? 'Copied' : 'Copy code'}
+          </button>
+          <button type="button" onClick={onDone} className="min-h-11 rounded-xl bg-cta px-5 font-semibold text-cta-foreground hover:brightness-95">
+            Go to dashboard
+          </button>
+        </div>
+        <p role="status" className="sr-only">{copied ? 'Pairing code copied' : ''}</p>
       </div>
     </main>
   );

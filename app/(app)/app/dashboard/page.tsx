@@ -18,6 +18,8 @@ import { computeVelocity } from '@/lib/pos/velocity';
 import { unitsPerSale } from '@/lib/pos/pour';
 import { assessSyncHealth } from '@/lib/pos/sync-health';
 import { SyncStatusStrip } from './_components/sync-status-strip';
+import { SetupChecklist } from './_components/setup-checklist';
+import { buildChecklist } from '@/lib/onboarding/checklist';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { hasPar, isBelowPar, parRatio } from '@/lib/inventory/par';
 
@@ -343,6 +345,17 @@ export default async function DashboardPage() {
     org.pos_provider as string | null,
   );
 
+  // Live nights only: a backfill loads history, which is not a first night.
+  const liveSince = isoDaysAgo(7).split('T')[0];
+  const checklist = buildChecklist({
+    posProvider: org.pos_provider as string | null,
+    posConfig: org.pos_config as Record<string, unknown> | null,
+    employeeCount: (employees ?? []).filter((e) => !(e as { archived_at?: string | null }).archived_at).length,
+    itemCount: items.length,
+    liveZCount: nights.filter((n) => (n.report_date as string) >= liveSince).length,
+  });
+  const showChecklist = !org.bar_settings?.onboarding_dismissed_at;
+
   // Stock reorders live in the Stock card; only non-stock alerts stay here.
   const hasAlerts = unconfiguredEmployees.length > 0 || pendingOrders > 0 || alertsFailed;
 
@@ -419,6 +432,8 @@ export default async function DashboardPage() {
           feed was alive, and was hidden on phones. The strip below is driven by
           the real sync outcome and renders nothing for a bar with no agent. */}
       <SyncStatusStrip health={syncHealth} />
+
+      {showChecklist && <SetupChecklist checklist={checklist} canDismiss={role === 'owner' || role === 'manager'} />}
 
       {/* ── 3. Last night ──────────────────────────────────────────────────── */}
       <section aria-labelledby="last-night-heading">
