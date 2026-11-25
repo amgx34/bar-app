@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Leaf, Flame, Monitor, CheckCircle, AlertTriangle,
-  RefreshCw, Unplug, ExternalLink, Loader2, KeyRound,
+  RefreshCw, Unplug, ExternalLink, Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,10 +12,11 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
   syncCloverInventory, syncCloverSales,
-  connectToast, syncToastSales, syncToastInventory, syncToastShifts,
+  syncToastSales, syncToastInventory,
   save2TouchConfig, triggerTwoTouchPoll, get2TouchAgentConfig, type TwoTouchAgentConfig,
   disconnectPOS,
 } from '../actions';
+import { ToastConnectForm } from '@/app/(app)/setup/pos/toast/_components/toast-connect-form';
 import type { Role } from '@/lib/permissions';
 
 const POS_META = {
@@ -32,104 +33,6 @@ interface Props {
   cloverAuthUrl:  string | null;
   flashConnected: boolean;
   flashError?:    string;
-}
-
-// ── Toast credentials form ────────────────────────────────────────────────────
-
-function ToastConnectForm({ onConnected }: { onConnected: () => void }) {
-  const [clientId,       setClientId]       = useState('');
-  const [clientSecret,   setClientSecret]   = useState('');
-  const [restaurantGuid, setRestaurantGuid] = useState('');
-  const [, startTransition] = useTransition();
-  const [loading, setLoading] = useState(false);
-
-  async function handleConnect() {
-    if (!clientId || !clientSecret || !restaurantGuid) {
-      toast.error('All three fields are required');
-      return;
-    }
-    setLoading(true);
-    try {
-      await connectToast({ client_id: clientId, client_secret: clientSecret, restaurant_guid: restaurantGuid });
-      toast.success('Toast connected successfully!');
-      onConnected();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Connection failed — check your credentials');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="rounded-lg border border-dashed border-orange-500/30 bg-orange-500/5 p-4 space-y-4">
-      <div className="flex items-center gap-2">
-        <KeyRound className="h-4 w-4 text-orange-700 dark:text-orange-300" />
-        <p className="text-sm font-medium">Connect Toast</p>
-      </div>
-      {/* Step-by-step instructions */}
-      <div className="rounded-md bg-muted/50 border p-3 space-y-1.5 text-xs text-muted-foreground">
-        <p className="font-semibold text-foreground">How to get your credentials:</p>
-        <ol className="list-decimal list-inside space-y-1 leading-relaxed">
-          <li>Log in to <strong>Toast Web</strong> at <span className="font-mono">pos.toasttab.com</span></li>
-          <li>Go to <strong>Integrations → Toast API access → Manage credentials</strong></li>
-          <li>Click <strong>Create new credentials → Standard API</strong></li>
-          <li>Enter a name (e.g. &quot;Rail&quot;), select scopes: <em>Orders, Labor, Menu</em>, choose your location</li>
-          <li>Copy the <strong>Client ID</strong>, <strong>Client Secret</strong>, and <strong>Restaurant GUID</strong> shown below</li>
-        </ol>
-        <p className="text-[10px] pt-1">
-          ⚠ Requires Toast Restaurant Management Suite Essentials or higher.
-        </p>
-      </div>
-
-      <div className="space-y-3">
-        <div className="space-y-1">
-          <Label className="text-xs">Client ID</Label>
-          <Input
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            className="h-8 text-sm font-mono"
-            autoComplete="off"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Client Secret</Label>
-          <Input
-            type="password"
-            value={clientSecret}
-            onChange={(e) => setClientSecret(e.target.value)}
-            placeholder="Paste your Toast client secret"
-            className="h-8 text-sm font-mono"
-            autoComplete="new-password"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Restaurant GUID</Label>
-          <Input
-            value={restaurantGuid}
-            onChange={(e) => setRestaurantGuid(e.target.value)}
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            className="h-8 text-sm font-mono"
-            autoComplete="off"
-          />
-          <p className="text-[11px] text-muted-foreground">
-            Shown on the credentials page — also called &quot;Toast-Restaurant-External-ID&quot;
-          </p>
-        </div>
-      </div>
-      <Button
-        size="sm"
-        disabled={loading}
-        onClick={handleConnect}
-        className="gap-2 bg-orange-500 hover:bg-orange-600 text-white"
-      >
-        {loading
-          ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Connecting…</>
-          : <><CheckCircle className="h-3.5 w-3.5" /> Connect Toast</>
-        }
-      </Button>
-    </div>
-  );
 }
 
 // ── 2Touch configuration panel ───────────────────────────────────────────────
@@ -313,14 +216,14 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
   const [provider,      setProvider]      = useState(posProvider);
   const [syncingInv,    setSyncingInv]    = useState(false);
   const [syncingSales,  setSyncingSales]  = useState(false);
-  const [syncingShifts, setSyncingShifts] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
 
   const canManage         = role === 'owner' || role === 'manager';
   // The login itself lives in the encrypted credentials store, not here. A zone
   // is required: without one Rail cannot say which night a sale belongs to.
   const isCloverConnected = provider === 'clover' && !!posConfig.merchant_id && !!posConfig.timezone && !posConfig.needs_reauth;
-  const isToastConnected  = provider === 'toast'  && !!(posConfig.client_id);
+  // The login lives in the encrypted store. Toast reports its own zone and closeout hour at connect.
+  const isToastConnected  = provider === 'toast'  && !!posConfig.restaurant_guid && !!posConfig.timezone && !posConfig.needs_reauth;
   const isConnected       = isCloverConnected || isToastConnected;
 
   useEffect(() => {
@@ -378,15 +281,6 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
     finally { setSyncingInv(false); }
   }
 
-  async function handleToastSyncShifts() {
-    setSyncingShifts(true);
-    try {
-      const res = await syncToastShifts(7);
-      toast.success(`Shifts synced — ${res.upserted} shift records, ${res.newEmployees} new employees`);
-    } catch (err) { toast.error(err instanceof Error ? err.message : 'Sync failed'); }
-    finally { setSyncingShifts(false); }
-  }
-
   // ── Disconnect ──────────────────────────────────────────────────────────────
 
   async function handleDisconnect() {
@@ -400,7 +294,7 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
     finally { setDisconnecting(false); }
   }
 
-  const busy = syncingInv || syncingSales || syncingShifts;
+  const busy = syncingInv || syncingSales;
 
   return (
     <div className="space-y-6">
@@ -509,13 +403,20 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
           <div className="flex items-center gap-2">
             <Flame className="h-4 w-4 text-orange-700 dark:text-orange-300" />
             <h3 className="text-sm font-semibold">Toast</h3>
-            <span className="text-xs text-muted-foreground">API key credentials</span>
+            <span className="text-xs text-muted-foreground">Toast API credentials</span>
           </div>
 
           {!isToastConnected ? (
-            <ToastConnectForm onConnected={() => setProvider('toast')} />
+            role === 'owner' ? (
+              <ToastConnectForm reconnect={provider === 'toast' && !!posConfig.needs_reauth} onConnected={() => setProvider('toast')} />
+            ) : (
+              <p className="text-xs text-muted-foreground">Only the owner can connect Toast.</p>
+            )
           ) : (
             <div className="space-y-3">
+              {typeof posConfig.toast_restaurant_name === 'string' && (
+                <p className="text-xs text-muted-foreground">Connected to <strong>{posConfig.toast_restaurant_name}</strong>.</p>
+              )}
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" onClick={handleToastSyncSales} disabled={busy} className="gap-2">
                   <RefreshCw className={`h-3.5 w-3.5 ${syncingSales ? 'animate-spin' : ''}`} />
@@ -525,10 +426,6 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
                   <RefreshCw className={`h-3.5 w-3.5 ${syncingInv ? 'animate-spin' : ''}`} />
                   {syncingInv ? 'Syncing…' : 'Sync Menu / Inventory'}
                 </Button>
-                <Button size="sm" variant="outline" onClick={handleToastSyncShifts} disabled={busy} className="gap-2">
-                  <RefreshCw className={`h-3.5 w-3.5 ${syncingShifts ? 'animate-spin' : ''}`} />
-                  {syncingShifts ? 'Syncing…' : 'Sync Shifts (7 days)'}
-                </Button>
                 {role === 'owner' && (
                   <Button size="sm" variant="outline" onClick={handleDisconnect} disabled={disconnecting} className="gap-2 text-muted-foreground">
                     <Unplug className="h-3.5 w-3.5" /> Disconnect
@@ -536,9 +433,10 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                <strong>Sync Sales</strong> pulls nightly order totals + tips into the Dashboard &amp; Books.{' '}
-                <strong>Sync Menu</strong> imports your Toast menu items as inventory.{' '}
-                <strong>Sync Shifts</strong> imports employee time entries into Payroll.
+                <strong>Sync Sales</strong> pulls the last 7 nights of totals, tips, items sold, hourly and per-server
+                sales, and employee hours into the Dashboard, Books and Payroll. Rail also does this once a night.{' '}
+                <strong>Sync Menu</strong> imports your Toast menu items as inventory. Stock itself moves with sales,
+                not with the menu.
               </p>
             </div>
           )}

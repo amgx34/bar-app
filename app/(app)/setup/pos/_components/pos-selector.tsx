@@ -51,12 +51,12 @@ const POS = [
   {
     value: 'toast' as const,
     name: 'Toast',
-    tagline: 'Manual import workflow',
+    tagline: 'API sync, needs Toast API access',
     description:
-      'Use Toast CSV and text exports to import shift data and Z reports. The same powerful payroll and tip-tracking tools, fed by your Toast POS exports.',
-    features: ['CSV export imports', 'Shift data support', 'Tip pool calculations', 'Toast API integration coming soon'],
-    status: 'ready',
-    statusLabel: 'Available now',
+      'Rail reads your sales from the Toast API once a night and on demand. Toast sells and approves API access separately from the POS, so you need to ask Toast for read-only credentials first.',
+    features: ['Nightly sales, tips and cash/card totals', 'Items sold, which deplete stock', 'Hourly and per-server sales', 'Employee hours and declared cash tips'],
+    status: 'setup',
+    statusLabel: 'Requires Toast API access',
     Icon: Flame,
     accent: 'orange',
     border: 'border-orange-500/30',
@@ -65,15 +65,15 @@ const POS = [
     activeBg: 'bg-orange-500/15',
     iconColor: 'text-orange-400',
     iconBg: 'bg-orange-500/15',
-    statusColor: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30',
-    cta: 'Get started with Toast',
+    statusColor: 'text-amber-400 bg-amber-400/10 border-amber-400/30',
+    cta: 'Set up Toast integration',
   },
 ] as const;
 
 const FEATURE_ICONS = {
   '2touch': Upload,
   clover: RefreshCw,
-  toast: Upload,
+  toast: RefreshCw,
 } as const;
 
 interface Props { orgId: string }
@@ -88,8 +88,8 @@ export default function POSSelector({ orgId: _ }: Props) {
     setLoading(true);
     try {
       await selectPOSProvider(selected);
-      if (selected === 'clover') {
-        router.push('/setup/pos/clover');
+      if (selected === 'clover' || selected === 'toast') {
+        router.push(`/setup/pos/${selected}`);
       } else {
         router.push('/app/dashboard');
       }
@@ -194,7 +194,7 @@ export default function POSSelector({ orgId: _ }: Props) {
           >
             {loading ? 'Setting up…' : (
               <>
-                {selected === 'clover' ? 'Continue to Clover setup' : 'Finish setup'}
+                {selected === 'clover' ? 'Continue to Clover setup' : selected === 'toast' ? 'Continue to Toast setup' : 'Finish setup'}
                 <ArrowRight className="h-4 w-4" />
               </>
             )}

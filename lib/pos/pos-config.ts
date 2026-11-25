@@ -65,3 +65,16 @@ export function applyCredentialsEnc(cfg: PosConfig, enc: string): PosConfig {
 export function applyProviderSettings(cfg: PosConfig, patch: PosConfig): PosConfig {
   return { ...cfg, ...patch };
 }
+
+/**
+ * The non-secret half of a Toast connection, merged over the latest config. It
+ * also drops `client_id` and `client_secret`: connections made before the
+ * encrypted credentials store kept both here in plaintext, and this column is
+ * selected into every membership row (lib/org.ts), so reconnecting must scrub
+ * them rather than leave them next to the new settings.
+ */
+export function applyToastConnection(cfg: PosConfig, settings: PosConfig): PosConfig {
+  const { client_id: _id, client_secret: _secret, ...rest } = cfg;
+  void _id; void _secret;
+  return { ...rest, ...settings };
+}

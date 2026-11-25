@@ -441,12 +441,40 @@ gets the sentence without a button rather than a control that would refuse it.
 Figures come off `run.snapshot`, never a recompute, or the banner would
 disagree with the screen it links to.
 
+**Toast is a pull source with a hard prerequisite, and its credentials never sit
+in `pos_config`.** A bar cannot connect until Toast has issued it API access:
+Toast sells and approves that separately from the POS, so the owner has to ask
+Toast for read-only credentials (client ID, client secret) that can read orders,
+labor, menus and restaurant details, plus the restaurant GUID. The connect screen
+says so up front. The login is verified against the restaurant before anything
+is saved, and the secret goes into `pos_credentials` encrypted. Reconnecting
+scrubs the plaintext `client_id`/`client_secret` an earlier build kept in
+`pos_config`. There is no refresh token: the cached login token is renewed by a
+fresh login under the same version compare-and-swap as Clover, and a 429 is
+reported, never retried in a loop.
+
+Toast's own `businessDate` is used as given; the time zone and closeout hour are
+read from the restaurant at connect and are only used for the hour of day. An
+order is a sale on its business date, a refund belongs to its
+`refundBusinessDate`, so the adapter also pulls orders *modified* since the
+window opened, because a refund on an old order lands on a later night. Only
+PAID or CLOSED checks count; voided, deleted and test-mode orders, voided checks
+and voided selections never reach Z or items. A check's net is split across its
+payments by share so the cash/card split always reconciles, and it is left NULL
+when any payment is not CASH or CREDIT. `declaredCashTips` from time entries is
+the only source of `cash_tips`, absent when the labor feed failed. Overtime is
+booked as plain hours so the pay run applies its weekly rule once.
+Unverified until a sandbox answers: dollars versus cents (`TOAST_AMOUNTS_IN_CENTS`
+flips it), whether `refundAmount` excludes tax, and the paging and scope list.
+
 ## Env vars (`.env.local`)
 
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
 `GROQ_API_KEY`, `DD_ENCRYPTION_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
 `TWILIO_FROM_NUMBER`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `TWOTOUCH_INGEST_SECRET`,
 `CLOVER_CLIENT_ID`, `CLOVER_REDIRECT_URI`, `CLOVER_SANDBOX`. Plus `CRON_SECRET` on Vercel.
+Optional for Toast: `TOAST_API_HOST` (the host Toast issues; defaults to production),
+`TOAST_AMOUNTS_IN_CENTS=true` (only if a sandbox shows cents, not dollars).
 
 Web Push (all three, or push silently no-ops and only the in-app bell works):
 `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (a

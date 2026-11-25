@@ -1,10 +1,11 @@
 import type { PosProvider } from '@/lib/pos/credentials';
 import type { PosAdapter } from './types';
 import { cloverAdapter } from './clover/adapter';
+import { toastAdapter } from './toast/adapter';
 
-/** Toast registers here when its adapter lands. */
 const adapters: Partial<Record<PosProvider, PosAdapter>> = {
   clover: cloverAdapter,
+  toast: toastAdapter,
 };
 
 export function adapterFor(provider: string | null | undefined): PosAdapter | null {
