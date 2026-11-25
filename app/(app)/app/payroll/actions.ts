@@ -142,14 +142,20 @@ export async function deleteEmployee(employeeId: string): Promise<void> {
     throw new Error('Organization not found');
   }
 
-  const { error } = await supabase
+  const { data: deleted, error } = await supabase
     .from('employees')
     .delete()
     .eq('id', employeeId)
-    .eq('organization_id', org.id);
+    .eq('organization_id', org.id)
+    .select('id');
 
   if (error) {
     throw new Error(`Failed to delete employee: ${error.message}`);
+  }
+  // Row-level security can refuse a delete by matching zero rows and returning no
+  // error, which used to surface as "removed" while the row stayed after a reload.
+  if (!deleted || deleted.length === 0) {
+    throw new Error('Could not remove this employee. They may already be gone, or you may not have permission.');
   }
 
   revalidatePath('/app/payroll');
