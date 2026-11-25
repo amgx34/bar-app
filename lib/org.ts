@@ -18,8 +18,11 @@ export type HourlyRates = {
 
 export type BarSettings = {
   // ── Existing ──────────────────────────────────────────────────────────
-  tip_split_percent:   number;
-  default_hourly_rate: number;
+  /** Absent until the owner or a demo carry-over supplies them; they feed payroll. */
+  tip_split_percent?:   number;
+  default_hourly_rate?: number;
+  /** IANA zone, used for the nightly close. */
+  timezone?: string;
   auto_reorder_enabled?: boolean;
   admin_phone?:          string;
 
