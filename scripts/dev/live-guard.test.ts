@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { assertDevIsNotLive, normalizeHost, readEnvValue } from './live-guard';
+import {
+  assertDevIsNotLive,
+  assertNoLiveThirdPartyKeys,
+  findLeakedLiveKeys,
+  normalizeHost,
+  readEnvValue,
+} from './live-guard';
 
 describe('normalizeHost', () => {
   it('lower-cases and drops scheme and trailing slash', () => {
@@ -63,5 +69,36 @@ describe('assertDevIsNotLive', () => {
   });
   it('lets the owner override on purpose', () => {
     expect(() => assertDevIsNotLive(live, live, true)).not.toThrow();
+  });
+});
+
+describe('findLeakedLiveKeys', () => {
+  const live = 'GROQ_API_KEY=gsk_live\nGMAIL_USER=bar@example.com\nTWILIO_AUTH_TOKEN=\n';
+  it('flags a key whose dev value is the live value', () => {
+    const dev = { GROQ_API_KEY: 'gsk_live', GMAIL_USER: 'bar@example.com' };
+    expect(findLeakedLiveKeys(dev, live, ['GROQ_API_KEY', 'GMAIL_USER'])).toEqual(['GROQ_API_KEY', 'GMAIL_USER']);
+  });
+  it('passes a key that dev overrides with a placeholder', () => {
+    const dev = { GROQ_API_KEY: 'disabled', GMAIL_USER: 'bar@example.com' };
+    expect(findLeakedLiveKeys(dev, live, ['GROQ_API_KEY', 'GMAIL_USER'])).toEqual(['GMAIL_USER']);
+  });
+  it('ignores a key that is blank in the live file (nothing to leak)', () => {
+    expect(findLeakedLiveKeys({ TWILIO_AUTH_TOKEN: '' }, live, ['TWILIO_AUTH_TOKEN'])).toEqual([]);
+  });
+  it('ignores a key missing from the dev environment', () => {
+    expect(findLeakedLiveKeys({}, live, ['GROQ_API_KEY'])).toEqual([]);
+  });
+});
+
+describe('assertNoLiveThirdPartyKeys', () => {
+  it('does not throw when nothing leaked', () => {
+    expect(() => assertNoLiveThirdPartyKeys([], false)).not.toThrow();
+  });
+  it('names the keys but never a value, and says a blank does not override', () => {
+    expect(() => assertNoLiveThirdPartyKeys(['GROQ_API_KEY'], false)).toThrow(/GROQ_API_KEY/);
+    expect(() => assertNoLiveThirdPartyKeys(['GROQ_API_KEY'], false)).toThrow(/blank/i);
+  });
+  it('does not throw when explicitly allowed', () => {
+    expect(() => assertNoLiveThirdPartyKeys(['GROQ_API_KEY'], true)).not.toThrow();
   });
 });

@@ -63,3 +63,49 @@ export function assertDevIsNotLive(
     );
   }
 }
+
+/**
+ * Keys that let the app reach a real third party: send mail or SMS, call a paid
+ * model, or talk to a POS. A dev server holding the live copy of any of these
+ * can message real people or spend real money while "just testing".
+ */
+export const THIRD_PARTY_KEYS = [
+  'GMAIL_USER',
+  'GMAIL_APP_PASSWORD',
+  'TWILIO_ACCOUNT_SID',
+  'TWILIO_AUTH_TOKEN',
+  'TWILIO_FROM_NUMBER',
+  'GROQ_API_KEY',
+  'CLOVER_CLIENT_ID',
+  'VAPID_PRIVATE_KEY',
+];
+
+/**
+ * Keys whose dev value is identical to a non-blank value in the live .env.local.
+ *
+ * A blank line in .env.development.local does NOT neutralise a key: Next keeps
+ * the live value from .env.local, which is how a dev server ended up holding the
+ * live Gmail, Twilio and Groq keys while the file said "deliberately not set".
+ */
+export function findLeakedLiveKeys(
+  devEnv: Record<string, string | undefined>,
+  liveText: string,
+  keys: string[] = THIRD_PARTY_KEYS,
+): string[] {
+  return keys.filter((key) => {
+    const live = readEnvValue(liveText, key);
+    return !!live && devEnv[key] === live;
+  });
+}
+
+/** Throws when dev holds live third-party keys, unless explicitly allowed. */
+export function assertNoLiveThirdPartyKeys(leaked: string[], allow: boolean): void {
+  if (!leaked.length || allow) return;
+  throw new Error(
+    `Refusing to start: dev would use the LIVE values of ${leaked.join(', ')} from .env.local.\n` +
+      'That lets a dev session send real email or SMS and call paid services.\n' +
+      'A blank value in .env.development.local does NOT override .env.local. Set each key there to a\n' +
+      'non-empty placeholder instead (for example GROQ_API_KEY=disabled-in-dev).\n' +
+      'To use the live keys on purpose, set RAIL_ALLOW_LIVE_THIRD_PARTY=1.',
+  );
+}

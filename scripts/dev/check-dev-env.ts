@@ -3,7 +3,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import nextEnv from '@next/env';
-import { assertDevIsNotLive, normalizeHost, readEnvValue } from './live-guard.ts';
+import {
+  assertDevIsNotLive,
+  assertNoLiveThirdPartyKeys,
+  findLeakedLiveKeys,
+  normalizeHost,
+  readEnvValue,
+} from './live-guard.ts';
 
 const root = process.cwd();
 // Same loading order `next dev` uses: .env.development.local wins over .env.local.
@@ -17,6 +23,10 @@ const liveUrl = existsSync(localFile)
 
 try {
   assertDevIsNotLive(devUrl, liveUrl, process.env.RAIL_ALLOW_LIVE_DEV === '1');
+  const leaked = existsSync(localFile)
+    ? findLeakedLiveKeys(process.env, readFileSync(localFile, 'utf8'))
+    : [];
+  assertNoLiveThirdPartyKeys(leaked, process.env.RAIL_ALLOW_LIVE_THIRD_PARTY === '1');
 } catch (error) {
   console.error(`\n${(error as Error).message}\n`);
   process.exit(1);
