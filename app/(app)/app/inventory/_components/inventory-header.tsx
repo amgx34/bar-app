@@ -8,8 +8,9 @@ import { Button } from '@/components/ui/button';
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { canEditInventory, canManageCategories, type Role } from '@/lib/permissions';
+import { canAdjustStock, canEditInventory, canManageCategories, type Role } from '@/lib/permissions';
 import { ItemFormDialog } from './item-form-dialog';
 import { CategoriesDialog } from './categories-dialog';
 import { InventoryImportDialog } from './inventory-import-dialog';
@@ -140,6 +141,11 @@ export function InventoryHeader({
               >
                 <Settings2 className="h-3.5 w-3.5 mr-1.5" />
                 Categories
+              </Button>
+            )}
+            {canAdjustStock(role) && (
+              <Button variant="outline" size="sm" className="h-9 border-border/60" render={<Link href="/app/inventory/count" />}>
+                Count stock
               </Button>
             )}
             {canEditInventory(role) && (
