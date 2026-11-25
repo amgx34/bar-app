@@ -55,4 +55,10 @@ describe('planCount', () => {
     const p = planCount([row(A, 1, 2), row(B, 1, -5)], mine);
     expect(p).toEqual({ ok: false, error: expect.any(String) });
   });
+
+  it('treats a Matches row as no change even when stock moved since the tap', () => {
+    // POS depleted 10 -> 7 after the person tapped Matches on 10.
+    const p = planCount([{ ...row(A, 7, 10), matches: true }], mine);
+    expect(p).toMatchObject({ ok: true, adjustments: [], unchanged: 1, skipped: 0 });
+  });
 });
