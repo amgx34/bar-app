@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { getCurrentOrg } from '@/lib/org';
 import { recordTermsAcceptance } from '@/lib/terms';
+import { safeNext } from '@/lib/auth/safe-next';
 
 /**
  * Records acceptance and returns the user to where they were headed.
@@ -17,8 +18,5 @@ export async function acceptTerms(next: string) {
 
   await recordTermsAcceptance(org.id);
 
-  const safeNext =
-    next.startsWith('/') && !next.startsWith('//') ? next : '/app/dashboard';
-
-  redirect(safeNext);
+  redirect(safeNext(next, '/app/dashboard'));
 }

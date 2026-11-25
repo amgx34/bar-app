@@ -32,6 +32,12 @@ export const RATE_LIMITS = {
   login:        { name: 'login',         limit: 10, windowSeconds: 15 * 60 },
   /** Each call bills a third-party model against uncapped input. */
   aiParse:      { name: 'ai-parse',      limit: 30, windowSeconds: 60 * 60 },
+  /** Public sign-up: each hit sends mail and creates an auth user. */
+  signup:       { name: 'signup',        limit: 5,  windowSeconds: 60 * 60 },
+  /** Resending the confirmation email. */
+  signupResend: { name: 'signup-resend', limit: 3,  windowSeconds: 60 * 60 },
+  /** Creating a bar provisions an org and seeded rows. */
+  createOrg:    { name: 'create-org',    limit: 2,  windowSeconds: 24 * 60 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 /**

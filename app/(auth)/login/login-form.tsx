@@ -5,6 +5,8 @@ import { Loader2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { signInWithPassword, sendMagicLink } from './actions';
+import { safeNext } from '@/lib/auth/safe-next';
+import { AUTH_ERROR_MESSAGES, isAuthErrorCode } from '@/lib/auth/errors';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,7 +19,9 @@ import {
 export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get('next') ?? '/app/dashboard';
+  const next = safeNext(params.get('next'), '/app/dashboard');
+  const errorParam = params.get('error');
+  const linkError = isAuthErrorCode(errorParam) ? AUTH_ERROR_MESSAGES[errorParam] : null;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,8 +30,8 @@ export function LoginForm() {
   // Inline state as well as the toast. A toast on a login failure vanishes
   // before someone re-reading their password has finished, and on a phone it
   // covers the field they are trying to correct.
-  const [status, setStatus] = useState<'idle' | 'error' | 'success'>('idle');
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [status, setStatus] = useState<'idle' | 'error' | 'success'>(linkError ? 'error' : 'idle');
+  const [statusMessage, setStatusMessage] = useState<string | null>(linkError);
 
   // Both flows go through server actions so they can be rate-limited and so
   // Supabase's error text never reaches the browser. See ./actions.ts.
@@ -135,7 +139,7 @@ export function LoginForm() {
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               Sending…
             </>
-          ) : 'Email me a magic link'}
+          ) : linkError ? 'Send me a new link' : 'Email me a magic link'}
         </Button>
 
       </CardContent>
