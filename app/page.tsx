@@ -241,6 +241,12 @@ export default function HomePage() {
             >
               Sign in
             </Link>
+            <Link
+              href="/signup"
+              className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors duration-200 hidden lg:inline-flex items-center"
+            >
+              Create an account
+            </Link>
             <a
               href="#contact"
               className="inline-flex items-center gap-2 h-11 sm:h-9 px-4 rounded-lg bg-cta text-cta-foreground font-semibold text-sm hover:brightness-95 transition-[filter] duration-200"

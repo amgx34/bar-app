@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { signInWithPassword, sendMagicLink } from './actions';
 import { safeNext } from '@/lib/auth/safe-next';
@@ -150,6 +151,10 @@ export function LoginForm() {
           ) : linkError ? 'Send me a new link' : 'Email me a magic link'}
         </Button>
 
+        <p className="text-center text-sm text-white/60">
+          New to Rail?{' '}
+          <Link href="/signup" className="inline-flex min-h-11 items-center text-white underline underline-offset-4">Create an account</Link>
+        </p>
       </CardContent>
     </Card>
   );

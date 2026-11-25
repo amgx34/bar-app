@@ -36,7 +36,8 @@ export default function PricingPage() {
         Sign up, then subscribe from Settings, Billing. You can cancel any time from the same screen.
       </p>
       <div className="mt-6 flex flex-wrap gap-3">
-        <Link href="/login" className="inline-flex min-h-11 items-center rounded-lg bg-primary px-5 font-medium text-primary-foreground">Sign in to subscribe</Link>
+        <Link href="/signup" className="inline-flex min-h-11 items-center rounded-lg bg-primary px-5 font-medium text-primary-foreground">Create an account to subscribe</Link>
+        <Link href="/login" className="inline-flex min-h-11 items-center rounded-lg border px-5 font-medium">Sign in</Link>
         <Link href="/#contact" className="inline-flex min-h-11 items-center rounded-lg border px-5 font-medium">Book a demo</Link>
       </div>
     </main>
