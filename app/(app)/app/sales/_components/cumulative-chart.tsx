@@ -30,7 +30,7 @@ export function CumulativeChart({ points }: { points: CumulativePoint[] }) {
 
   return (
     <div className="h-48 w-full sm:h-56">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 224 }}>
         <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
           <defs>
             <linearGradient id="cumulative-fill" x1="0" y1="0" x2="0" y2="1">

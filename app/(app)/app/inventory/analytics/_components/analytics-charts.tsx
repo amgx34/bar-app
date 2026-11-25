@@ -15,7 +15,7 @@ export function CategoryValuePie({ data }: { data: CategoryBreakdown[] }) {
     // Legend lives OUTSIDE the SVG so it doesn't shrink the drawing area on mobile
     <div className="w-full">
       <div className="w-full h-44">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 224 }}>
           <PieChart>
             <Pie
               data={chartData}
@@ -59,7 +59,7 @@ export function FastMoversChart({ data }: { data: VelocityItem[] }) {
   }
   return (
     <div className="w-full h-72">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 224 }}>
         <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 40, left: 4, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
           <XAxis type="number" tick={tickStyle} axisLine={false} tickLine={false} tickFormatter={(v: number) => v.toFixed(2)} />
@@ -77,7 +77,7 @@ export function TopValueChart({ data }: { data: TopValueItem[] }) {
   if (chartData.length === 0) return <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">No cost data available</div>;
   return (
     <div className="w-full h-72">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 224 }}>
         <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 60, left: 4, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
           <XAxis type="number" tick={tickStyle} axisLine={false} tickLine={false} tickFormatter={fmtDollar} />
@@ -94,7 +94,7 @@ export function ShrinkagePie({ data }: { data: ShrinkageRow[] }) {
   if (data.length === 0) return <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">No shrinkage recorded</div>;
   return (
     <div className="w-full h-52">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 224 }}>
         <PieChart>
           <Pie data={data} dataKey="estimatedCost" nameKey="reason" cx="50%" cy="50%" outerRadius={75} paddingAngle={3}>
             {data.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
@@ -111,7 +111,7 @@ export function MonthlyShrinkageChart({ data }: { data: MonthlyShrinkage[] }) {
   if (data.length === 0) return <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">No shrinkage data</div>;
   return (
     <div className="w-full h-52">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 224 }}>
         <BarChart data={data} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
           <XAxis dataKey="month" tick={tickStyle} axisLine={false} tickLine={false} />
@@ -129,7 +129,7 @@ export function PourCostChart({ data }: { data: PourCostItem[] }) {
   if (chartData.length === 0) return <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">No items with bottle + pour data. Add bottle size and pour size to your liquor inventory.</div>;
   return (
     <div className="w-full h-72">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 224 }}>
         <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 60, left: 4, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
           <XAxis type="number" tick={tickStyle} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${v.toFixed(2)}`} />

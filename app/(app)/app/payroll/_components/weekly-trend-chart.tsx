@@ -23,7 +23,7 @@ function fmtDollar(v: number) {
 
 export default function WeeklyTrendChart({ data }: Props) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 224 }}>
       <ComposedChart data={data} margin={{ top: 4, right: 16, left: -10, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
         <XAxis

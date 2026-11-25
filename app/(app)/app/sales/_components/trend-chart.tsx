@@ -28,7 +28,7 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
 
   return (
     <div className="h-64 w-full">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 224 }}>
         <LineChart data={data} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
           <XAxis dataKey="date" tick={tickStyle} axisLine={false} tickLine={false}
