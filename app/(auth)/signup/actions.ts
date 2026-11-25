@@ -6,6 +6,7 @@ import { checkRateLimit, clientIp, RATE_LIMITS, type RateLimitRule } from '@/lib
 import { checkPassword } from '@/lib/auth/password';
 import { signupAnswer, type SignupAnswer } from '@/lib/auth/signup-result';
 import { SIGNUP_OPEN } from '@/lib/auth/signup-open';
+import { isBotRequest } from '@/lib/auth/bot-check';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -28,6 +29,8 @@ export async function signUpOwner(
   if (!SIGNUP_OPEN) return signupAnswer('closed');
   // A filled hidden field is a script: same screen as a real sign-up, no account.
   if (honeypot) return signupAnswer('honeypot');
+  // Same words as a real throttle, so a bot learns nothing about why.
+  if (await isBotRequest()) return signupAnswer('throttled', { retryAfterSeconds: 60 });
 
   const addr = String(email ?? '').trim().toLowerCase();
   if (!EMAIL.test(addr) || addr.length > 254) return signupAnswer('invalid_email');

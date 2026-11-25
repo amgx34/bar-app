@@ -20,6 +20,7 @@ import { DEMO_PROFILES, profileSlug } from '@/lib/demo/profiles';
 import { DEMO_EMAIL_SUFFIX, DEMO_SLUG_PREFIX } from '@/lib/demo/constants';
 import { recordTermsAcceptanceForUser } from '@/lib/terms';
 import { checkRateLimit, clientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { isBotRequest } from '@/lib/auth/bot-check';
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 
@@ -41,6 +42,10 @@ function fail(reason: string, status: number) {
 }
 
 export async function POST(req: NextRequest) {
+  if (await isBotRequest()) {
+    return NextResponse.json({ error: 'Too many attempts. Try again in a few minutes.' }, { status: 429 });
+  }
+
   // ── 0. Bound the abuse ────────────────────────────────────────────────────
   const ip = clientIp(req.headers);
   const limit = await checkRateLimit(RATE_LIMITS.demoCreate, ip);

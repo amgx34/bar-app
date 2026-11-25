@@ -9,6 +9,7 @@ import { checkRateLimit, clientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { barSlug, buildBarSettings, decideCreate } from '@/lib/setup/create-bar';
 import { parsePrefill } from '@/lib/setup/prefill';
 import { findOwnedBar } from '@/lib/setup/owned-bar';
+import { isBotRequest } from '@/lib/auth/bot-check';
 
 export type SetupInput = {
   name:            string;
@@ -41,6 +42,7 @@ const DEFAULT_CATEGORIES: { name: string; cost_type: string }[] = [
 ];
 
 export async function createOrgWithSettings(data: SetupInput): Promise<SetupResult> {
+  if (await isBotRequest()) return fail('rate_limited', 'Too many attempts. Try again in a few minutes.');
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return fail('signed_out', 'Sign in to create your bar.');

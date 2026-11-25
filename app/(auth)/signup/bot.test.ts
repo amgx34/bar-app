@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const createClient = vi.fn();
+const { createClient } = vi.hoisted(() => ({ createClient: vi.fn() }));
+vi.mock('server-only', () => ({}));
 vi.mock('botid/server', () => ({ checkBotId: vi.fn(async () => ({ isBot: true })) }));
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient }));

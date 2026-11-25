@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const createClient = vi.fn();
-const createAdminClient = vi.fn();
+const { createClient, createAdminClient } = vi.hoisted(() => ({ createClient: vi.fn(), createAdminClient: vi.fn() }));
+vi.mock('server-only', () => ({}));
 vi.mock('botid/server', () => ({ checkBotId: vi.fn(async () => ({ isBot: true })) }));
 vi.mock('@/lib/supabase/server', () => ({ createClient }));
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient }));

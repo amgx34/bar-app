@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
-const createClient = vi.fn();
-const createAdminClient = vi.fn();
+const { createClient, createAdminClient } = vi.hoisted(() => ({ createClient: vi.fn(), createAdminClient: vi.fn() }));
+vi.mock('server-only', () => ({}));
 vi.mock('botid/server', () => ({ checkBotId: vi.fn(async () => ({ isBot: true })) }));
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
