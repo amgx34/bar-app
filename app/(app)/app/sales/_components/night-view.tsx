@@ -48,7 +48,13 @@ export function NightView({
   tieOutDate?: string;
 }) {
   if (!data.capabilities.hasHourly || !data.daypart) {
-    return <MissingPanel title="When the money came in" capability="hasHourly" provider={provider} />;
+    // The tie-out needs only the Z row, not hourly data, so it stays outside this gate.
+    return (
+      <>
+        <MissingPanel title="When the money came in" capability="hasHourly" provider={provider} />
+        {tieOutDate && <TieOutCard date={tieOutDate} live={live} />}
+      </>
+    );
   }
 
   const cumulative = buildCumulative(data.daypart);

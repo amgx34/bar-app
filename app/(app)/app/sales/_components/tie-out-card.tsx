@@ -43,8 +43,9 @@ export function TieOutCard({ date, live = false }: { date: string; live?: boolea
   const data = night?.date === date ? night.data : null;
 
   function save() {
-    const value = Number(amount);
-    if (!/^\d*\.?\d+$|^\d+\.$/.test(amount.trim()) || !Number.isFinite(value) || value < 0) {
+    const cleaned = amount.trim().replace(/,/g, '');
+    const value = Number(cleaned);
+    if (!/^\d*\.?\d+$|^\d+\.$/.test(cleaned) || !Number.isFinite(value) || value < 0) {
       setError('Enter the cash counted in the drawer, or 0 if it was empty');
       return;
     }
@@ -94,9 +95,9 @@ export function TieOutCard({ date, live = false }: { date: string; live?: boolea
               )}
               {result.state === 'cannot-tie-out' && result.reason === 'tips-not-entered' && (
                 <p className="text-sm">
-                  Enter cash tips for this night first. Until then the drawer figure would read short by
+                  Enter cash tips for this night first (enter 0 if there were none). Until then the drawer figure would read short by
                   the tips already paid out.{' '}
-                  <Link href="/app/payroll" className="underline underline-offset-2">Enter cash tips</Link>.
+                  <Link href={`/app/payroll?view=day&date=${date}`} className="underline underline-offset-2">Enter cash tips</Link>.
                 </p>
               )}
               {result.state === 'cannot-tie-out' && result.reason === 'no-count' && (
