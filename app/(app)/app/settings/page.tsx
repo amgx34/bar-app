@@ -13,6 +13,8 @@ import ImportTab from '../payroll/_components/import-tab';
 import { BillingTab } from './_components/billing-tab';
 import { getOrgBilling, isDemoOrg } from '@/lib/billing/store';
 import { stripeConfigured } from '@/lib/billing/stripe';
+import { DataTab } from './_components/data-tab';
+import { deletionEnabled } from '@/lib/account/delete-org';
 import { NotificationsTab } from './_components/notifications-tab';
 import { getNotificationPreferences, getRegisteredDevices } from '../actions/notifications';
 
@@ -27,6 +29,7 @@ const TABS = [
   { key: 'notifications', label: 'Notifications' },
   { key: 'team',        label: 'Team' },
   { key: 'billing',     label: 'Billing' },
+  { key: 'data',        label: 'Data' },
 ];
 
 /** Clover's redirect needs a signed state and a region, so it starts on the setup page. */
@@ -95,6 +98,9 @@ export default async function SettingsPage({
       {tab === 'billing' && (
         <BillingTab billing={billing} isOwner={role === 'owner'} configured={stripeConfigured()}
           flash={params.billing} isDemo={isDemoOrg(org.slug)} />
+      )}
+      {tab === 'data' && (
+        <DataTab orgName={org.name} isOwner={role === 'owner'} isDemo={isDemoOrg(org.slug)} deletionOpen={deletionEnabled()} />
       )}
       {tab === 'tip-pay'     && <TipPayTab   role={role}         settings={settings} />}
       {tab === 'inventory'   && <InventoryTab role={role}         settings={settings} />}
