@@ -31,7 +31,7 @@ export default async function InventorySetupPage() {
   ]);
 
   return (
-    <main className="p-4 sm:p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 space-y-6 max-w-5xl mx-auto">
       <div>
         <p className="text-sm text-muted-foreground">Inventory</p>
         <h1 className="flex items-center gap-2 text-2xl font-bold">
@@ -54,6 +54,6 @@ export default async function InventorySetupPage() {
         options={inventoryOptions}
         canEdit={canEditInventory(role)}
       />
-    </main>
+    </div>
   );
 }

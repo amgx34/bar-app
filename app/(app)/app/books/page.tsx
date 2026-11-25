@@ -191,7 +191,7 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
   const previouslyOmitted = data.supplies + data.operatingExpenses;
 
   return (
-    <main className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -373,6 +373,6 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
         periodStart={start}
         canEdit={canEditInventory(role)}
       />
-    </main>
+    </div>
   );
 }

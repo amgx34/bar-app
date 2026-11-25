@@ -14,7 +14,7 @@ export default async function WeighPage() {
   ]);
 
   return (
-    <main className="p-6 space-y-4">
+    <div className="p-6 space-y-4">
       <div>
         <p className="text-sm text-muted-foreground">Inventory</p>
         <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -29,6 +29,6 @@ export default async function WeighPage() {
       </p>
 
       <WeighManager initialReports={reports} inventoryItems={inventoryItems} />
-    </main>
+    </div>
   );
 }

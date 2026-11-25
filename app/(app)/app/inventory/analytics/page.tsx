@@ -43,7 +43,7 @@ export default async function InventoryAnalyticsPage() {
   ];
 
   return (
-    <main className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
       <div>
         <p className="text-sm text-muted-foreground">Inventory</p>
         <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -264,6 +264,6 @@ export default async function InventoryAnalyticsPage() {
           )}
         </CardContent>
       </Card>
-    </main>
+    </div>
   );
 }

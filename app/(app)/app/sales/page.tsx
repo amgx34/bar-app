@@ -75,10 +75,10 @@ export default async function SalesPage({
   // the fetch entirely and waits for the browser to say what night it is.
   if (view === 'tonight' && !explicitPeriod) {
     return (
-      <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+      <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
         <TonightClock cutoffHour={cutoffHour} active />
         <p className="text-sm text-muted-foreground">Loading tonight&rsquo;s numbers…</p>
-      </main>
+      </div>
     );
   }
 
@@ -127,7 +127,7 @@ export default async function SalesPage({
   const asOf = syncHealth.lastSyncAt ? describeAge(syncHealth.minutesAgo) : null;
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm text-muted-foreground">Sales</p>
@@ -418,6 +418,6 @@ export default async function SalesPage({
       ) : (
         <MissingPanel title="Who was pouring" capability="hasServer" />
       )}
-    </main>
+    </div>
   );
 }

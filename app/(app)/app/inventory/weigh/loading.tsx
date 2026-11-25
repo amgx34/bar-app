@@ -2,7 +2,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function WeighLoading() {
   return (
-    <main className="p-6 space-y-4">
+    <div className="p-6 space-y-4">
       <div className="space-y-1.5">
         <Skeleton className="h-4 w-28" />
         <Skeleton className="h-8 w-48" />
@@ -17,6 +17,6 @@ export default function WeighLoading() {
           <Skeleton key={i} className="h-14 rounded-lg" />
         ))}
       </div>
-    </main>
+    </div>
   );
 }

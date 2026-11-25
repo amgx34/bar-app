@@ -75,11 +75,11 @@ export default async function InventoryPage({
   ]);
 
   if (error) {
-    return <main className="p-6 text-destructive">{error.message}</main>;
+    return <div className="p-6 text-destructive">{error.message}</div>;
   }
 
   return (
-    <main className="p-6 space-y-4">
+    <div className="p-6 space-y-4">
       {/* This page leads with a dashboard rather than a title bar, so the
           heading is visually hidden — but the document still needs one h1. */}
       <h1 className="sr-only">Inventory</h1>
@@ -106,6 +106,6 @@ export default async function InventoryPage({
         defaultPourOz={org.bar_settings?.default_pour_oz ?? 1.5}
         bottleSizesMl={org.bar_settings?.bottle_sizes_ml ?? [375, 750, 1000, 1750]}
       />
-    </main>
+    </div>
   );
 }
