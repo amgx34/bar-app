@@ -18,7 +18,11 @@ export const maxDuration = 60;
 export async function GET(req: NextRequest) {
   // Verify the request comes from Vercel Cron
   const auth = req.headers.get('authorization');
-  if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  // Fail closed: with no secret configured (a preview deploy, a fresh clone)
+  // the job would otherwise run for anyone. Only local dev may skip it.
+  const secret = process.env.CRON_SECRET;
+  const open = !secret && process.env.NODE_ENV === 'development';
+  if (!open && (!secret || auth !== `Bearer ${secret}`)) {
     return new Response('Unauthorized', { status: 401 });
   }
 
