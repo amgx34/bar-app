@@ -11,7 +11,8 @@
     "lint": "eslint",
     "test": "node scripts/dev/run-vitest.mjs run",
     "test:watch": "node scripts/dev/run-vitest.mjs",
-    "audit:scope": "node scripts/audit-admin-scope.mjs"
+    "audit:scope": "node scripts/audit-admin-scope.mjs",
+    "audit:tokens": "node --no-warnings scripts/design/check-tokens.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
