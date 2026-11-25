@@ -32,7 +32,7 @@ export default async function CloverConnectPage() {
             <div className="h-2 w-2 rounded-full bg-green-400" />
           </div>
           <h1 className="text-2xl font-bold text-white">Connect Clover</h1>
-          <p className="text-white/40 text-sm">You'll be redirected to Clover to authorize access</p>
+          <p className="text-white/40 text-sm">You&apos;ll be redirected to Clover to authorize access</p>
         </div>
 
         {/* Connection card */}
@@ -48,7 +48,7 @@ export default async function CloverConnectPage() {
           </div>
 
           <p className="text-sm text-white/60 leading-relaxed">
-            Rail will request read access to your Clover merchant account. You'll approve this on Clover's site — Rail never stores your Clover password.
+            Rail will request read access to your Clover merchant account. You&apos;ll approve this on Clover&apos;s site — Rail never stores your Clover password.
           </p>
 
           {/* What Rail can access */}

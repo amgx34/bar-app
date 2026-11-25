@@ -122,7 +122,7 @@ export function OrderDialog({ open, onOpenChange, rep, prefillItems, onSent }: P
               ) : fields.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-8 text-center border border-dashed rounded-lg">
                   <Package className="h-8 w-8 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">No items — click "Add item" above</p>
+                  <p className="text-sm text-muted-foreground">No items — click &quot;Add item&quot; above</p>
                 </div>
               ) : (
                 <div className="space-y-2">

@@ -17,6 +17,9 @@ const eslintConfig = defineConfig([
     ".worktrees/**",
     ".superpowers/**",
     "graphify-out/**",
+    // Sibling non-app codebases (Node agent, test servers) with their own toolchains.
+    "2touch-agent/**",
+    "2touch-agent-dotnet/**",
   ]),
 ]);
 
