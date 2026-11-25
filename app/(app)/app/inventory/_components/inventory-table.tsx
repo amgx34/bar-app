@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useOptimistic, useState } from 'react';
 import { MoreHorizontal, Package, AlertTriangle } from 'lucide-react';
 import {
@@ -49,6 +50,9 @@ type Props = {
   categories:     { id: string; name: string }[];
   reps:           { id: string; name: string }[];
   role:           Role;
+  /** True when a search, category or stock filter is hiding items. */
+  isFiltered?:    boolean;
+  searchTerm?:    string;
   defaultPourOz?: number;
   bottleSizesMl?: number[];
 };
@@ -60,7 +64,7 @@ function formatMoney(n: number | null): string {
   }).format(n);
 }
 
-export function InventoryTable({ items, categories, reps, role, defaultPourOz, bottleSizesMl }: Props) {
+export function InventoryTable({ items, categories, reps, role, isFiltered, searchTerm, defaultPourOz, bottleSizesMl }: Props) {
   const [editing, setEditing] = useState<ItemRow | null>(null);
   const [adjusting, setAdjusting] = useState<ItemRow | null>(null);
   const [deactivating, setDeactivating] = useState<ItemRow | null>(null);
@@ -81,6 +85,21 @@ export function InventoryTable({ items, categories, reps, role, defaultPourOz, b
         row.id === adjustment.id ? { ...row, current_stock: adjustment.newStock } : row,
       ),
   );
+
+  if (optimisticItems.length === 0 && isFiltered) {
+    return (
+      <div className="border rounded-lg p-12 text-center space-y-2">
+        <Package className="h-8 w-8 mx-auto text-muted-foreground" />
+        <h3 className="font-medium">
+          {searchTerm ? `No items match "${searchTerm}"` : 'No items match these filters'}
+        </h3>
+        <p className="text-sm text-muted-foreground">Try a different search or clear the filters.</p>
+        <Link href="/app/inventory" className="inline-block text-sm text-primary underline underline-offset-2">
+          Clear search and filters
+        </Link>
+      </div>
+    );
+  }
 
   if (optimisticItems.length === 0) {
     return (
@@ -168,7 +187,7 @@ export function InventoryTable({ items, categories, reps, role, defaultPourOz, b
                     {item.sku ? ` · ${item.sku}` : ''}
                   </p>
                   {item.reps && (
-                    <p className="text-xs text-muted-foreground/60">{item.reps.name}</p>
+                    <p className="text-xs text-muted-foreground">{item.reps.name}</p>
                   )}
                 </div>
                 <ActionsMenu item={item} className="h-11 w-11 shrink-0" />
@@ -178,7 +197,7 @@ export function InventoryTable({ items, categories, reps, role, defaultPourOz, b
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">In stock</dt>
                   <dd className="flex items-center gap-1.5 tabular-nums font-medium">
-                    {belowPar && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
+                    {belowPar && <AlertTriangle className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400" aria-label="Below par" role="img" />}
                     {hasPack(item.units_per_pack)
                       ? describePackCount(item.current_stock, item.units_per_pack, item.unit)
                       : `${item.current_stock} ${item.unit}`}
@@ -233,7 +252,7 @@ export function InventoryTable({ items, categories, reps, role, defaultPourOz, b
                       <div className="text-xs text-muted-foreground">{item.sku}</div>
                     )}
                     {item.reps && (
-                      <div className="text-xs text-muted-foreground/60">{item.reps.name}</div>
+                      <div className="text-xs text-muted-foreground">{item.reps.name}</div>
                     )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
@@ -243,7 +262,7 @@ export function InventoryTable({ items, categories, reps, role, defaultPourOz, b
                   <TableCell className="text-right tabular-nums">
                     <div className="flex items-center justify-end gap-1.5">
                       {belowPar && (
-                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400" aria-label="Below par" role="img" />
                       )}
                       <span title={hasPack(item.units_per_pack)
                         ? describePackCount(item.current_stock, item.units_per_pack, item.unit)

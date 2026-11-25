@@ -21,6 +21,7 @@ type Props = {
   currentQ:      string;
   currentCategory: string;
   includeInactive: boolean;
+  currentStock:    string;
   defaultPourOz?:  number;
   bottleSizesMl?:  number[];
 };
@@ -32,7 +33,7 @@ const STOCK_FILTERS = [
 ];
 
 export function InventoryHeader({
-  role, categories, reps, currentQ, currentCategory, includeInactive,
+  role, categories, reps, currentQ, currentCategory, includeInactive, currentStock,
   defaultPourOz, bottleSizesMl,
 }: Props) {
   const router = useRouter();
@@ -43,8 +44,6 @@ export function InventoryHeader({
   const [addOpen, setAddOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-
-  const currentStock = searchParams.get('stock') ?? 'all';
 
   function updateParams(updates: Record<string, string | null>) {
     const next = new URLSearchParams(searchParams);
@@ -75,6 +74,7 @@ export function InventoryHeader({
           <div className="relative flex-1 min-w-[180px]">
             <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-muted-foreground pointer-events-none" />
             <Input
+              aria-label="Search items"
               placeholder="Search items…"
               className="pl-8 h-9 bg-card border-border/60 focus-visible:ring-primary/40"
               value={q}
@@ -109,9 +109,11 @@ export function InventoryHeader({
             {STOCK_FILTERS.map(({ label, value }) => (
               <button
                 key={value}
+                type="button"
+                aria-pressed={currentStock === value}
                 onClick={() => updateParams({ stock: value === 'all' ? null : value })}
                 className={cn(
-                  'px-3 py-1 rounded-full text-xs font-medium border transition-all duration-200',
+                  'min-h-9 px-3 py-1 rounded-full text-xs font-medium border transition-all duration-200',
                   currentStock === value || (value === 'all' && currentStock === 'all')
                     ? 'bg-primary border-primary text-primary-foreground'
                     : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
