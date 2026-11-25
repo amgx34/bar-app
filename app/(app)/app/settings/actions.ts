@@ -1,5 +1,6 @@
 'use server';
 
+import { validateRoutingNumber } from '@/lib/direct-deposit/routing';
 import { revalidatePath } from 'next/cache';
 import { randomBytes }    from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -65,6 +66,14 @@ export async function updateGeneralInfo(data: {
 }) {
   const { org, role } = await getCurrentOrg();
   assertEditor(role);
+
+  // This number is the ODFI routing in every ACH file the bar sends. A value that
+  // is not a real ABA routing number used to save with a "Saved" toast ("12345"
+  // did) and would then be padded into the file. Blank is allowed: it clears the
+  // field, and the NACHA export refuses to run until one is set.
+  if (data.nacha_routing_number && !validateRoutingNumber(data.nacha_routing_number)) {
+    throw new Error('Routing number must be 9 digits and pass the bank routing check. Check it against a check or your bank statement.');
+  }
 
   const admin = createAdminClient();
   const { error } = await admin
