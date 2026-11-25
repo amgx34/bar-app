@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
@@ -23,6 +23,7 @@ export function LoginForm() {
   const errorParam = params.get('error');
   const linkError = isAuthErrorCode(errorParam) ? AUTH_ERROR_MESSAGES[errorParam] : null;
 
+  const emailRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -59,7 +60,7 @@ export function LoginForm() {
     if (!email) {
       setStatus('error');
       setStatusMessage('Enter your email first.');
-      toast.error('Enter your email first');
+      emailRef.current?.focus();
       return;
     }
     setMagicLoading(true);
@@ -94,9 +95,9 @@ export function LoginForm() {
           <div className="space-y-2">
             <Label htmlFor="email" className="text-white/80">Email</Label>
             <Input
-              id="email" type="email" autoComplete="email" required
+              id="email" ref={emailRef} type="email" autoComplete="email" required
               value={email} onChange={(e) => setEmail(e.target.value)}
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/30 focus-visible:ring-white/30"
+              className="h-11 bg-white/10 border-white/20 text-white placeholder:text-white/30 focus-visible:ring-white/30"
             />
           </div>
           <div className="space-y-2">
@@ -104,11 +105,18 @@ export function LoginForm() {
             <PasswordInput
               id="password" autoComplete="current-password" required
               value={password} onChange={(e) => setPassword(e.target.value)}
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/30 focus-visible:ring-white/30"
+              className="h-11 bg-white/10 border-white/20 text-white placeholder:text-white/30 focus-visible:ring-white/30"
               toggleClassName="text-white/50 hover:text-white"
             />
           </div>
-          <FormStatus status={status} message={statusMessage} />
+          {/* The card is dark in both themes, so the status colours must not follow the theme. */}
+          <FormStatus
+            status={status}
+            message={statusMessage}
+            className={status === 'error'
+              ? 'border-red-400/40 bg-red-500/15 text-red-300'
+              : 'border-emerald-400/40 bg-emerald-500/15 text-emerald-300'}
+          />
 
           <Button type="submit" className="w-full bg-white text-gray-900 hover:bg-white/90" disabled={loading}>
             {loading ? (
