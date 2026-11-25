@@ -1,5 +1,6 @@
 'use client';
 
+import { formatMoney } from '@/lib/money';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -176,21 +177,6 @@ export default function PayrollTab({
         </div>
       )}
 
-      {/* Weekly revenue trend */}
-      {weeklyTrend.length > 1 && (
-        <div className="rounded-xl border bg-card overflow-hidden">
-          <div className="px-5 py-4 border-b flex items-center justify-between">
-            <h2 className="text-sm font-semibold flex items-center gap-2">
-              <BarChart2 className="h-4 w-4 text-muted-foreground" />
-              Weekly Revenue — Last {weeklyTrend.length} Weeks
-            </h2>
-          </div>
-          <div className="px-5 py-4 h-52">
-            <WeeklyTrendChart data={weeklyTrend} />
-          </div>
-        </div>
-      )}
-
       {/* Week navigator.
           Wraps on a phone: the arrows-and-label group and the date form are
           each about 200-370px, so side by side they forced the page wider than
@@ -258,8 +244,48 @@ export default function PayrollTab({
         </form>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* Above the table, not among the summary cards: that grid is
+          lg:grid-cols-5 and a sixth card would orphan onto its own row. This
+          also puts the question — how much of this is done — immediately
+          before the rows that answer it person by person. */}
+      {payrollEntries.length > 0 && (
+        <PayoutProgress
+          summary={payoutSummary}
+          bulk={{
+            entries: bulkEntries,
+            alreadyPaidByEmployee,
+            periodStart: startDate,
+            periodEnd: endDate,
+            canAdjust,
+            onChanged: () => router.refresh(),
+          }}
+        />
+      )}
+
+      {canAdjust && (
+        <div className="flex justify-end">
+          {/* Somebody who never clocked in has no payroll row, so there is no
+              row-level control that could reach them. */}
+          <Button variant="outline" size="sm" onClick={() => setAddShiftOpen(true)} className="gap-1.5">
+            <UserPlus className="h-4 w-4" aria-hidden />
+            Add someone to a shift
+          </Button>
+        </div>
+      )}
+
+      <PayrollTable
+        entries={payrollEntries}
+        totals={totals}
+        startDate={startDate}
+        endDate={endDate}
+        payouts={payoutsById}
+        canAdjust={canAdjust}
+        overtime={overtime}
+      />
+
+      {/* Period totals: the sum of the rows above. */}
+      <h2 className="sr-only">Period totals</h2>
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
         <Card className="border-l-4 border-l-indigo-600 dark:border-l-indigo-400">
           <CardHeader className="flex flex-row items-center justify-between pb-1 pt-4 px-4">
             <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -281,7 +307,7 @@ export default function PayrollTab({
             <DollarSign className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <div className="text-2xl font-bold tabular-nums">${totals.regularPay.toFixed(2)}</div>
+            <div className="text-2xl font-bold tabular-nums">{formatMoney(totals.regularPay)}</div>
           </CardContent>
         </Card>
 
@@ -293,7 +319,7 @@ export default function PayrollTab({
             <TrendingUp className="h-4 w-4 text-amber-700 dark:text-amber-300" />
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <div className="text-2xl font-bold tabular-nums">${totals.overtimePay.toFixed(2)}</div>
+            <div className="text-2xl font-bold tabular-nums">{formatMoney(totals.overtimePay)}</div>
           </CardContent>
         </Card>
 
@@ -305,7 +331,7 @@ export default function PayrollTab({
             <Banknote className="h-4 w-4 text-cyan-700 dark:text-cyan-300" />
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <div className="text-2xl font-bold tabular-nums">${totals.tips.toFixed(2)}</div>
+            <div className="text-2xl font-bold tabular-nums">{formatMoney(totals.tips)}</div>
           </CardContent>
         </Card>
 
@@ -318,50 +344,35 @@ export default function PayrollTab({
           </CardHeader>
           <CardContent className="px-4 pb-4">
             <div className="text-2xl font-bold tabular-nums text-primary">
-              ${totals.totalCompensation.toFixed(2)}
+              {formatMoney(totals.totalCompensation)}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {canAdjust && (
-        <div className="flex justify-end">
-          {/* Somebody who never clocked in has no payroll row, so there is no
-              row-level control that could reach them. */}
-          <Button variant="outline" size="sm" onClick={() => setAddShiftOpen(true)} className="gap-1.5">
-            <UserPlus className="h-4 w-4" aria-hidden />
-            Add someone to a shift
-          </Button>
-        </div>
+      {/* Context, not the pay task, so it sits below the run. */}
+      {weeklyTrend.length > 1 && (
+        <section aria-labelledby="trend-heading" className="rounded-xl border bg-card overflow-hidden">
+          <div className="px-5 py-4 border-b">
+            <h2 id="trend-heading" className="text-sm font-semibold flex items-center gap-2">
+              <BarChart2 className="h-4 w-4 text-muted-foreground" aria-hidden />
+              Sales and tips, last {weeklyTrend.length} weeks
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Weekly totals in dollars. The current week is partial until it ends.
+            </p>
+          </div>
+          <div
+            role="img"
+            aria-label={`Bar chart of weekly sales and tips. ${weeklyTrend
+              .map((w) => `${w.weekLabel}: ${formatMoney(w.sales)} sales, ${formatMoney(w.tips)} tips`)
+              .join('; ')}.`}
+            className="px-5 py-4 h-56"
+          >
+            <WeeklyTrendChart data={weeklyTrend} />
+          </div>
+        </section>
       )}
-
-      {/* Above the table, not among the summary cards: that grid is
-          lg:grid-cols-5 and a sixth card would orphan onto its own row. This
-          also puts the question — how much of this is done — immediately
-          before the rows that answer it person by person. */}
-      {payrollEntries.length > 0 && (
-        <PayoutProgress
-          summary={payoutSummary}
-          bulk={{
-            entries: bulkEntries,
-            alreadyPaidByEmployee,
-            periodStart: startDate,
-            periodEnd: endDate,
-            canAdjust,
-            onChanged: () => router.refresh(),
-          }}
-        />
-      )}
-
-      <PayrollTable
-        entries={payrollEntries}
-        totals={totals}
-        startDate={startDate}
-        endDate={endDate}
-        payouts={payoutsById}
-        canAdjust={canAdjust}
-        overtime={overtime}
-      />
 
       {canAdjust && addShiftOpen && (
         <AddToShiftDialog

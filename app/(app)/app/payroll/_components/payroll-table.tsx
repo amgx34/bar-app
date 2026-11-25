@@ -1,5 +1,6 @@
 'use client';
 
+import { formatMoney } from '@/lib/money';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SlidersHorizontal, ChevronRight } from 'lucide-react';
@@ -149,7 +150,7 @@ export default function PayrollTable({
     );
   }
 
-  const fmt = (n: number) => `$${n.toFixed(2)}`;
+  const fmt = (n: number) => formatMoney(n);
   const groups = groupByRole(entries);
 
   // Weighted, never a mean of the per-person figures: two hours must not move
@@ -219,7 +220,7 @@ export default function PayrollTable({
                       {/* The total itself opens the nights behind it — on a phone
                           that is the figure being questioned, so it is the thing
                           worth making tappable. */}
-                      {entry.totalHours.toFixed(2)} hrs @ ${entry.hourlyRate.toFixed(2)}
+                      {entry.totalHours.toFixed(2)} hrs @ {formatMoney(entry.hourlyRate)}
                       <ChevronRight
                         className={`h-3 w-3 transition-transform ${openDays === entry.employeeId ? 'rotate-90' : ''}`}
                         aria-hidden
@@ -442,7 +443,7 @@ export default function PayrollTable({
                     {entry.totalHours.toFixed(2)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground text-sm">
-                    ${entry.hourlyRate.toFixed(2)}
+                    {formatMoney(entry.hourlyRate)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{fmt(entry.regularPay)}</TableCell>
                   <TableCell className="text-right tabular-nums">

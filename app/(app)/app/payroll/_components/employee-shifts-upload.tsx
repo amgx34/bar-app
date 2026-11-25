@@ -117,6 +117,7 @@ export default function EmployeeShiftsUpload() {
       {state === 'idle' && (
         <>
           <Textarea
+            aria-label="Employee shifts text"
             placeholder={"Paste your Employee Worked Report or CSV here…\n\nSupports: POS text report, CSV (name, date, hours), or any shift export — AI fallback if format isn't recognised."}
             className="min-h-[180px] font-mono text-xs resize-none"
             value={text}
