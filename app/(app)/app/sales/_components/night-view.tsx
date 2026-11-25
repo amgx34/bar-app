@@ -8,6 +8,7 @@ import { HourlyCurve } from './hourly-curve';
 import { CumulativeChart } from './cumulative-chart';
 import { PaymentSplit, CategoryBars } from './night-bits';
 import { money } from './sales-bits';
+import { TieOutCard } from './tie-out-card';
 
 /**
  * One night, read on a phone.
@@ -32,6 +33,7 @@ export function NightView({
   items,
   categories,
   provider,
+  tieOutDate,
 }: {
   data: PeriodSalesData;
   title: string;
@@ -42,6 +44,8 @@ export function NightView({
   items: ItemMargin[];
   categories: CategoryMargin[];
   provider?: string | null;
+  /** Set only for owner and manager; the drawer count is not for every role. */
+  tieOutDate?: string;
 }) {
   if (!data.capabilities.hasHourly || !data.daypart) {
     return <MissingPanel title="When the money came in" capability="hasHourly" provider={provider} />;
@@ -140,6 +144,8 @@ export function NightView({
           <CardContent><PaymentSplit night={data.night} /></CardContent>
         </Card>
       )}
+
+      {tieOutDate && <TieOutCard date={tieOutDate} />}
     </>
   );
 }

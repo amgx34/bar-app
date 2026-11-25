@@ -4,6 +4,7 @@ import { TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getSalesData, getPeriodSalesData } from './actions';
 import { getCurrentOrg } from '@/lib/org';
+import { canManagePayroll } from '@/lib/permissions';
 import { PeriodToggle } from '../_components/period-toggle';
 import { MissingPanel } from './_components/missing-panel';
 import { ServerTable } from './_components/server-table';
@@ -62,7 +63,7 @@ export default async function SalesPage({
 
   const explicitPeriod = payPeriodFromParams(params.start, params.end);
 
-  const { org } = await getCurrentOrg();
+  const { org, role } = await getCurrentOrg();
   if (!org?.id) return <div className="p-6">Organization not found</div>;
 
   const cutoffHour = cutoffHourFromSettings(org.bar_settings ?? {});
@@ -183,6 +184,7 @@ export default async function SalesPage({
           items={legacy.items}
           categories={legacy.categories}
           provider={org.pos_provider}
+          tieOutDate={canManagePayroll(role) ? period.start : undefined}
         />
       ) : (
         <>
