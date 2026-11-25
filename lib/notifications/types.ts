@@ -67,7 +67,7 @@ export const EVENT_LABELS: Record<EventType, { title: string; description: strin
   },
   'weekly.summary': {
     title:       'Weekly summary',
-    description: 'Monday: last week’s sales and how they compare, tips per hour, labour hours, low stock and anything awaiting approval. Bar totals only.',
+    description: 'Monday: last week’s sales and how they compare, tips per hour, labor hours, low stock and anything awaiting approval. Bar totals only.',
   },
 };
 

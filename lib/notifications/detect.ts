@@ -401,7 +401,7 @@ export function detectWeeklySummary(input: WeeklyInput): { draft: NotificationDr
     nightsReported: cur.length,
     change,
     tipsPerHour: tph === null ? null : `${tph.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} an hour`,
-    hoursText: hours > 0 ? `${hours} labour hours` : null,
+    hoursText: hours > 0 ? `${hours} labor hours` : null,
     lowStock,
     pendingApprovals: input.pendingPayrollRuns,
     feedNote: input.feedNote,

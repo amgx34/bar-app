@@ -37,3 +37,8 @@ export function parRatio(item: ParCheckable): number {
   if (!hasPar(item)) return 1;
   return Number(item.current_stock ?? 0) / Number(item.par_level);
 }
+
+/** The dashboard's rule: NULL is_active counts as active, only an explicit false is archived. */
+export function isActiveItem(item: { is_active?: boolean | null }): boolean {
+  return item.is_active !== false;
+}

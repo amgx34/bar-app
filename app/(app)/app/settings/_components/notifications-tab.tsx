@@ -146,7 +146,7 @@ export function NotificationsTab({
         <div>
           <h2 className="text-lg font-semibold">What you get told about</h2>
           <p className="text-sm text-muted-foreground">
-            These apply to the bell and to push. Defaults follow your role.
+            These apply to the bell, push and, for the weekly summary, email. Defaults follow your role.
           </p>
         </div>
 

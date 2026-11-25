@@ -7,6 +7,7 @@ import {
   detectWeeklySummary, weekEndingOn,
   type StockItem, type ZDay,
 } from './detect';
+import { isActiveItem } from '@/lib/inventory/par';
 import { deliverWeekly, type WeeklyDeps } from './weekly';
 import { sendEmail } from '@/lib/reps/email';
 import { SITE_URL } from '@/lib/site';
@@ -114,13 +115,13 @@ export async function runDailyNotifications(): Promise<DailyRunResult> {
       // ── Low stock ──────────────────────────────────────────────────────────
       const { data: items } = await supabase
         .from('inventory_items')
-        .select('id, name, current_stock, par_level')
-        .eq('organization_id', orgId)
-        .eq('is_active', true);
+        .select('id, name, current_stock, par_level, is_active')
+        // is_active filtered in memory: SQL equality would drop NULL rows the dashboard keeps.
+        .eq('organization_id', orgId);
 
       const previous = await getLastNotificationPayload(orgId, 'inventory.low_stock');
       const lowStock = detectLowStock(
-        (items ?? []) as StockItem[],
+        ((items ?? []) as (StockItem & { is_active: boolean | null })[]).filter(isActiveItem),
         previous ? { itemIds: (previous.itemIds as string[]) ?? [] } : null,
         businessDate,
       );
@@ -148,7 +149,7 @@ export async function runDailyNotifications(): Promise<DailyRunResult> {
         }, 0);
         const built = detectWeeklySummary({
           week, days: wDays ?? [], hoursThisWeek: hours,
-          items: (items ?? []) as StockItem[],
+          items: ((items ?? []) as (StockItem & { is_active: boolean | null })[]).filter(isActiveItem),
           pendingPayrollRuns: pending ?? 0,
           feedNote: feed?.title ?? null,
         });
