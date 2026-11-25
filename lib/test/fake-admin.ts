@@ -55,7 +55,7 @@ export function createFakeAdmin(respond: Respond = () => undefined) {
     b.delete = () => setOp('delete');
     b.eq = (c: string, v: unknown) => (q.filters.push(`eq ${c}=${JSON.stringify(v)}`), b);
     b.in = (c: string, v: unknown) => (q.filters.push(`in ${c}=${JSON.stringify(v)}`), b);
-    b.single = () => ((q.single = true), b);
+    b.single = b.maybeSingle = () => ((q.single = true), b);
     b.then = (resolve: (r: Reply) => unknown, reject?: (e: unknown) => unknown) => {
       calls.push(q);
       return Promise.resolve(answer(q)).then(resolve, reject);

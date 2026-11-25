@@ -44,3 +44,15 @@ export function applySyncOutcome(
     last_sync_summary: summary ?? null,
   };
 }
+
+/**
+ * Stores encrypted provider secrets inside pos_config. Only used while the
+ * pos_credentials table does not exist (see lib/pos/credentials.ts), and it
+ * drops the plaintext `access_token` key older Clover connections stored, in
+ * the same write.
+ */
+export function applyCredentialsEnc(cfg: PosConfig, enc: string): PosConfig {
+  const { access_token: _plaintext, ...rest } = cfg;
+  void _plaintext;
+  return { ...rest, credentials_enc: enc };
+}
