@@ -7,43 +7,43 @@ Pages are walked at 1280x800 and 390x844 (Plan 1, Task 9). API routes are listed
 
 | path | kind | group | needs params | checked |
 |---|---|---|---|---|
-| `/` | page | public |  | |
-| `/accept-terms` | page | app |  | |
-| `/accessibility` | page | public |  | |
-| `/app/analytics` | page | app |  | |
-| `/app/books` | page | app |  | |
+| `/` | page | public |  | x |
+| `/accept-terms` | page | app |  | x |
+| `/accessibility` | page | public |  | x |
+| `/app/analytics` | page | app |  | x |
+| `/app/books` | page | app |  | x |
 | `/app/dashboard` | page | app |  | |
-| `/app/employees` | page | app |  | |
-| `/app/inventory` | page | app |  | |
-| `/app/inventory/analytics` | page | app |  | |
-| `/app/inventory/loss` | page | app |  | |
-| `/app/inventory/setup` | page | app |  | |
-| `/app/inventory/shipments` | page | app |  | |
-| `/app/inventory/weigh` | page | app |  | |
-| `/app/no-access` | page | public |  | |
-| `/app/payroll` | page | app |  | |
-| `/app/payroll/direct-deposit` | page | app |  | |
-| `/app/payroll/employees` | page | app |  | |
-| `/app/payroll/review` | page | app |  | |
-| `/app/payroll/split` | page | app |  | |
-| `/app/reps` | page | app |  | |
-| `/app/sales` | page | app |  | |
-| `/app/sales/categories` | page | app |  | |
-| `/app/sales/margins` | page | app |  | |
-| `/app/settings` | page | app |  | |
-| `/app/tax` | page | app |  | |
-| `/app/tips` | page | app |  | |
-| `/eula` | page | public |  | |
-| `/join` | page | auth |  | |
-| `/login` | page | auth |  | |
-| `/me` | page | staff |  | |
-| `/me/pending` | page | staff |  | |
-| `/privacy` | page | public |  | |
-| `/setup` | page | app |  | |
-| `/setup/pos` | page | app |  | |
-| `/setup/pos/clover` | page | app |  | |
-| `/terms` | page | public |  | |
-| `/thank-you` | page | public |  | |
+| `/app/employees` | page | app |  | x |
+| `/app/inventory` | page | app |  | x |
+| `/app/inventory/analytics` | page | app |  | x |
+| `/app/inventory/loss` | page | app |  | x |
+| `/app/inventory/setup` | page | app |  | x |
+| `/app/inventory/shipments` | page | app |  | x |
+| `/app/inventory/weigh` | page | app |  | x |
+| `/app/no-access` | page | public |  | x |
+| `/app/payroll` | page | app |  | x |
+| `/app/payroll/direct-deposit` | page | app |  | x |
+| `/app/payroll/employees` | page | app |  | x |
+| `/app/payroll/review` | page | app |  | x |
+| `/app/payroll/split` | page | app |  | x |
+| `/app/reps` | page | app |  | x |
+| `/app/sales` | page | app |  | x |
+| `/app/sales/categories` | page | app |  | x |
+| `/app/sales/margins` | page | app |  | x |
+| `/app/settings` | page | app |  | x |
+| `/app/tax` | page | app |  | x |
+| `/app/tips` | page | app |  | x |
+| `/eula` | page | public |  | x |
+| `/join` | page | auth |  | x |
+| `/login` | page | auth |  | x |
+| `/me` | page | staff |  | x (redirect to /login only) |
+| `/me/pending` | page | staff |  | x (redirect to /login only) |
+| `/privacy` | page | public |  | x |
+| `/setup` | page | app |  | x |
+| `/setup/pos` | page | app |  | x |
+| `/setup/pos/clover` | page | app |  | x |
+| `/terms` | page | public |  | x |
+| `/thank-you` | page | public |  | x |
 
 ## API routes
 
