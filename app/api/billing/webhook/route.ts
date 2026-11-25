@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { subscriptionToRow } from '@/lib/billing/access';
+import { checkoutOrgId, shouldApplyEvent } from '@/lib/billing/webhook';
 import { priceMap, stripeApi, verifyStripeSignature } from '@/lib/billing/stripe';
 
 export const runtime = 'nodejs';
@@ -29,16 +30,22 @@ export async function POST(req: NextRequest) {
     if (SUB_EVENTS.includes(event.type)) sub = event.data.object;
     else if (event.type === 'checkout.session.completed' && event.data.object.subscription) {
       sub = await stripeApi<Obj>('GET', `/subscriptions/${event.data.object.subscription}`);
-      sub!.metadata = { ...sub!.metadata, organization_id: sub!.metadata?.organization_id ?? event.data.object.client_reference_id! };
+      const orgId = checkoutOrgId(sub!.metadata?.organization_id, event.data.object.client_reference_id);
+      sub!.metadata = { ...sub!.metadata, ...(orgId ? { organization_id: orgId } : {}) };
     }
     if (sub) {
       const row = subscriptionToRow(sub, priceMap());
+      if (!row.organization_id && event.type === 'checkout.session.completed') {
+        // Deterministic: the event carries no org, so a Stripe retry would resolve nothing. Ack (200)
+        // rather than loop for days; the error log is the record. The schema has no unresolved ledger.
+        console.error('[billing/webhook] UNRESOLVED checkout: no organization', { eventId: event.id, subscription: sub.id ?? event.data.object.subscription });
+      }
       if (row.organization_id) {
         const at = new Date(event.created * 1000).toISOString();
         const { data: cur } = await db.from('org_billing').select('last_event_at')
           .eq('organization_id', row.organization_id).maybeSingle();
         // Stripe does not order deliveries: never let an older event overwrite a newer one.
-        if (!cur?.last_event_at || cur.last_event_at <= at) {
+        if (shouldApplyEvent(cur?.last_event_at, event.created)) {
           // admin-scope-ok: upsert keyed on organization_id taken from the signed event's metadata.
           const { error } = await db.from('org_billing').upsert({ ...row, last_event_at: at, updated_at: new Date().toISOString() });
           if (error) throw error;
