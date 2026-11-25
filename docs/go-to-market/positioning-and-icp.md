@@ -78,13 +78,23 @@ For independent single-location bars on 2Touch whose owner or manager works out 
 Category line (public, stays): "One app for the whole bar." [B2, owner-confirmed]
 2Touch line (conversation only, owner to confirm per `PRODUCT.md`): "Rail reads your 2Touch Z report and works out the night's tip split and pay run for you to check and approve." [B1]
 
+### Three message pillars (each with its proof)
+
+| Pillar | Say | Proof | Limit to say beside it |
+|---|---|---|---|
+| 1. One app for the whole bar | "Stock, tips and pay, nightly sales and supplier orders in one place." | B2, A17, B8 | No scheduling, one bar per account, stock needs per-item setup first [B2 limit, B20]. |
+| 2. It starts from the 2Touch you already run | "A small program on your POS computer reads your sales every few minutes. It reads; it does not write." | A27, B12, L6, E2 | Windows only, administrator install; conversation only until the owner approves the line. |
+| 3. Figures you check and approve | "Rail works the night out; you check it and an owner approves it. It does not file taxes or hold your money." | A15, B7, L1, L2; B6 only after the Payroll Review fix | Never "correct", "accurate" or "reconciles" until the real-data checks are done [B5]. |
+
+The 25-word version is the one-line intro in the table below (20 words).
+
 ### The one-line promise, by context
 
 | Context | Line | Claims used |
 |---|---|---|
 | In person, to a 2Touch owner | "Show me how you split last night's tips. Rail reads your 2Touch Z report and works out the night's tip split and pay run for you to check and approve." | B1 (conversation only), A27 |
 | One-line intro (a warm introduction, a text a friend forwards) | "Rail is one app for the whole bar: stock, tips and pay, sales and supplier orders, built for bar operators." | B2, A3 suggested wording |
-| Email subject (warm contacts only; cold email waits for counsel, see G3) | "A demo bar to try: tips, pay and your Z report in one app" | A6, A43, B2 |
+| Email subject (only to someone who asked for an email, and only once a domain, mailbox and postal address exist: briefing 4.2; cold email waits for counsel, see G3) | "A demo bar to try: tips, pay and your Z report in one app" | A6, A43, B2 |
 | Sign or card left on the bar | "Try a demo bar now. No signup, no credit card. Rail does not file taxes or hold your money." | A6, A43, L1, L2 |
 | When someone asks "who else does this?" | "We have not found another tool that does stock, tips and pay, nightly sales and supplier orders together for one bar. We read competitor pages on 2026-11-25 and I will show you what I read." | B3 (UNVERIFIED until the dated re-read; use only with the date) |
 
@@ -119,6 +129,7 @@ Why no "set up in minutes": the register says setup time has never been measured
 | "Tips reconcile to the Z report" | Only in tests and on the demo bar; two real-data checks are waiting [B5]. |
 | A price | Not published; every figure is HYPOTHESIS [B13]. |
 | "Pay your staff correctly" | Rail works out figures for you to check; the Terms say the bar must check [A24]. |
+| "Sign up and start yourself" | There is no public owner sign-up. For the first bars the founder creates the account and sets the bar up in person (`onboarding-checklist.md` section 0). |
 
 ---
 
@@ -153,14 +164,14 @@ The product's own principle governs this list: say what is missing, never overst
 | Job (owner's words) | Feature | Honest limit | Claim |
 |---|---|---|---|
 | "Close the night from the Z report" | A Windows agent reads 2Touch and sends Z reports, employee-week data and the item audit every five minutes; an emailed nightly report is the fallback | Windows and administrator install. An amber "no data" status can mean the bar was closed or the feed is broken. A feed that moved nothing is not a healthy feed. | B12 |
-| "Split the tips by our rule" | Pooled by hours, individual, or percent of sales; barback cut; opener bonus | The pooling engine pays pool-mode staff; the other modes were not traced end to end for the battlecards. Verified: the engine has automated tests (`lib/payroll/tip-pool.ts`). Not verified: that a night's tips reconcile to the Z report on real data [B5]. Tell the owner to check the first nights by hand. | A15, B5 |
+| "Split the tips by our rule" | Pooled by hours, individual, or percent of sales; barback cut; opener bonus | Pooled staff are paid by the pool engine (`lib/payroll/tip-pool.ts`); individual and percent-of-sales are worked out in `lib/payroll/night-split.ts`. Both have automated tests [A15]. No mode has been checked on a stranger's real nights. Not verified: that a night's tips reconcile to the Z report on real data [B5]. Tell the owner to check the first nights by hand. | A15, B5 |
 | "Count the cash tips" | A person types the cash tip count and the POS never overwrites it | Cash tips are entered, not read, so "automated" is not accurate [A9]. | B7 |
 | "Know what to pay and sign off" | Pay run frozen at submit; owner approves; bank file locked until approval | Rail does not file or withhold tax and does not move money. The bar checks the figures. Review screen defects are open until fixed. | B6, L1, L2 |
 | "See how the night did" | Sales trends, tip percentages and per-server sales from Z reports | Depends on the feed having brought data. | A16 |
 | "Know when I am low" | Low-stock flag against par, a daily alert; stock moves as drinks sell | Needs a container size and a pour size or recipe per item, which takes real work per bar. Alerts are once a day, not instant. | B8, B9, B20 |
 | "Order from my reps" | Orders by email or text with a history | None beyond reps being set up. | A17 |
 | "Know what a delivery cost" | Cost is what the invoice charged | Older deliveries fall back to the item cost price (`AGENTS.md`). | B8 |
-| "Hand my accountant the numbers" | Draft summaries to pass along | Rail does not file or withhold tax. | L1 |
+| "Hand my accountant the numbers" | Pay figures the owner has checked and approved, to pass along. Draft W-2 and 1099-NEC screens exist but are not offered [A19, PARTLY] | Rail does not file or withhold tax. The withholding behind the draft figures is unchecked and switched off, so do not demo or sell the tax screens (pricing section 3). | L1, A19 |
 
 ---
 
@@ -169,9 +180,9 @@ The product's own principle governs this list: say what is missing, never overst
 | Channel | What changes | What does not |
 |---|---|---|
 | In person, at the bar in a quiet hour | Open with the question ("show me how last night's tips were split"), then the 2Touch line, then offer the demo bar on your phone | The limits: Windows install, stock setup later, no tax filing |
-| Warm introduction (a rep, a friend) | The introducer says only the one-line intro; the founder follows with the demo link | No one is paid or rewarded for an introduction until counsel answers G3 question 3 |
-| Inbound page or demo request | Category line "One app for the whole bar" and the demo bar; no 2Touch line or price on the page unless the owner confirms | The page may not carry the register's UNSUPPORTED claims; that fix is a separate code task for the owner |
-| Email (warm contacts only) | Subject and two lines from section 4 | Cold email, calls and texts wait for counsel (G3) |
+| Warm introduction (an owner the founder knows; a supplier rep only after counsel answers briefing Q12) | The introducer says only the one-line intro; the founder follows with the demo link | No one is paid or rewarded for an introduction until counsel answers G3 question 3 |
+| Inbound page or demo request | Category line "One app for the whole bar" and the demo bar; no 2Touch line on the page unless the owner confirms; no price on the page at all until a payment link works and three bars have paid (strategy section 4) | The page may not carry the register's UNSUPPORTED claims; that fix is a separate code task for the owner |
+| Email (only to someone who asked for one, once a domain, mailbox and postal address exist) | Subject and two lines from section 4 | Cold email, calls and texts wait for counsel (G3). A reply to a demo request is the one exception (playbook section 2.3) |
 | Leave-behind card or sign | Demo link, "what Rail does not do" list from section 6 | Same words as the conversation |
 
 ---

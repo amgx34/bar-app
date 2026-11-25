@@ -4,6 +4,8 @@ Date: 2026-11-25. Branch `rebuild/foundation`. Drafted for the owner. Documents 
 
 **What this is.** A launch and content plan for one founder with a small time budget. It shows the order things happen in, the gates that hold the public launch back, twelve posts with captions, a 60 to 90 second video script, and how to tell whether any of it worked.
 
+**What to do first.** Nothing public. Tick the gates in section 1. Until G-1 to G-5 are ticked no post goes out, and the only parts to act on are section 5 (the front-page copy list, for the owner to approve as a code task) and the shot list in section 4.
+
 **Rules this plan keeps.**
 - No paid ads, no spend, no scheduling tools. The founder posts by hand, or nothing goes out. No agent posts anything.
 - No cold direct messages, no cold emails, no cold texts, no cold calls. Those are on hold with the other cold outreach until counsel answers (`outreach-rules-for-counsel.md`, "On hold until counsel answers", which lists direct messages on social media). Social here shows the product and the founder's thinking. It is not outbound selling to strangers.
@@ -25,9 +27,9 @@ The strategy (`strategy.md` section 7 and section 8) says days 1 to 30 are "make
 | G-1 | Payroll Review approval issues fixed (the "Confirm Payroll" button that saves nothing, the Approved badge over recalculating figures, no approver/date/total shown) | `strategy.md` section 8 item 1; claims B1, B6 | Not done. Needs the owner's rules first. |
 | G-2 | Role fix (A1 in the overnight log) confirmed and deployed on live, and the six tables with row security off checked on live | `strategy.md` section 8 item 2 | Not done (owner step). |
 | G-3 | The two real-data tips checks run and recorded | `strategy.md` section 8 item 3; claim B5 | Not done (owner step). |
-| G-4 | Front-page copy fixed per the claims register: Toast removed, the three invented statistics removed, "minutes" and "under an hour" removed, "every type of venue" changed, export and deletion promises fixed or softened, the confirmation-email promise removed | `claims-register.md` Section C items 1 to 6 | Not done. A code change; needs the owner's go-ahead. |
+| G-4 | Front-page and legal-page copy fixed per the claims register: Toast removed, the invented statistics removed, "minutes" and "under an hour" removed, "every type of venue" changed, export and deletion promises fixed or softened, the confirmation-email promise removed, "pay staff correctly" and "calculates payroll automatically every night" reworded, "instant" and "Auto-Reorder" dropped, the Terms and Licence made to agree on the SQL login, the legal entity confirmed or blanked, the hero card labelled sample data | `claims-register.md` Section C items 1 to 10 | Not done. A code change; needs the owner's go-ahead. |
 | G-5 | Open doors closed (the cross-bar mailbox poll and the cron route) | `strategy.md` section 8 item 7 | Not done. |
-| G-6 | A domain and a mailbox on it exist; the contact is no longer a Gmail address; hosting plan checked for commercial use | `strategy.md` section 10 items 9; manager plan owner step 4 | Not done. TODO(owner). |
+| G-6 | A domain and a mailbox on it exist; the contact is no longer a Gmail address; a postal address exists before anything is printed; hosting plan checked for commercial use | `strategy.md` section 10 items 9; manager plan owner step 4 | Not done. TODO(owner). |
 | G-7 | The founder's bar is running Rail on real nights and the owner has written down, in writing, what may be said about it | manager plan owner step 8 | Not known. TODO(owner). |
 
 Not a gate for posting: online billing, the packages table, the native app (`strategy.md` section 8, "Gates").
@@ -37,7 +39,7 @@ Not a gate for posting: online billing, the packages table, the native app (`str
 | Phase | When (HYPOTHESIS: the strategy's day counts, reset to the day the gates close) | What happens in public | Posting allowed |
 |---|---|---|---|
 | **0. Make it true** | Days 1 to 30 | Nothing public. Gates G-1 to G-6 are worked. Owner holds ten in-person conversations with 2Touch owners the founder already knows. | None. The founder's personal accounts are left alone. |
-| **1. Soft proof** | Starts when G-1, G-2, G-3 are ticked, at the earliest. Runs with the first pilots (days 31 to 60). | The founder's own bar runs on real nights. The demo bar is shown in person, on a phone, in conversation. A short list of warm contacts is invited to look at the demo. The launch video is recorded and sits unpublished. | Only the **S-posts** in section 3 (marked "S"): behind the scenes of building it, and what Rail does not do. These make no claim about pay accuracy, tips, saving or setup, and link to the demo bar only. Optional. No video yet. |
+| **1. Soft proof** | Starts when G-1 to G-5 are ticked, at the earliest: every post links to the front page (G-4) and sends strangers into the demo (G-5), and the first pilots need G-5 as well (playbook section 8, Gate A item 4). Runs with the first pilots (days 31 to 60). | The founder's own bar runs on real nights. The demo bar is shown in person, on a phone, in conversation. A short list of warm contacts is invited to look at the demo. The launch video is recorded and sits unpublished. | Only the **S-posts** in section 3 (marked "S"): behind the scenes of building it, and what Rail does not do. These make no claim about pay accuracy, saving or setup, and link to the front page only. Until G-6 is ticked the link is the `vercel.app` address, so the owner may prefer to wait for the domain. Optional. No video yet. |
 | **2. Public launch** | Starts only when every gate G-1 to G-7 is ticked, and the front page carries the corrected copy. Likely inside days 61 to 90. | The 4-week calendar in section 3 runs. The launch video is published on the founder's own channels and the front page. | The full 12 posts. |
 | **3. Keep going** | After week 4 | Repeat the weekly routine in section 7 at a lower pace (two posts a week). Add a post only from real events: a release, a fix, a question owners asked. | Same approval check. |
 
@@ -53,12 +55,12 @@ Not a gate for posting: online billing, the packages table, the native app (`str
 
 | Channel | Why | Limit |
 |---|---|---|
-| **The founder's own bar** (a printed card or a QR on the bar-office door, shown to reps and regulars who ask) | The proof is the place. Reps who visit the bar are already the warm-introduction route in the strategy (channel 2). | No customer or staff name. Nothing about the bar is printed until the owner supplies the bar's name and written permission (manager plan, open question 12). TODO(owner). |
+| **The founder's own bar** (a printed card or a QR on the bar-office door, shown to reps and regulars who ask) | The proof is the place. Reps who visit the bar are already the warm-introduction route in the strategy (channel 2). | No customer or staff name. Nothing is printed at all until a domain and a postal address exist (playbook section 9 print gate; G-6), and nothing about the bar is printed until the owner supplies the bar's name and written permission (manager plan, open question 12). TODO(owner). |
 | **A simple public page** (the existing front page after the G-4 fixes; one page, one call to action) | The page already exists, already records demo requests and where they came from. The strategy lists inbound as channel 4. | Do not build a second site. Fix `app/page.tsx` copy (section 5) and stop. |
 | **Instagram** (one account) | HYPOTHESIS: bar owners and managers use it already for their own bar, and it favours short video and pictures of a screen. Fits a 60 to 90 second video and a screen recording. | Handle is TODO(owner). Test: ask the first ten owners which app they check at close. |
 | **Facebook** (the founder's page, and local bar and hospitality groups the founder is already a member of) | HYPOTHESIS: local trade groups and "bar owners of Cincinnati and Northern Kentucky" style groups are where owners ask each other for tool advice. | Join rules vary. Post only where the group's own rules allow a tool post, read them first, and do not post to a group the founder is not a member of. Do not tag or name any owner. Group names are TODO(owner). |
 | **Local trade groups and associations** (as a member, in person, or as a reply when asked) | Trust products sell through people (`strategy.md` section 5). | Only reply when someone asks about tips, payroll or stock tools. Never a drive-by link. Membership and group rules are TODO(owner). |
-| **Supplier reps** (in person, unpaid) | The strategy's own warm route. | No referral fee and nothing offered in return until counsel answers question 3 (`outreach-rules-for-counsel.md`). |
+| **Supplier reps** (in person, unpaid) | The strategy's own warm route. | **Confirm with counsel before the first ask** (`outreach-rules-for-counsel.md` Q12; the alcohol trade rules were not read, and the briefing leaves reps off its allowed-today list). No referral fee and nothing offered in return, whatever the answer, until counsel answers question 3. |
 
 **Why only one or two social platforms.** One person cannot keep four going. Choose Instagram first and Facebook second; the same video and the same captions serve both. **Not chosen, and why:** TikTok and X (more to learn, an audience further from a bar owner with a 2Touch POS: HYPOTHESIS), LinkedIn (owners are not there for bar tools: HYPOTHESIS, but cheap to test once with one post), YouTube as a channel (host the video file once for the front page if the owner wants; do not run a channel).
 
@@ -80,7 +82,7 @@ Not a gate for posting: online billing, the packages table, the native app (`str
 
 Three posts a week: 12 posts. **Post IDs P1 to P12.** "S" in the last column marks a post safe for Phase 1. Everything else waits for Phase 2. Days are chosen around bar hours: no posting Friday or Saturday evening (`strategy.md` section 5: Friday and Saturday are not selling days). Times of day are HYPOTHESIS; the owner picks them.
 
-The call to action is one of two, never both in a post: **"Try the demo bar, no signup"** (the page's own words, A43) or **"Ask us for a walk-through"** (the demo request form). The link in every post carries UTM tags (section 6).
+The call to action is one of two, never both in a post: **"Try the demo bar, no signup"** (rests on A43; the page's own wording differs today) or **"Ask us for a walk-through"** (the demo request form). The link in every post carries UTM tags (section 6).
 
 | Wk | Day | Format | Topic | Claim IDs relied on | Call to action | Phase |
 |---|---|---|---|---|---|---|
@@ -88,14 +90,14 @@ The call to action is one of two, never both in a post: **"Try the demo bar, no 
 | 1 | Wed | Screen recording, 20 s | How a nightly close works: last night's sales on the dashboard | B12, A16 | Try the demo bar | |
 | 1 | Thu | Text and one screenshot | What Rail does not do (taxes and money) | L1, L2 | Ask us for a walk-through | S |
 | 2 | Mon | Screen recording, 30 s | The pay run: submit, an owner approves, then the bank file | B6 (after G-1), L2 | Try the demo bar | |
-| 2 | Wed | Text post (question) | The tip-split mistakes bars make: a question, no statistics | A15 | Reply with how you split it | |
+| 2 | Wed | Text post (question) | How did you split last night's tips? A question, no statistics | A15 | Reply with how you split it | |
 | 2 | Thu | Photo or screen, text | Behind the scenes: why the pay run is frozen when it is submitted | B6, B7 | Ask us for a walk-through | S |
 | 3 | Mon | Carousel, 5 frames | Tip modes: pooled, individual, percentage, barback cut, opener bonus | A15 | Try the demo bar | |
 | 3 | Wed | Text and one screenshot | Behind the scenes: a cash tip count typed by a person is never overwritten by the POS | B7 | Ask us for a walk-through | S |
 | 3 | Thu | Text post | What Rail does not do yet: no scheduling, one bar per account, stock needs setup | B2, B8, B20 | Ask us for a walk-through | S |
 | 4 | Mon | Screen recording, 30 s | Stock, honestly: a sale moves stock only once pour sizes are set | B8, B20 | Try the demo bar | |
 | 4 | Wed | Short video, founder to camera (TODO(owner), optional) | Behind the scenes: why the founder built it | B2 (the story itself is TODO(owner)) | Ask us for a walk-through | S |
-| 4 | Thu | Screen recording, 30 s | Demo walk-through: five taps, the demo bar | A43, A42, A44 | Try the demo bar | |
+| 4 | Thu | Screen recording, 30 s | Demo walk-through: five screens of the demo bar | A43, A42, A44 | Try the demo bar | |
 
 ### What each post may rely on (the limits, copied from the register)
 
@@ -118,7 +120,7 @@ Each caption below has been checked line by line against the register. `[link]` 
 
 > One app for the whole bar. Rail brings last night's sales, the tip split, the pay run, stock and supplier orders into one place.
 >
-> This is the demo bar, with sample data, not a real bar. It is early: we are working with our first bars and the founder's own bar. Rail reads 2Touch POS today. It does not file or withhold taxes, and it never holds or moves your money.
+> This is the demo bar, with sample data, not a real bar. It is early, and it is built by one founder. [TODO(owner): one true sentence about where Rail runs on the day this is posted, for example "It runs at the founder's own bar." Leave it out if G-7 is not ticked. Do not say "our first bars" unless a pilot bar exists that day.] Rail reads 2Touch POS today. It does not file or withhold taxes, and it never holds or moves your money.
 >
 > Look around the demo bar, no signup: [link]
 
@@ -126,7 +128,7 @@ Alt text: "Screen recording of the Rail demo bar: a dashboard, a pay run and a s
 
 **P2. Nightly close, dashboard (Week 1, Wednesday).** Claim IDs B12, A16.
 
-> What a nightly close looks like in Rail, in 20 seconds. A small program on the POS computer sends the Z report every few minutes. Open Rail in the morning and last night is on the dashboard: sales, tips, and how the night compares with the nights before.
+> A 20-second look at the morning after a close in Rail. A small program on the POS computer sends the Z report every few minutes. Open Rail in the morning and last night is on the dashboard: sales, tips, and how the night compares with the nights before.
 >
 > Demo bar, sample data. Rail reads 2Touch POS on Windows today.
 >
@@ -192,7 +194,7 @@ Alt text: "Five frames, one per tip mode, from the Rail demo bar. Sample data."
 
 **P8. Cash tip count (Week 3, Wednesday).** Claim ID B7. Safe for Phase 1.
 
-> A small thing we are careful about. The POS often reports zero cash tips. If a manager counts the jar and types the figure in, Rail keeps that figure. The POS does not overwrite it, even though the agent sends the night again every few minutes.
+> A small thing we are careful about. A POS report can show zero cash tips, because the jar is counted by hand. If a manager counts the jar and types the figure in, Rail keeps that figure. The POS does not overwrite it, even though the agent sends the night again every few minutes.
 >
 > Ask us for a walk-through: [link]
 
@@ -228,7 +230,7 @@ Alt text: "Screen recording of a stock list in the demo bar with a pour size fie
 
 **P12. Demo walk-through (Week 4, Thursday).** Claim IDs A43, A42, A44.
 
-> Five taps through the demo bar: dashboard, last night, the tip split, the pay run, a stock item. No signup, no credit card. It is sample data and it clears itself after a day.
+> Five screens of the demo bar: dashboard, last night, the tip split, the pay run, a stock item. No signup, no credit card. It is sample data and it is cleared periodically.
 >
 > Rail is built for bar operators and is not affiliated with any POS vendor.
 >
@@ -240,23 +242,23 @@ Alt text: "Screen recording of five screens in the Rail demo bar. Sample data."
 
 ## 4. The launch video script
 
-**Length:** 75 seconds (inside the 60 to 90 second range). **Format:** a screen recording of the demo bar on a phone and a laptop, with a voice over. **Audience:** a bar owner or manager who closes the night by hand. **Stage the product is at:** early; one founder; first bars. The voiceover says so at the end.
+**Length:** 75 seconds (inside the 60 to 90 second range). **Format:** a screen recording of the demo bar on a phone and a laptop, with a voice over. **Audience:** a bar owner or manager who closes the night by hand. **Stage the product is at:** early; one founder. The voiceover says so at the end. It names "first bars" only if a pilot bar exists on the day of recording (TODO(owner)).
 
 **Rules for the script.** Only the demo bar and real screens. No invented numbers, no testimonial, no stock footage, no mock-up. Every spoken or written product line has a claim ID.
 
 | Time | Visual (screen, from the demo bar) | Voiceover | On-screen text | Claim |
 |---|---|---|---|---|
-| 0:00 to 0:06 | The demo entry on the front page: the "Try a demo bar" button. Then the dashboard of the demo bar opens. | "Closing a bar's night means a lot of separate jobs." | "Demo bar. Sample data." | A43, A42 |
+| 0:00 to 0:06 | The demo entry on the front page: the demo button. Then the dashboard of the demo bar opens. | "Closing a bar's night means a lot of separate jobs." | "Demo bar. Sample data." | A43, A42 |
 | 0:06 to 0:16 | The dashboard block headed "Last night" (or "Tonight"): sales and how the night compares with the nights before. | "Rail reads your 2Touch sales every few minutes. In the morning, last night is already there." | "Reads 2Touch POS on Windows" | A27, B12, A16 |
 | 0:16 to 0:30 | The tips screen: the tip modes (pooled, individual, percentage), a barback cut and an opener bonus. | "The tip split follows the rule you set: pooled by hours, individual, or by percentage of sales, with a barback cut and an opener bonus. You check it." | "You set the rule. You check the result." | A15 |
 | 0:30 to 0:45 | The cash tips entry on the payroll close screen: a person types a figure, it stays. | "If you count the cash jar and type it in, the POS will not overwrite it." | "Cash tips you type in are kept" | B7 |
 | 0:45 to 0:57 | The pay run: submit, then an owner approves. Show the approval and the locked-then-available bank file. (Record only after G-1 is ticked.) | "A pay run is frozen when it is submitted. An owner approves it before the bank file can be downloaded." | "Rail does not move the money. Your bank does." | B6, L2 |
 | 0:57 to 1:05 | A stock list, then the supplier order screen (email or text to a rep). | "Stock and supplier orders sit in the same app. Stock needs pour sizes set up first." | "Stock needs setup" | B8, B20, A17 |
-| 1:05 to 1:15 | A plain card, then the front page with the demo button. No animation beyond a fade. | "Rail is early. We work with our first bars. It does not file taxes or hold your money. Look around the demo bar, no signup." | "Early stage. One app for the whole bar. Try the demo bar." and the front-page address | L1, L2, B2, A43 |
+| 1:05 to 1:15 | A plain card, then the front page with the demo button. No animation beyond a fade. | "Rail is early, and one founder builds it. It does not file taxes or hold your money. Look around the demo bar, no signup." | "Early stage. One app for the whole bar. Try the demo bar." and the front-page address | L1, L2, B2, A43 |
 
 (Total 75 seconds. If it runs long, cut the supplier order from the sixth row, not the final row.)
 
-**The ending is the honest one.** It says "early", says who it works with, says what it does not do and ends on the single call to action (the demo). It does not say how many bars use it.
+**The ending is the honest one.** It says "early", says who builds it, says what it does not do and ends on the single call to action (the demo). It does not say how many bars use it.
 
 ### What must be recorded, and with what (the owner supplies the recording)
 
@@ -265,8 +267,8 @@ No agent produces media. The owner records.
 | Item | What | Tool (suggested, owner decides) |
 |---|---|---|
 | Demo bar | Open the demo from the front page (`POST /api/demo`) on a fresh session. The demo is created with realistic sample data (`lib/demo/seed.ts`) and clears after 24 hours (`DEMO_TTL_HOURS`), so record in one sitting. | The site as it is. Rate limit: three demos an hour per address (A43). |
-| Screen capture, phone | The dashboard, tips, pay run and stock screens on a phone, since owners close on a phone (`PRODUCT.md`). | The phone's built-in screen recording. |
-| Screen capture, laptop | The pay run review and the bank file step. | The laptop's built-in screen recording. |
+| Screen capture, phone | The dashboard and stock screens on a phone, since owners close on a phone (`PRODUCT.md`). Not the payroll day view: its rows overlap on a phone until that is fixed (strategy section 8 item 8). | The phone's built-in screen recording. |
+| Screen capture, laptop | The tip split, the cash tips entry, the pay run review and the bank file step. | The laptop's built-in screen recording. |
 | Voiceover | The seventy-five seconds of words above, read slowly in a quiet room. | A phone voice-memo app or a laptop's recorder. |
 | Editing | Cuts, the on-screen text, captions for hearing. | The owner's own editing app. The spec mentions a render from a demo org; any tool works if it keeps to the shot list. |
 | Captions | Burned-in captions or a caption file. | Owner's choice. Required: many people watch without sound. |
@@ -398,7 +400,7 @@ Where a post draws a question the founder cannot answer from the register (for e
 |---|---|---|
 | **Overclaiming** | The front page and the product already disagree (Toast, statistics, setup time). A public post that repeats them is the first thing a bar owner who knows bars would catch. | The approval check above. Fix G-4 before Phase 2. |
 | **Alcohol-marketing rules** | A bar is a licensed business and rules on alcohol advertising may apply to content that shows drinks, to promotions, and to contacts with suppliers. **Confirm with counsel.** Nothing here has been read; **UNVERIFIED.** | Rail is software for a bar, not an alcohol brand. Keep posts about the software: screens, not bottles being poured or drinks promoted. No age-gate or drinking content has been designed. Ask counsel before any post that shows alcohol or involves a supplier. |
-| **Platform ad policies** | Not applicable while there are no paid ads. If the owner ever pays for reach, each platform's alcohol, financial-services and business-opportunity rules are likely to matter. **Confirm** by reading each platform's own current policy; none was read for this plan, **UNVERIFIED.** | No paid promotion in this plan. |
+| **Platform policies** | Each platform's terms for ordinary (unpaid) business posts, for using a personal profile for a business, and each group's own rules were not read: **confirm** by reading them before the first post (`outreach-rules-for-counsel.md` 2.6). Ad policies do not apply while there are no paid ads. If the owner ever pays for reach, each platform's alcohol, financial-services and business-opportunity rules are likely to matter. **Confirm** by reading each platform's own current policy; none was read for this plan, **UNVERIFIED.** | No paid promotion in this plan. |
 | **Using a customer's name or bar without written permission** | The strategy forbids testimonials, logos and case studies before written permission and the numbers. | The founder's bar stays "the founder's own bar" until the owner supplies the name and written permission. No customer is named, tagged, reposted, thanked or shown, even when they offer. Ask for the written permission first. |
 | **Cold outreach by the back door** | A comment, a tag or a "DM me" is outreach. Direct messages are on the counsel hold list. | Reply only to people who contact the founder first. Never start a direct message. |
 | **Texting and email lists** | Texts and email have their own rules (consent, postal address, opt-out). Rail has no postal address on record. | Do not collect numbers or addresses on social. The form on the front page is the only intake. Nothing is sent to a list. |
@@ -409,7 +411,7 @@ Where a post draws a question the founder cannot answer from the register (for e
 | **Legal pages that do not match reality** | The Terms and the Licence disagree (L7); the entity may not be real (L12). A launch sends people to them. | Resolve before Phase 2 (gate G-4 and copy change 11). |
 
 **Stop conditions.**
-- Any gate G-1 to G-7 un-ticks (for example, a real bug in tips is found): stop publishing posts that rest on that area until it is ticked again. Say so only if someone asks.
+- Any gate G-1 to G-7 un-ticks (for example, a real bug in tips is found): stop publishing posts that rest on that area until it is ticked again. Tell every pilot bar it affects straight away (playbook section 10 stop rules). A public statement is needed only if a post made the claim; then correct it in a follow-up post.
 - A post is found to contain a claim the register does not support: remove it the same day, fix the register or the post, and do not re-post.
 - Counsel answers that an activity is not allowed: stop that activity at once.
 - Two comments from owners say the demo or the product does not do what a post said: pause the calendar and review every remaining post against the register.

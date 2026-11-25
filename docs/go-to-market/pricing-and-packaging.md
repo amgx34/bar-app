@@ -6,6 +6,8 @@ Date: 2026-11-25. Drafted for the founder; the manager reviews it before it is f
 
 **Ten-minute read:** sections 2, 3, 4 and 6. Reference: 1, 5, 7 to 10.
 
+**Do first:** ask the four price questions (section 6) in the first ten conversations, and fill the blanks in sections 5 and 7. No quote goes to anyone before those are done. A price is never said aloud: it appears only in the written quote in section 5 (claims register B13, B15).
+
 Sources inside the repo: `docs/go-to-market/strategy.md` (decisions 3 and 5), `docs/superpowers/findings/competitors/matrix.md` and the ten competitor files, `docs/go-to-market/claims-register.md`, `docs/go-to-market/battlecards.md`, `docs/superpowers/specs/2026-11-24-rail-rebuild-design.md` (Monetization, Packages), `docs/superpowers/specs/2026-11-25-native-app-architecture.md` (Decision 5, section 4), `AGENTS.md`. No live competitor page was re-read for this draft: the matrix was read the same day (2026-11-25), so nothing is known to have changed. **Re-read each live page the day a quote goes out.**
 
 ---
@@ -56,10 +58,12 @@ The mechanism is the rebuild spec's four modules (Stock, Sales, Team & Pay, Book
 
 | Bundle | Spec modules | In plain words | HYPOTHESIS price |
 |---|---|---|---|
-| **Close** | Sales, Team & Pay | Reads the night's Z report from the 2Touch the bar already runs, works out the tip split and the pay run for the owner to check and approve, and locks the bank file until an owner approves. | $99 a bar a month |
-| **Whole bar** | Close, plus Stock, Books and rep ordering | Everything in Close, plus stock that moves with POS sales, delivery costs taken from the invoice, books figures, and orders to supplier reps by email or text with a history. | $199 a bar a month |
+| **Close** | Sales, Team & Pay | Reads the night's Z report from the 2Touch the bar already runs, works out the tip split and the pay run for the owner to check and approve, and keeps the bank file locked until an owner approves (an owner can override, and must write down why). | $99 a bar a month |
+| **Whole bar** | Close, plus Stock, Books and rep ordering | Everything in Close, plus stock that moves with POS sales once each item has a bottle size and a pour size or recipe, delivery costs taken from the invoice, a books view, and orders to supplier reps by email or text with a history. | $199 a bar a month |
 
-Why these numbers (reasoning, not evidence): Close sits below 7shifts' reported $79.99 to $134.99 plus $49.99 for tips only if one counts that tool's scheduling and payroll filing, which Rail lacks; Whole bar sits under the reported inventory specialists ($249 and up) while including pay (section 1, all indicative). The $99 and $199 figures are strategy decision 3, **HYPOTHESIS, unproven**.
+Limits on these two rows before they are copied into a quote: the approval sentence in Close is claims register B6 (PARTLY), so it goes in a quote only after the Payroll Review fix (strategy section 8 item 1). "A books view" promises no figure: a new bar with no costs entered is shown 0.0% pour cost and 87.4% profit today (strategy section 8 item 5), and that screen is not shown to a bar until it is fixed.
+
+Why these numbers (reasoning, not evidence): Close ($99) sits under 7shifts' reported top tier plus its tips add-on ($134.99 plus $49.99, section 1, indicative), and it should, because Rail does not schedule or file taxes; Whole bar sits under the reported inventory specialists ($249 and up) while including pay (section 1, all indicative). The $99 and $199 figures are strategy decision 3, **HYPOTHESIS, unproven**.
 
 ### Module-by-module: what may be sold today
 
@@ -70,7 +74,7 @@ Verified against `claims-register.md` (verdicts A14 to A19, B1, B5), `AGENTS.md`
 | Sales (Z report analytics) | Yes (`lib/pos/*.test.ts`) | **With a limit.** Say "reads your 2Touch Z report". Not "instant" or "real time" (A16). | Only 2Touch (and Clover, unverified, A22) may be named. Windows POS computer, agent install (A25, A27). |
 | Team & Pay: tips and pay run | Yes (`lib/payroll/tip-pool.ts`, `run-diff.ts`) | **With a limit.** Say "worked out for you to check and approve" (A15, B1). | The two real-data checks that tips reconcile to the Z report are done (B5: do not say it to a customer yet); the Payroll Review "Confirm Payroll" button issue fixed (B1). Never "payroll" in a way that implies withholding, filing or paying. |
 | Stock | Yes (POS sales deplete stock; deliveries cost from the invoice) | **Not yet as a promise of accurate stock.** Offered as the second step after the first approved pay run (strategy). | Container size and pour size or recipe set for each item; until then depletion does not convert drinks to bottles. Low-stock alerts run once a day, not instantly (A14). |
-| Books | A `books` area exists (`app/(app)/app/books/`) | **Not yet: no claims-register row covers it, and its figures depend on Stock being set up.** Include it in Whole bar for the founding ten without describing results. | A register verdict on Books, and Stock setup finished for that bar. |
+| Books | A `books` area exists (`app/(app)/app/books/`) | **Not yet: no claims-register row covers it, and its figures depend on Stock being set up.** Include it in Whole bar for the founding ten without describing results. | A register verdict on Books, the zero-cost display fixed (strategy section 8 item 5: no costs entered shows as 0.0% pour cost and 87.4% profit), and Stock setup finished for that bar. |
 | Rep ordering | Yes (`lib/reps/email.ts`, `sms.ts`; A17 is TRUE) | **Yes**, as "orders to supplier reps by email or text, with a history". | Mail and text credentials set for the deployment. Not "auto-reorder" (A18). |
 | Payroll tax withholding and filing | Withholding code exists but is switched off and unchecked | **Never sold.** "Rail does not file taxes, withhold taxes, or hold or move your money." | Checked against official tables, plus a decision by the owner and counsel. |
 | Tax and W-2 drafts | Screens exist (A19, PARTLY) | **Not sold** as a feature; do not describe until the register verdict changes. | Register verdict. |
@@ -85,7 +89,11 @@ Verified against `claims-register.md` (verdicts A14 to A19, B1, B5), `AGENTS.md`
 
 ## 4. The founding offer for the first ten bars
 
-HYPOTHESIS (strategy decision 3). "Ten" is real, not a sales device: it is the number of bars the founder can install and support alone (strategy; the capacity limit is itself a HYPOTHESIS). That is why "founding" and "ten" may be said out loud.
+HYPOTHESIS (strategy decision 3). "Ten" is real, not a sales device: it is the number of bars the founder can install and support alone (strategy; the capacity limit is itself a HYPOTHESIS). That is why "founding" and "ten" may be said out loud. The dollar figures may not: they appear only in the written quote (section 5).
+
+**When the quote is handed over (manager's ruling at review, owner may change it):** when the pilot is agreed, before anything is installed, and only after the four price questions in section 6 have been asked. A bar must not reach night 31 without having seen its price in writing, or "paid without bargaining" measures surprise, not willingness to pay.
+
+`TODO(owner)`: the strategy counts the founder's own bar as bar 1. Decide whether it takes one of the ten places and one of the three $99 places. Default taken here: it is the reference bar, it pays nothing, and the ten places and the ladder count the other bars only.
 
 **Terms in plain words**
 
@@ -134,6 +142,8 @@ A bar that is not a 2Touch, single-location, owner-present bar is outside the of
 
 ### The one-page quote the founder hands over
 
+Not to be handed to anyone until every `TODO` below is filled, the accountant has answered on sales tax, and counsel has checked the "cancel any time" and refund wording. This page is the only place a price appears.
+
 > **Rail: quote for [bar name, filled in per bar]**
 > Issued by: `TODO(owner: legal entity, address, EIN not printed unless the accountant says so)`
 > Date: `TODO` Valid for: `TODO`
@@ -164,7 +174,7 @@ The script, word for word:
 
 If they say "it depends", ask once: "For a bar like yours, running as it does now?" If they refuse a number, write "refused" and move on. Do not suggest an answer.
 
-Record sheet (one row per conversation; no names of people or bars in this document; the real sheet lives in the metrics sheet):
+Record sheet (one row per conversation; no names of people or bars in this document; the real sheet is the Conversations tab in `metrics-sheet.md`, which has the four price columns but not the last three below, so add those three by hand):
 
 | # | Date | Too cheap | Bargain | Getting expensive | Too expensive | What they pay today for tips and pay work (their words) | Per-employee vs flat reaction | Notes |
 |---|---|---|---|---|---|---|---|---|
@@ -216,7 +226,7 @@ No cost has been measured and none is invented here. The owner supplies each fig
 | Cancellation | Any time, effective at the end of the paid month. | Month to month is the promise. | |
 | Annual plan | Not offered yet; later "two months free, refundable pro rata" (strategy). | Section 2. | |
 | Data on cancellation | `TODO(counsel)`. The site's promise to export and delete data has no code behind it (A34, UNSUPPORTED), so **do not put it in a quote.** | | |
-| Non-payment | A reminder, a call, then the bar loses access. The app shows a neutral sentence with nothing to tap (native spec). | Apple rule (above). | |
+| Non-payment | A reminder, a call, then the bar loses access. No code does this today (there is no billing or entitlement code and no phone app), so it is done by hand and how is `TODO(owner)`. When the phone app exists it shows a neutral sentence with nothing to tap (native spec). | Apple rule (above). | |
 
 All refund and cancellation wording: **confirm with counsel.**
 

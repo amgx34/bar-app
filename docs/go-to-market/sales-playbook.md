@@ -2,6 +2,8 @@
 
 Date: 2026-11-25. Branch `rebuild/foundation`. For one founder selling in person to independent bar owners who run the 2Touch POS, around Cincinnati and Northern Kentucky. Documents only: nothing here has been said, sent, printed or run.
 
+**Do first.** In days 1 to 30 nothing is sold or installed: hold ten conversations with 2Touch owners the founder already knows, using section 3, and log them (section 10). No install at a stranger's bar until section 8 is ticked.
+
 **How to use it.** Section 1 is the week. Sections 2 and 3 are what to say. Section 8 is the go/no-go gate: read it before any install at a stranger's bar. Every spoken line carries a claim id from `docs/go-to-market/claims-register.md` (written "reg A27"). If a line has no id it makes no product claim.
 
 **Labels.** HYPOTHESIS: a belief nobody has tested, with its cheap test. UNVERIFIED: not confirmed. TODO(owner): only the owner can fill it. "We have not verified that" is a sentence the founder is allowed, and expected, to say out loud.
@@ -28,12 +30,17 @@ Ten hours a week for selling and installs is a HYPOTHESIS; the owner sets the re
 | Friday, Saturday | No selling | 0 | Bars are busy (strategy section 5). |
 | Reserve | Slack for an install that ran long | 1 | Not scheduled. |
 
+**Does this week fit? (manager's note at review; all HYPOTHESIS.)** Three things do not fit inside ten hours as drawn, so decide them before the first week:
+- **Install time has never been measured** (`onboarding-checklist.md` section 14). The 3 hours on Thursday is a guess. Time the founder's own bar first; if an install with travel runs past 3 hours, an install week has no visits.
+- **Content is not in this table.** The launch plan's 90 minutes a week must come out of these ten hours, not on top (`launch-and-content-plan.md` section 7). In a week with posts, drop one visit afternoon or the reserve.
+- **Ten conversations a week (the metrics sheet's threshold) does not fit a ten-hour week that also holds an install.** Two visit afternoons give four to six doors, and not every door has the owner behind it. Treat ten a week as the figure for a week with no install; the numbers that matter first are ten conversations in days 1 to 30 and twenty before the first stop rule. In days 1 to 30 there are no installs, so Thursday's block goes to conversations.
+
 **Hours by channel (HYPOTHESIS, to be re-cut after ten conversations):**
 
 | Channel | Share of the ten hours | Notes |
 |---|---|---|
 | The founder's own bar | Standing; counted inside Monday | The worked example. Write down real figures and, in writing, which may be used (plan, owner step 8). Unnamed until permission. |
-| Warm introductions (unpaid) | About 2 | Owners the founder knows; supplier reps who already visit them. Nothing is offered back. |
+| Warm introductions (unpaid) | About 2 | Owners the founder knows. Supplier reps only after counsel answers briefing Q12 (section 2.2). Nothing is offered back. |
 | Quiet-hours visits | About 2.5 | Tuesday to Thursday afternoons. |
 | Inbound (landing page, demo request) | About 1 | Reply on the channel they used. |
 | Install and onboarding | About 3 | Gated by section 8. |
@@ -52,7 +59,7 @@ Goal: five minutes, or a time to come back. Not a sale.
 
 **When.** Tuesday to Thursday afternoon, before service, when the bar is open to staff and deliveries. Do not interrupt a delivery, a count, or service. Do not keep pressing after a "no". Rules for in-person solicitation and liquor premises were not read: UNVERIFIED, so ask counsel (briefing section 2.1) and, if in doubt, leave when asked.
 
-**Carry.** The leave-behind (section 9) once the print gate in section 9 is cleared; a phone with the demo bar open and logged in; nothing else.
+**Carry.** The leave-behind (section 9) once the print gate in section 9 is cleared; a phone with the demo bar open and logged in; nothing else. On a phone show demo steps 1, 4 and 5 only: the tip split and the pay run need a laptop until the phone layout is fixed (section 4).
 
 **Opening (say it, then stop):**
 
@@ -78,7 +85,7 @@ Then go straight to the first discovery question (section 3), not a pitch:
 
 ### 2.2 The warm-introduction ask, and the message to the introducer
 
-Who is asked: bar owners the founder already knows by name, and supplier reps who already visit them. **Nothing is offered in return, not even a free month.** Whether a supplier rep may be rewarded is an open question for counsel (briefing Q3, strategy section 5). Do not hint at one.
+Who is asked: bar owners the founder already knows by name. **Supplier reps are not asked yet: confirm with counsel first.** The briefing lists the rep route as "not decided" (its section 1), leaves it off the allowed-today list (its 4.1), and asks counsel whether Rail may accept a rep's introduction even with nothing given back (Q12); the alcohol trade rules were not read. Bars 2 to 4 are owners the founder knows, so waiting costs nothing. **Nothing is offered in return to anyone, not even a free month.** Whether a supplier rep may be rewarded is an open question for counsel (briefing Q3, strategy section 5). Do not hint at one.
 
 **Ask, in person, to an owner the founder knows:**
 
@@ -86,7 +93,7 @@ Who is asked: bar owners the founder already knows by name, and supplier reps wh
 
 **Message to the introducer** (typed by hand to one person they know, who already deals with the founder; not to anyone who has not been in contact):
 
-> "Thanks for the offer to mention me to [first name or 'the owner']. Please ask them first whether they would like to hear from me. If they say yes, tell them what I do in your own words, or forward this line: 'He builds a small app for 2Touch bars that works out tip splits and pay runs. It's early. The demo is open to try, and he'd like to see how you close the night.' If they say no or don't answer, that's fine and I won't follow up. I'm not offering anything for this. Thanks."
+> "Thanks for the offer to mention me to [first name or 'the owner']. Please ask them first whether they would like to hear from me. If they say yes, tell them what I do in your own words, or forward this line: '[founder first name] builds a small app for 2Touch bars that works out tip splits and pay runs for you to check. It's early. The demo is open to try, and [founder first name] would like to see how you close the night.' If they say no or don't answer, that's fine and I won't follow up. I'm not offering anything for this. Thanks."
 
 Rules: the introducer asks first. The founder does not collect or save a stranger's mobile number from the introducer without the owner's say-so. If the owner says no, log it as "no" and stop.
 
@@ -113,11 +120,11 @@ Trigger: a row in `demo_requests` or an email to the contact mailbox. Reply on t
 > [founder name]
 > [postal address and contact line: TODO(owner)]
 
-Notes. One-to-one, no marketing paragraph, no price, no "within minutes" (reg A25, A28). If the person asks to be called, call at the time they gave; the request is the consent. If the person asks to be texted, use section 2.4. If the requester ran the demo, ask what they looked at, not whether they liked it. Whether a reply email needs a postal address under CAN-SPAM for a single reply is an open question for counsel (briefing 2.5); put the owner's address in the signature once it exists.
+Notes. This is a reply to someone who wrote first (briefing 4.1), and it is the only email this playbook allows before a domain, a mailbox and a postal address exist (briefing 4.2). One-to-one, no marketing paragraph, no price, no "within minutes" (reg A25, A28). If the person asks to be called, call at the time they gave; the request is the consent. If the person asks to be texted, use section 2.4. If the requester ran the demo, ask what they looked at, not whether they liked it. Whether a reply email needs a postal address under CAN-SPAM for a single reply is an open question for counsel (briefing 2.5); put the owner's address in the signature once it exists.
 
 ### 2.4 One consent-first reply for a prospect who asks to be texted
 
-Use only when the prospect has asked for texts in writing (their own message or note). Keep that message. Counsel has not answered what a consent line must say (briefing Q5), so this is a template to be replaced by counsel's wording, not a final form:
+**Awaiting counsel. Draft wording, not approved.** Counsel has not answered what a consent line must say or what proof to keep (briefing Q5), nor how a hand-typed text to a personal mobile is treated (Q2, Q10). Until then, prefer to answer on another channel the prospect used. If a text is the only way, send it only when the prospect has asked for texts in writing (their own message or note), and keep that message. This template is to be replaced by counsel's wording:
 
 > "Hi [first name], it's [founder name] from Rail. You asked me to text you, so here I am. I'll only text about your demo and set-up questions. Reply STOP any time and I'll stop everywhere."
 
@@ -139,7 +146,7 @@ Ask them in this order, in the bar, with the owner or the person who does the cl
 | 6 | "Which POS do you run, and is it on the machine behind the bar?" | The hard fit test. Rail's direct link is 2Touch via a Windows program on the POS computer reading its local database (reg B12, L6). | 2Touch on a Windows PC at the bar. | Any other POS: say what imports exist and that the direct link does not; do not install. A cloud-only or remote database: the agent cannot read it (`onboarding-checklist.md` section 1). |
 | 7 | "Who has administrator rights on that computer, and are you the person who can say yes to a program being installed?" | Whether the install can happen the same day, and who consents. Whether the bar's 2Touch agreement allows a third-party reader is UNVERIFIED (strategy section 3 risk 2): get the owner's written yes. | The owner can say yes and unlock the PC. | A landlord or franchise owner holds the PC, or the owner refuses any program on the POS computer: disqualifier. |
 | 8 | "Is this the only bar you run?" | One organisation is one bar. | One bar. | Two or more bars: not yet (no bar switcher or group reporting). |
-| 9 | (Last, optional) The four price questions from the strategy: at what monthly price would this be so cheap you would doubt it; a bargain; getting expensive; too expensive? | The willingness-to-pay table in `pricing-and-packaging.md` (G4, not written when this was drafted). Ask only after the demo. Record the four answers; do not react to them. | Four answers that make a range. | Refusal to answer: record it. |
+| 9 | (Last, optional) The four price questions from the strategy: at what monthly price would this be so cheap you would doubt it; a bargain; getting expensive; too expensive? | The willingness-to-pay table in `pricing-and-packaging.md` section 6, which has the exact words. Ask only after the demo, one at a time. Never name a price, a range or a competitor's price before they answer. Then ask its one extra question: "If the price were per employee, would that change your answer?" Record the answers; do not react to them. | Four answers that make a range. | Refusal to answer: record it. |
 
 **Disqualifiers (stop and say so politely):** not 2Touch or no local database; no one will grant administrator rights or written consent; wants tax filing or withholding done by the tool; more than one bar; wants Toast or any POS Rail does not read. **"Not yet" list:** groups, restaurants needing food costing, bars on Toast or Square, hotels, breweries and clubs, anyone beyond a reasonable drive (strategy section 3).
 
@@ -182,8 +189,8 @@ That is the honest limit, and the strongest line in the demo.
 Every answer uses only a verified fact, or says "we have not verified that." Where the owner is asked for a decision, the founder says what is not yet built.
 
 **"What does it cost?" (price)**
-> "I haven't set a final price. I'd like to hear what you'd expect to pay, and I'll put the terms in writing before your pilot ends. You won't be asked for a card to start."
-Facts: the price is a HYPOTHESIS ($99 for the nightly close and $199 for the whole bar, strategy section 4), not stated aloud; no price goes on the website yet; the ladder for the first ten is in section 6. If they compare to another tool: "I can't quote their price; their page may have changed. Check it." (`battlecards.md`: every competitor price is reported, dated, with a doubt).
+> "I'm still setting the price with my first ten bars, so I'd like to hear what you'd expect to pay first. You'll have the price and the terms in writing before I install anything, and you won't be asked for a card to start."
+Facts: the price is a HYPOTHESIS ($99 for the nightly close and $199 for the whole bar, `pricing-and-packaging.md` section 3), not stated aloud; no price goes on the website yet; the ladder for the first ten is in section 6. The written quote is handed over when the pilot is agreed and before the install (`pricing-and-packaging.md` section 4). If they compare to another tool: "I can't quote their price; their page may have changed. Check it." (`battlecards.md`: every competitor price is reported, dated, with a doubt).
 
 **"I already use my POS reports."**
 > "You should: Rail starts from the same data. What it adds is the tip split, the pay run you approve, and stock and rep orders on top, once set up. If your POS reports already do everything you need, you don't need me."
@@ -191,7 +198,7 @@ Basis: battlecard 11. Do not say the POS cannot do something; "not shown on the 
 
 **"My accountant does payroll."**
 > "That's fine. Rail doesn't file taxes, withhold taxes or pay anyone (reg L1). It works out the hours, tips and pay run for you to check and approve, and gives you a bank file or a figure to hand to your accountant. Your accountant keeps the filing."
-Do not promise what an accountant login can see until the role fix is confirmed on live (reg B21, A1). Do not claim a QuickBooks or Xero link (none exists).
+Do not promise what an accountant login can see until the role fix is confirmed on live (reg B21; the role fix is item A1 in the overnight log, which is not register row A1). Do not claim a QuickBooks or Xero link (none exists).
 
 **"I don't want a program touching my payroll money" (trust)**
 > "Rail never holds or moves your money. It produces a file; you submit it to your own bank (reg L2). A pay run is frozen when it is submitted and an owner approves it before the bank file can be downloaded, unless an owner overrides and writes down why." (reg B6: say this only after gate item 1.) "Bank account numbers are encrypted, and only the last four digits show on screen" (reg A31, L3).
@@ -207,7 +214,7 @@ Do not say "accurate", "correct" or "reconciles to your Z report" until the two 
 
 **"Do I have to put a program on my POS computer?" (agent install)**
 > "Yes. It's a small Windows service on the POS computer. It uses a read-only database login and never writes to your POS (reg E1, E2, L6). Setup needs someone with administrator rights, and I do the first installs in person with you there. I won't give you a setup time, because I haven't measured one with a real bar yet." (reg A25, A28)
-Add, if asked about their 2Touch agreement: "I haven't verified what your 2Touch agreement says about a program reading its database. Please check, and give me your yes in writing before I install." (strategy section 3 risk 2: counsel question 4). Will it slow the POS? "We have not verified that. It reads every few minutes; I will watch it at install." (reg A27)
+Add, if asked about their 2Touch agreement: "I haven't verified what your 2Touch agreement says about a program reading its database. Please check, and give me your yes in writing before I install." (strategy section 3 risk 2; briefing Q6). Will it slow the POS? "We have not verified that. It reads every few minutes; I will watch it at install." (reg A27)
 
 **"Who sees my data?" (data privacy)**
 > "Only people you invite to your bar can see your bar's data." (reg A30, P16: say this only after gate item 2 is ticked.) "Bank numbers are encrypted; files you import are read and discarded, not stored (reg P12). If a file is in a format Rail doesn't recognise, its text is sent to a third-party AI service to read it; the Privacy page says which and why (reg A32). We do not sell your data (reg L4)."
@@ -228,26 +235,28 @@ Do not say "never used to train a model" until Groq's terms are read and dated (
 
 ## 6. The first-customer offer, and how to ask at night 31
 
-`docs/go-to-market/pricing-and-packaging.md` (G4) did not exist when this was drafted. This section follows the strategy and marks every number HYPOTHESIS. When G4 lands, replace this with its wording; do not reconcile the two by hand.
+Reconciled at review to `docs/go-to-market/pricing-and-packaging.md` sections 4, 5 and 8, which is the source: if the two ever differ, that file wins. Every number is a HYPOTHESIS. **Prices are never said aloud. They appear only in the written quote** (`pricing-and-packaging.md` section 5), which is handed over when the pilot is agreed, before anything is installed, and after the four price questions have been asked.
 
 **The offer, in words the founder can say (HYPOTHESIS: a free 30-night pilot is accepted by more than half of the owners who see the demo; test with the conversations sheet):**
 
-> "The first ten bars get everything, free for 30 nights of your real data, counted from your first synced Z report. No card to start. Then there's a founding price, held for 12 months, that steps up as the ten places fill. In return I'd ask for a short call once a month. I'll put the price and the terms in writing before night 30."
+> "The first ten bars get everything, free for 30 nights of your real data, counted from your first synced Z report. No card to start. Then there's a founding price, held for 12 months, that steps up as the ten places fill, so the bars that came in earlier pay less than the later ones. In return I'd ask for a 20-minute call each month. You'll have the price and the terms in writing before I install anything."
 
 Each phrase's basis:
 - "everything, 30 nights free, from the first synced Z report": strategy section 4; plan open question 10 (reg B14, UNVERIFIED until the owner holds to ten).
-- "steps up as places fill": honest only if ten really is the cap (reg B14). TODO(owner): confirm the cap.
-- The ladder is HYPOTHESIS, not said aloud: bars 1 to 3 at $99, 4 to 6 at $149, 7 to 10 at $199 (strategy section 4). The prices appear only in the written quote.
-- "No setup fee" and "month to month" only in a written quote (reg B15). "No long-term contract" is not said until the quote says so (reg A39).
+- "steps up as places fill": honest only if ten really is the cap (reg B14). TODO(owner): confirm the cap. "Earlier bars pay less" is said openly because owners talk (`pricing-and-packaging.md` section 4 term 3).
+- The ladder is HYPOTHESIS, not said aloud: bars 1 to 3 at $99, 4 to 6 at $149, 7 to 10 at $199 a month, held 12 months (`pricing-and-packaging.md` section 4). The prices appear only in the written quote. TODO(owner): whether the founder's own bar takes place 1; the default there is that it does not.
+- "No setup fee", "month to month" and "cancel any time" only in a written quote (reg B15), after counsel has checked the wording. "No long-term contract" is not said until the quote says so (reg A39).
+- Refund: the first paid month refundable on request is a HYPOTHESIS in `pricing-and-packaging.md` section 8, for counsel to word. Do not offer it aloud.
+- "Everything" means both bundles (Close and Whole bar). Stock is still set up after the first approved pay run, and no Books figure is promised (`pricing-and-packaging.md` section 3).
 - No annual plan, no referral fee, no lifetime discount, no free tier (plan "Do NOT do now").
 
-**Before any invoice goes out (separate from the install gate in section 8):** TODO(owner): legal entity, Stripe account in its name, a mailbox on a domain, and a check that the hosting plan allows commercial use (strategy section 10 items 9 and 10). Plus strategy section 8 items 1 to 5 ticked, including the front-page claims and the Books zero display.
+**Before any invoice goes out (separate from the install gate in section 8):** TODO(owner): legal entity, EIN, a business bank account, a Stripe account in the entity's name, a mailbox on a domain, the accountant's answer on sales tax in Ohio and Kentucky, counsel's check of the cancel and refund wording, and a check that the hosting plan allows commercial use (`pricing-and-packaging.md` section 5; strategy section 10 items 9 and 10). Plus strategy section 8 items 1 to 5 ticked, including the front-page claims and the Books zero display.
 
 **At night 28 to 30, a one-to-one message** (by hand; the owner is a pilot who has already asked to be in touch):
 
 > "Hi [first name], your 30 nights end on [date]. I'll send the invoice on night 31 at [price per the quote, TODO(owner)], for [bundle]. Before I do, what would make you stop? If something has been wrong, tell me now."
 
-**Night 31 (HYPOTHESIS to test: if 3 of the first 5 activated pilots pay without bargaining, the next rung of the ladder stands; if fewer than 2 pay, the problem is value and the price is not cut):**
+**Night 31 (HYPOTHESIS to test: if 3 of the first 5 activated pilots pay without bargaining, the next rung of the ladder stands; if fewer than 2 pay, the problem is value and the price is not cut; at exactly 2, ask the other three "what would have to be true for you to pay?" and change nothing on that evidence):**
 
 > "Your pilot is up. I'm sending the invoice today for [bundle and price from the written quote]. If it isn't worth that to you, say so and I'll turn it off, no hard feelings. If something's missing, I'd like to hear it."
 
@@ -279,19 +288,21 @@ HYPOTHESIS: a visit followed by a demo within two weeks lifts pilots per convers
 
 The founder ticks every box, in writing, with the date. If any is unticked, the answer is no: demo and conversations continue, no install. The reason is in the strategy: installing before these are true "would embarrass the first customers", and overpaying tips at a bar's first week is the worst case (strategy section 8).
 
-**Gate A. The product (strategy section 8 items 1, 2, 3, 7, and the login path).**
+**Gate A. The product (strategy section 8 items 1, 2, 3, 7, the login path, and key rotation).**
 
 - [ ] **1. Payroll Review approval is fixed.** No "Confirm Payroll" button that saves nothing next to the real approval; the Approved badge no longer sits over figures that keep recalculating; the panel shows approver, date and total. Needs the owner's rules first. Date: ____
-- [ ] **2. The role fix (A1) is confirmed on live and deployed**, and the six tables with row security off are checked on live. A manager treated as owner could approve pay and export the bank file. Date: ____
+- [ ] **2. The role fix (item A1 in the overnight log, not register row A1) is confirmed on live and deployed**, and the six tables with row security off are checked on live. A manager treated as owner could approve pay and export the bank file. Date: ____
 - [ ] **3. The two real-data tips checks are done and recorded** (morning list item 3). Date: ____ Result: ____
 - [ ] **4. The open endpoint gates are closed.** `/api/poll-2touch` rejects an ordinary signed-in user (a demo visitor included), and the cron route fails closed when `CRON_SECRET` is unset. Date: ____
 - [ ] **5. The owner login path is decided and tested end to end.** There is no public owner sign-up. The founder either creates the owner's account and walks through `/setup` signed in as that owner, or the Supabase sign-up setting is checked and the magic-link path tested (`onboarding-checklist.md` section 0). Record which path. Date: ____
+
+- [ ] **6. The keys that were printed once in a walk session are rotated** (plan owner step 7; `onboarding-checklist.md` section 13 calls it a gate). Date: ____
 
 **Gate B. The bar (ticked per prospect).**
 
 - [ ] 2Touch on a Windows PC at the bar with a local database the agent can read (`onboarding-checklist.md` section 1).
 - [ ] The owner can say yes to the install, someone with administrator rights is present, and the bar has outbound internet on that PC.
-- [ ] The owner's written yes to reading the 2Touch database (the 2Touch agreement question is UNVERIFIED; counsel question 4).
+- [ ] The owner's written yes to reading the 2Touch database (the 2Touch agreement question is UNVERIFIED; briefing Q6).
 - [ ] The person who approves pay is an owner.
 - [ ] The prospect has seen the demo and heard section 4's honest limits, including that stock needs setup.
 - [ ] The bar knows Rail does not file taxes, withhold, or move money, and they have chosen who does.
@@ -304,7 +315,7 @@ The founder ticks every box, in writing, with the date. If any is unticked, the 
 
 ## 9. One-page leave-behind (draft text)
 
-**Print gate.** The strategy says nothing printed or emailed goes out until a domain and a postal address exist (briefing section 5; plan owner step 4). Until then, show this on a phone and say it aloud. Every line below is from the claims register's approved list or a TRUE verdict.
+**Print gate.** The strategy says nothing printed or emailed goes out until a domain and a postal address exist (briefing section 5; plan owner step 4). Until then, show this on a phone and say it aloud. Every line below is from the claims register's approved list or a TRUE verdict, with two exceptions that carry a condition: the pay-run line (reg B6, PARTLY, gated) and "does not sell your data" (reg L4: a promise in the Terms, which the register marks UNVERIFIED because it is a rule the owner must keep, not a feature).
 
 > **Rail: one app for the whole bar** (reg B2)
 >
@@ -320,7 +331,7 @@ The founder ticks every box, in writing, with the date. If any is unticked, the 
 > **What it does not do**
 > - It does not file or withhold tax, and it does not hold or move your money. Your own bank does that. (reg L1, L2)
 > - It does not connect to other point-of-sale systems directly; the direct link is for 2Touch.
-> - It has no scheduling, no multi-location reporting, no accounting-software link, and no phone app. (strategy section 2)
+> - It has no scheduling, no multi-location reporting, no accounting-software link, and no app-store app; it is a website you open on a phone or a computer. (strategy section 2)
 > - Stock is not accurate until bottle and pour sizes are set. We start with the nightly close.
 >
 > **Your data**
@@ -377,9 +388,10 @@ At the pilot stage the sheet's other tabs apply: install, first Z report, first 
 - Texts to anyone who has not asked for one in writing, including a hand-typed text. Rail's own SMS number is never used for prospecting.
 - Cold email, and any email at all to a prospect who has not asked, until a domain, a mailbox and a postal address exist and counsel has answered.
 - Unsolicited direct messages on social media.
+- Asking a supplier rep or distributor for an introduction at all (briefing Q12), until counsel answers.
 - Paying, giving or discounting anything to a supplier rep or distributor for an introduction.
 - Bought or scraped lead lists, and collecting personal mobile numbers from lists or the web.
-- Approaching 2Touch as a partner (after three to five paying bars and counsel's answer on question 4).
+- Approaching 2Touch as a partner (after three to five paying bars and counsel's answer on briefing Q6).
 
 When counsel answers, the founder updates this section and, only then, asks for a separate script to be written.
 
@@ -407,11 +419,11 @@ When counsel answers, the founder updates this section and, only then, asks for 
 ## Unverified
 
 1. How many 2Touch bars exist near Cincinnati and Northern Kentucky; whether an owner will accept a program on the POS computer.
-2. Whether a bar's 2Touch agreement permits a third-party reader (counsel question 4).
+2. Whether a bar's 2Touch agreement permits a third-party reader (briefing Q6).
 3. Rules for in-person solicitation, liquor premises and local permits (briefing 2.1).
 4. Every threshold and hour in this file: all HYPOTHESIS.
 5. The founder's hours, story, bar name, and whether the founder's bar may be named.
-6. G4 (`pricing-and-packaging.md`) did not exist at drafting; section 6 follows the strategy.
+6. Section 6 was reconciled to `pricing-and-packaging.md` at review; every figure in both is still a HYPOTHESIS.
 7. Whether the cap of ten is a real cap (reg B14); whether the hosting plan allows commercial use; entity, domain, postal address, Stripe.
 8. Whether a reply email to a demo requester needs a postal address; the exact consent wording for a text (counsel Q5).
 9. Whether the pilot offer, the ladder and the five-step demo will be accepted: all HYPOTHESIS.
@@ -419,4 +431,4 @@ When counsel answers, the founder updates this section and, only then, asks for 
 
 ## Sources (all inside the repo, read 2026-11-25)
 
-`docs/superpowers/findings/2026-11-25-gtm-manager-plan.md` (guardrails, G8 brief, open questions), `docs/go-to-market/strategy.md` (sections 2 to 5, 7, 8), `docs/go-to-market/claims-register.md` (all rows cited as "reg"), `docs/go-to-market/outreach-rules-for-counsel.md` (sections 2 to 5), `docs/go-to-market/battlecards.md` (card 11 and the Rail side), `docs/go-to-market/onboarding-checklist.md` (sections 0, 1, 13), `docs/go-to-market/metrics-sheet.md` (sheet columns, stop rules, reason list), `PRODUCT.md`. No outside pages were read. `docs/go-to-market/pricing-and-packaging.md` did not exist.
+`docs/superpowers/findings/2026-11-25-gtm-manager-plan.md` (guardrails, G8 brief, open questions), `docs/go-to-market/strategy.md` (sections 2 to 5, 7, 8), `docs/go-to-market/claims-register.md` (all rows cited as "reg"), `docs/go-to-market/outreach-rules-for-counsel.md` (sections 2 to 5), `docs/go-to-market/battlecards.md` (card 11 and the Rail side), `docs/go-to-market/onboarding-checklist.md` (sections 0, 1, 13), `docs/go-to-market/metrics-sheet.md` (sheet columns, stop rules, reason list), `PRODUCT.md`. No outside pages were read. `docs/go-to-market/pricing-and-packaging.md` (sections 3 to 6 and 8) was added at review.

@@ -16,7 +16,7 @@ Date: 2026-11-25. For the founder, to use in a conversation with a bar owner. Br
 
 True today, with the source:
 - A Windows agent on the bar's 2Touch computer sends Z reports, employee-week data and the item audit every five minutes; an emailed nightly report is the fallback (AGENTS.md, "Integrations"; PRODUCT.md "Operating Context").
-- Tip splits with pooled, individual and percentage-of-sales modes, a barback cut and an opener bonus (strategy.md section 2; `lib/payroll/tip-pool.ts:13-14,35`). **Limit:** the pool engine itself pays only pool-mode staff (`tip-pool.ts:15`); the other modes were not traced end to end for this file. A hand-entered cash tip count is never overwritten by the POS (AGENTS.md, "Cash tips entered by a person outrank the POS"). The claim that a night's tips reconcile to the Z report is not to be made until the two real-data checks are done (strategy.md section 2, "True with a limit").
+- Tip splits with pooled, individual and percentage-of-sales modes, a barback cut and an opener bonus (strategy.md section 2; `lib/payroll/tip-pool.ts:13-14,35`). **Limit:** `tip-pool.ts:15` says the pool engine itself pays only pool-mode staff; individual and percentage-of-sales staff are handled by `lib/payroll/night-split.ts` (added 2026-11-25). Individual mode was checked end to end on the demo bar (the pay run and the day split both reconcile to the cent); percentage-of-sales mode is covered by unit tests only, not checked on real data. A hand-entered cash tip count is never overwritten by the POS (AGENTS.md, "Cash tips entered by a person outrank the POS"). The claim that a night's tips reconcile to the Z report is not to be made until the two real-data checks are done (strategy.md section 2, "True with a limit").
 - A pay run is frozen when submitted, an owner approves it, and the bank file (NACHA) is locked until approval unless an owner overrides with a written reason (AGENTS.md, "A pay run is a snapshot"; `app/api/payroll/nacha/route.ts:78`; `app/(app)/app/payroll/approval-actions.ts:441`). Rail never holds or moves funds; the bar's own bank does (strategy.md section 2).
 - A delivery's cost is the invoice's, not an estimate (AGENTS.md, "A delivery's cost is recorded, not inferred").
 - POS sales reduce stock, but only once each item has a container size and a pour size or recipe (AGENTS.md, "POS sales deplete stock"; strategy.md section 2, "True with a limit").
@@ -222,7 +222,7 @@ Write each owner's answers to the three questions after the conversation. If an 
 - Every competitor price and contract term (see each card). Third-party prices for BevSpot, Bar Cop, Toast and Restaurant365 conflict or may be stale.
 - Whether 7shifts, MarginEdge, Square and Lightspeed handle cash tips or barback and opener rules like Rail does.
 - Contract, cancellation and data-export terms for all competitors: not read (matrix.md "Gaps in this research").
-- Rail: the end-to-end working of individual and percentage-of-sales tip modes (`lib/payroll/tip-pool.ts:15` says the pool engine pays pool-mode staff only), and reconciliation of tips to the Z report on real data. Both stay out of anything said to an owner until confirmed.
+- Rail: percentage-of-sales tip mode on real data (unit-tested only; individual mode was checked on the demo bar on 2026-11-25 via `lib/payroll/night-split.ts`), and reconciliation of tips to the Z report on real data. Both stay out of anything said to an owner until confirmed.
 - The claims register was not present when this file was written.
 
 ## Sources
