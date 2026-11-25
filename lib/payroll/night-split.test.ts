@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { carveOutKeptTips, type KeptTipsInput } from './night-split';
+import { carveOutKeptTips, nightForSharing, type KeptTipsInput } from './night-split';
+import { applyTipRemovals } from './adjustments';
 import { splitBarbackTips } from './tip-pool';
 
 /**
@@ -154,5 +155,56 @@ describe('a whole night, end to end', () => {
       [server('wes', 2400, 432), server('danny', 1200, 384), server('pat', 600, 90)],
     );
     expect(total).toBeCloseTo(1212, 6);
+  });
+});
+
+describe('nightForSharing', () => {
+  const rm = (amount: number, employeeId: string | null = null) => ({ amount, employeeId, reason: 'x' });
+  const run = (over: Partial<Parameters<typeof nightForSharing>[0]> = {}) =>
+    nightForSharing({ zTotalTips: 1000, removals: [], serverTips: [], keepers: [], ...over });
+
+  it('with no removals and no keepers the remainder is the Z total', () => {
+    const r = run();
+    expect(r).toMatchObject({ removed: 0, removalOverdrawn: false, keptTotal: 0, remainder: 1000, overAllocated: false });
+  });
+  it('an unattributed removal shrinks the night', () => {
+    const r = run({ removals: [rm(100)] });
+    expect(r.removed).toBe(100);
+    expect(r.remainder).toBe(900);
+  });
+  it('a removal naming an employee does not shrink the night', () => {
+    const r = run({ removals: [rm(100, 'e1')] });
+    expect(r.removed).toBe(0);
+    expect(r.remainder).toBe(1000);
+  });
+  it('a removal larger than the night leaves nothing and is flagged', () => {
+    const r = run({ removals: [rm(1200)] });
+    expect(r.remainder).toBe(0);
+    expect(r.removed).toBe(1000);
+    expect(r.removalOverdrawn).toBe(true);
+  });
+  it('removal then individual keeper', () => {
+    const r = run({
+      removals: [rm(100)],
+      serverTips: [server('Dan', 2000, 300)],
+      keepers: [keeper('k1', 'Dan', 'individual')],
+    });
+    expect(r.keptTotal).toBe(300);
+    expect(r.remainder).toBe(600);
+  });
+  it('sales_pct keeper matches applyTipRemovals then carveOutKeptTips by hand', () => {
+    const serverTips = [server('Sam', 3000, 0), server('Bo', 1000, 0)];
+    const keepers = [keeper('k2', 'Sam', 'sales_pct')];
+    const removals = [rm(250)];
+    const hand = carveOutKeptTips({ dailyTips: applyTipRemovals(1000, removals).tipsAfterRemoval, serverTips, keepers });
+    const r = run({ removals, serverTips, keepers });
+    expect(r.remainder).toBe(hand.remainder);
+    expect(r.keptTotal).toBe(sum(hand.kept));
+    expect(r.kept).toEqual(hand.kept);
+  });
+  it('keeper tips larger than the night: overAllocated, remainder 0', () => {
+    const r = run({ serverTips: [server('Dan', 100, 5000)], keepers: [keeper('k1', 'Dan', 'individual')] });
+    expect(r.overAllocated).toBe(true);
+    expect(r.remainder).toBe(0);
   });
 });

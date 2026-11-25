@@ -12,6 +12,8 @@
  * Pure, so the conservation rule can be tested without a database.
  */
 
+import { applyTipRemovals, type TipRemoval } from './adjustments';
+
 export type ServerTipRow = {
   name: string;
   totalSales: number;
@@ -88,4 +90,43 @@ export function carveOutKeptTips(input: KeptTipsInput): KeptTips {
   }
 
   return { kept, remainder: afterIndividual - salesPctTotal, overAllocated: false };
+}
+
+export type NightForSharing = {
+  /** Unattributed removals actually taken off the night (clamped to it). */
+  removed: number;
+  removalOverdrawn: boolean;
+  kept: Map<string, number>;
+  keptTotal: number;
+  /** What is left for the barback cut, opener bonus and pool. */
+  remainder: number;
+  overAllocated: boolean;
+};
+
+/**
+ * One night, in the pay run's order: unattributed tip removals first, then the
+ * staff-kept carve-out. The day-split screen calls this so it cannot show a pool
+ * the pay run does not pay.
+ */
+export function nightForSharing(input: {
+  zTotalTips: number;
+  removals: TipRemoval[];
+  serverTips: ServerTipRow[];
+  keepers: Keeper[];
+}): NightForSharing {
+  const rem = applyTipRemovals(input.zTotalTips, input.removals);
+  const carve = carveOutKeptTips({
+    dailyTips: rem.tipsAfterRemoval,
+    serverTips: input.serverTips,
+    keepers: input.keepers,
+  });
+  const keptTotal = [...carve.kept.values()].reduce((s, v) => s + v, 0);
+  return {
+    removed: rem.removed,
+    removalOverdrawn: rem.overdrawn,
+    kept: carve.kept,
+    keptTotal,
+    remainder: carve.remainder,
+    overAllocated: carve.overAllocated,
+  };
 }
