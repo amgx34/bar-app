@@ -115,6 +115,49 @@ describe('schemaToSql', () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
+  it('creates a function that returns a table row type after that table, and the rest before', () => {
+    const rowTypeFn = [
+      'CREATE OR REPLACE FUNCTION public.commit_account(p_id uuid)',
+      ' RETURNS accounts',
+      ' LANGUAGE plpgsql',
+      'AS $function$',
+      'BEGIN RETURN NULL; END;',
+      '$function$',
+    ].join(String.fromCharCode(10));
+    const sql = schemaToSql(
+      empty({
+        tables: [{ name: 'accounts', rls: false }],
+        columns: [col('accounts', 'id', 1, 'uuid', { notNull: true, default: 'default_id()' })],
+        functions: [
+          {
+            name: 'default_id()',
+            definition: 'CREATE OR REPLACE FUNCTION public.default_id() RETURNS uuid LANGUAGE sql AS $$ select gen_random_uuid() $$',
+          },
+          { name: 'commit_account(p_id uuid)', definition: rowTypeFn },
+        ],
+      }),
+    );
+    const at = (s: string) => sql.indexOf(s);
+    expect(at('public.default_id()')).toBeLessThan(at('CREATE TABLE'));
+    expect(at('CREATE TABLE')).toBeLessThan(at('public.commit_account'));
+  });
+
+  it('does not treat a parameter named like part of a table as that table', () => {
+    const sql = schemaToSql(
+      empty({
+        tables: [{ name: 'staff', rls: false }],
+        columns: [col('staff', 'id', 1, 'uuid', { notNull: true })],
+        functions: [
+          {
+            name: 'pay(p_staff_id uuid)',
+            definition: 'CREATE OR REPLACE FUNCTION public.pay(p_staff_id uuid) RETURNS numeric LANGUAGE sql AS $$ select 1 $$',
+          },
+        ],
+      }),
+    );
+    expect(sql.indexOf('public.pay(')).toBeLessThan(sql.indexOf('CREATE TABLE'));
+  });
+
   it('puts primary keys before foreign keys that point at them', () => {
     const sql = schemaToSql(full);
     expect(sql.indexOf('PRIMARY KEY')).toBeLessThan(sql.indexOf('FOREIGN KEY'));

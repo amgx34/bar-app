@@ -92,13 +92,29 @@ function columnLine(c: SchemaExport['columns'][number]): string {
 }
 
 /**
+ * True when a function's signature (everything before its body) names one of the
+ * tables, meaning it returns or takes that table's row type. Postgres needs the
+ * table to exist before such a function can be created. The match is on whole
+ * identifiers, so a parameter called `p_staff_id` does not count as `staff`.
+ */
+function namesTableInSignature(definition: string, tables: string[]): boolean {
+  const bodyAt = definition.search(/\sAS\s+\$/i);
+  const header = bodyAt === -1 ? definition : definition.slice(0, bodyAt);
+  return tables.some((t) => {
+    const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(?<![\\w"])${escaped}(?![\\w"])`).test(header);
+  });
+}
+
+/**
  * SQL that recreates the exported `public` schema in an empty project.
  *
  * Order matters and is the point of this function: functions come before tables
  * because a column default can call one; every foreign key comes after every
  * table because two tables may point at each other; policies come last because
  * they refer to tables, columns and functions. A function whose *signature*
- * names a table's row type would still fail; none has been seen.
+ * names a table's row type (`RETURNS accounts`) cannot exist before that table,
+ * so those are created right after the tables instead.
  */
 export function schemaToSql(s: SchemaExport): string {
   const blocks: string[] = [
@@ -110,12 +126,15 @@ export function schemaToSql(s: SchemaExport): string {
     blocks.push(`CREATE TYPE ${inPublic(e.name)} AS ENUM (${labels});`);
   }
   for (const seq of s.sequences) blocks.push(`CREATE SEQUENCE ${inPublic(seq.name)} AS ${seq.dataType};`);
-  for (const f of s.functions) blocks.push(terminated(f.definition));
+  const tableNames = s.tables.map((t) => t.name);
+  const needsTables = (f: SchemaExport['functions'][number]) => namesTableInSignature(f.definition, tableNames);
+  for (const f of s.functions.filter((f) => !needsTables(f))) blocks.push(terminated(f.definition));
 
   for (const t of s.tables) {
     const cols = s.columns.filter((c) => c.table === t.name).sort((a, b) => a.position - b.position);
     blocks.push(`CREATE TABLE ${inPublic(t.name)} (\n${cols.map(columnLine).join(',\n')}\n);`);
   }
+  for (const f of s.functions.filter(needsTables)) blocks.push(terminated(f.definition));
 
   const constraint = (k: SchemaExport['constraints'][number]) =>
     `ALTER TABLE ONLY ${inPublic(k.table)} ADD CONSTRAINT ${q(k.name)} ${k.definition};`;
