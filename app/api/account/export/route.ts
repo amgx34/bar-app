@@ -33,8 +33,14 @@ export async function GET() {
   const files: { name: string; data: string }[] = [];
   const skipped: string[] = [];
 
-  const orgRows = await all((a, b) => supabase.from('organizations')
-    .select('id, name, slug, bar_settings, created_at').eq('id', org.id).range(a, b));
+  let orgRows: Record<string, unknown>[];
+  try {
+    orgRows = await all((a, b) => supabase.from('organizations')
+      .select('id, name, slug, bar_settings, created_at').eq('id', org.id).range(a, b));
+  } catch (e) {
+    console.error('[account] export org read failed', { orgId: org.id, message: e instanceof Error ? e.message : e });
+    return NextResponse.json({ error: 'We could not read your bar to build the export.' }, { status: 500 });
+  }
   files.push({ name: 'organization.csv', data: toCsv(orgRows) });
 
   const parentIds = new Map<string, string[]>();

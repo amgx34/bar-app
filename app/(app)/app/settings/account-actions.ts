@@ -6,6 +6,7 @@ import { getCurrentOrg, CURRENT_ORG_COOKIE } from '@/lib/org';
 import { createClient } from '@/lib/supabase/server';
 import { isDemoOrg } from '@/lib/billing/store';
 import { confirmationMatches, DeletionRefused } from '@/lib/account/deletion-plan';
+import { LEGAL_CONTACT_EMAIL } from '@/lib/legal';
 import { deleteOrg, deletionEnabled } from '@/lib/account/delete-org';
 
 export type CloseBarState = { error?: string };
@@ -15,7 +16,7 @@ export async function closeBar(_prev: CloseBarState, formData: FormData): Promis
   const { org, role } = await getCurrentOrg();
   if (role !== 'owner') return { error: 'Only the owner can close this bar.' };
   if (isDemoOrg(org.slug)) return { error: 'Sample bars are removed automatically after 24 hours.' };
-  if (!deletionEnabled()) return { error: 'Closing a bar is not switched on yet. Email us and we will do it for you.' };
+  if (!deletionEnabled()) return { error: `Closing a bar is not switched on yet. Email us at ${LEGAL_CONTACT_EMAIL} and we will do it for you.` };
   if (!confirmationMatches(String(formData.get('confirm') ?? ''), org.name)) {
     return { error: 'The name you typed does not match. Nothing was deleted.' };
   }
