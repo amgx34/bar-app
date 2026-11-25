@@ -1,5 +1,6 @@
 'use server';
 
+import { carveOutKeptTips, type Keeper } from '@/lib/payroll/night-split';
 import { revalidatePath } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
@@ -778,6 +779,15 @@ export async function computePayrollForOrg(
       addTip(tipsByEmployeeByDate, employeeId, date, amount);
     };
 
+    // Employees who keep their own tips rather than sharing the pool. What they
+    // keep comes out of the night BEFORE the pool is worked out (see
+    // lib/payroll/night-split.ts): the Z total already contains it.
+    const keepers: Keeper[] = payrollEmployees.flatMap((e) =>
+      e.tip_mode === 'individual' || e.tip_mode === 'sales_pct'
+        ? [{ employeeId: e.id, name: e.name, mode: e.tip_mode }]
+        : [],
+    );
+
     for (const report of zReports || []) {
       // Removals come off BEFORE the barback cut and the bartender split, so a
       // court-ordered payout shrinks the night for everybody proportionally
@@ -788,6 +798,23 @@ export async function computePayrollForOrg(
       );
       const dailyTips = removal.tipsAfterRemoval;
       if (dailyTips <= 0) continue;
+
+      // Individual and sales_pct employees keep their tips; the barback cut, the
+      // opener bonus and the pool all work from what is left. Crediting them on
+      // top of a pool built from the full total over-allocated the night.
+      const night = carveOutKeptTips({
+        dailyTips,
+        serverTips: serverTipsByDate.get(report.report_date) || [],
+        keepers,
+      });
+      for (const [employeeId, amount] of night.kept) {
+        addTips(employeeId, report.report_date, amount);
+      }
+      if (night.overAllocated) {
+        // Bad server rows asked for more than the night held; they were scaled to
+        // fit. Not yet shown in the UI, so say so where it can be found.
+        console.error(`[payroll] ${orgId} ${report.report_date}: kept tips exceeded the night's tips and were scaled down`);
+      }
 
       const dayShifts = shiftsByDate.get(report.report_date) || [];
 
@@ -801,7 +828,7 @@ export async function computePayrollForOrg(
       // so they hold a slot in the split but do not claim it — see
       // splitBarbackTips for why the slot is not simply removed.
       const barbackSplit = splitBarbackTips({
-        dailyTips,
+        dailyTips: night.remainder,
         barbackFraction: barbackFrac,
         method: barbackSplitMethod,
         tiers: barbackTiers,
@@ -856,27 +883,6 @@ export async function computePayrollForOrg(
           const tip = (hrs / poolHoursToday) * shareablePool;
           addTips(s.employee_id, report.report_date, tip);
         });
-      }
-
-      // Individual and sales_pct tips from server breakdown
-      const dayServerTips = serverTipsByDate.get(report.report_date) || [];
-      if (dayServerTips.length > 0) {
-        const totalDaySales = dayServerTips.reduce((sum, s) => sum + s.totalSales, 0);
-
-        for (const serverEntry of dayServerTips) {
-          // Match server name to an employee (case-insensitive)
-          const emp = payrollEmployees.find(
-            (e) => e.name.toLowerCase() === serverEntry.name
-          );
-          if (!emp) continue;
-
-          if (emp.tip_mode === 'individual') {
-            addTips(emp.id, report.report_date, serverEntry.tipsPaidOut);
-          } else if (emp.tip_mode === 'sales_pct' && totalDaySales > 0) {
-            const tipShare = (serverEntry.totalSales / totalDaySales) * dailyTips;
-            addTips(emp.id, report.report_date, tipShare);
-          }
-        }
       }
     }
 
