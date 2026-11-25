@@ -54,6 +54,13 @@ describe('assertDevIsNotLive', () => {
     expect(() => assertDevIsNotLive(undefined, live, false)).toThrow();
     expect(() => assertDevIsNotLive('', live, false)).toThrow();
   });
+  it('throws on a placeholder that was never replaced, not a host', () => {
+    expect(() => assertDevIsNotLive('PASTE_NEW_PROJECT_URL_HERE', live, false)).toThrow(/not a real|placeholder|replace/i);
+  });
+  it('accepts a local Supabase address', () => {
+    expect(() => assertDevIsNotLive('http://127.0.0.1:54321', live, false)).not.toThrow();
+    expect(() => assertDevIsNotLive('http://localhost:54321', live, false)).not.toThrow();
+  });
   it('lets the owner override on purpose', () => {
     expect(() => assertDevIsNotLive(live, live, true)).not.toThrow();
   });

@@ -46,6 +46,14 @@ export function assertDevIsNotLive(
       'NEXT_PUBLIC_SUPABASE_URL is not set for development. Create .env.development.local with the dev project URL and keys.',
     );
   }
+  // A real host has a dot (abc.supabase.co) or is a local address. Anything else is
+  // a leftover placeholder or a typo, and starting on it would only fail later.
+  if (!dev.includes('.') && dev !== 'localhost') {
+    throw new Error(
+      `NEXT_PUBLIC_SUPABASE_URL is "${devUrl}", which is not a real address. ` +
+        'Replace the placeholder in .env.development.local with the new project URL and save the file.',
+    );
+  }
   const live = normalizeHost(liveUrl ?? '');
   if (live && dev === live && !allowLive) {
     throw new Error(
