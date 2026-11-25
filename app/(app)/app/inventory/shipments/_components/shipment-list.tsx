@@ -115,8 +115,8 @@ export function ShipmentList({
           <TableRow>
             <TableHead>Date</TableHead>
             <TableHead>Vendor</TableHead>
-            <TableHead>Invoice #</TableHead>
-            <TableHead className="text-right">Lines</TableHead>
+            <TableHead className="hidden sm:table-cell">Invoice #</TableHead>
+            <TableHead className="hidden text-right sm:table-cell">Lines</TableHead>
             <TableHead className="text-right">Total</TableHead>
             <TableHead className="text-right">Invoice total</TableHead>
             <TableHead />
@@ -132,9 +132,16 @@ export function ShipmentList({
             return (
               <TableRow key={s.id} className={s.voided ? 'opacity-60' : undefined}>
                 <TableCell className="tabular-nums">{formatDate(s.invoiceDate)}</TableCell>
-                <TableCell className="font-medium">{s.vendorName}</TableCell>
-                <TableCell className="text-muted-foreground">{s.invoiceNumber ?? '—'}</TableCell>
-                <TableCell className="text-right tabular-nums">{s.lineCount}</TableCell>
+                <TableCell className="font-medium">
+                  {s.vendorName}
+                  {/* Below sm the Invoice # and Lines columns are hidden so
+                      Total, Invoice total and Void stay on screen. */}
+                  <span className="block text-xs font-normal text-muted-foreground sm:hidden">
+                    {s.invoiceNumber ? `#${s.invoiceNumber} · ` : ''}{s.lineCount} lines
+                  </span>
+                </TableCell>
+                <TableCell className="hidden text-muted-foreground sm:table-cell">{s.invoiceNumber ?? '—'}</TableCell>
+                <TableCell className="hidden text-right tabular-nums sm:table-cell">{s.lineCount}</TableCell>
                 <TableCell className="text-right tabular-nums font-medium">
                   {money(s.computedTotal)}
                 </TableCell>

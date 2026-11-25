@@ -371,14 +371,14 @@ export default async function SalesPage({
               ) : (
                 <div className="space-y-2">
                   {legacy.slowMovers.map((s) => (
-                    <div key={s.matchKey} className="flex items-center justify-between gap-3 text-sm">
+                    <div key={s.matchKey} className="flex flex-col gap-0.5 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                       <div className="min-w-0">
-                        <span className="truncate">{s.itemName}</span>
+                        <span className="break-words">{s.itemName}</span>
                         <span className="ml-2 text-xs text-muted-foreground">
                           {s.categoryName ?? 'Uncategorised'}
                         </span>
                       </div>
-                      <span className="shrink-0 text-right text-xs">
+                      <span className="text-xs sm:shrink-0 sm:text-right">
                         {s.neverSold ? (
                           <span className="font-medium text-amber-600 dark:text-amber-400">Never sold</span>
                         ) : (

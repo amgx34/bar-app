@@ -15,7 +15,9 @@ import { ArrowRight } from 'lucide-react';
  * duplicate the button already on screen.
  */
 export function StickyCta() {
-  const [visible, setVisible] = useState(false);
+  const [passedHero, setVisible] = useState(false);
+  const [atContact, setAtContact] = useState(false);
+  const visible = passedHero && !atContact;
 
   useEffect(() => {
     // A sentinel + IntersectionObserver rather than a scroll listener, so this
@@ -34,7 +36,13 @@ export function StickyCta() {
       { rootMargin: '0px' },
     );
     observer.observe(sentinel);
-    return () => observer.disconnect();
+
+    // The contact form is the destination of this button; sitting on top of
+    // its fields while the visitor types is worse than no button.
+    const contact = document.getElementById('contact');
+    const contactObserver = new IntersectionObserver(([entry]) => setAtContact(entry.isIntersecting));
+    if (contact) contactObserver.observe(contact);
+    return () => { observer.disconnect(); contactObserver.disconnect(); };
   }, []);
 
   return (

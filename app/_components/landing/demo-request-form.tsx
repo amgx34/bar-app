@@ -76,14 +76,14 @@ export function DemoRequestForm() {
           <Label className="flex items-center gap-1.5">
             <User className="h-3.5 w-3.5 text-muted-foreground" /> Full Name *
           </Label>
-          <Input {...register('name')} placeholder="Alex Johnson" />
+          <Input className="h-11 md:h-8" {...register('name')} placeholder="Alex Johnson" />
           {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
         </div>
         <div className="space-y-1.5">
           <Label className="flex items-center gap-1.5">
             <Building2 className="h-3.5 w-3.5 text-muted-foreground" /> Bar / Business Name *
           </Label>
-          <Input {...register('business_name')} placeholder="The Tipsy Tavern" />
+          <Input className="h-11 md:h-8" {...register('business_name')} placeholder="The Tipsy Tavern" />
           {errors.business_name && <p className="text-xs text-destructive">{errors.business_name.message}</p>}
         </div>
       </div>
@@ -94,14 +94,14 @@ export function DemoRequestForm() {
           <Label className="flex items-center gap-1.5">
             <Mail className="h-3.5 w-3.5 text-muted-foreground" /> Email *
           </Label>
-          <Input {...register('email')} type="email" placeholder="alex@tipsy-tavern.com" />
+          <Input className="h-11 md:h-8" {...register('email')} type="email" placeholder="alex@tipsy-tavern.com" />
           {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
         </div>
         <div className="space-y-1.5">
           <Label className="flex items-center gap-1.5">
             <Phone className="h-3.5 w-3.5 text-muted-foreground" /> Phone
           </Label>
-          <Input {...register('phone')} type="tel" placeholder="+1 (555) 000-0000" />
+          <Input className="h-11 md:h-8" {...register('phone')} type="tel" placeholder="+1 (555) 000-0000" />
         </div>
       </div>
 
@@ -112,6 +112,7 @@ export function DemoRequestForm() {
             <Hash className="h-3.5 w-3.5 text-muted-foreground" /> Number of Locations
           </Label>
           <Input
+            className="h-11 md:h-8"
             type="number" min={1} max={500}
             {...register('num_locations', { valueAsNumber: true })}
           />
@@ -124,7 +125,7 @@ export function DemoRequestForm() {
             value={inquiryType}
             onValueChange={(v) => setValue('inquiry_type', (v ?? 'demo') as DemoRequestInput['inquiry_type'])}
           >
-            <SelectTrigger>
+            <SelectTrigger className="h-11 md:h-8">
               <span className="text-sm">
                 {INQUIRY_TYPES.find(t => t.value === inquiryType)?.label ?? 'Schedule a Demo'}
               </span>
@@ -159,7 +160,7 @@ export function DemoRequestForm() {
         />
       </div>
 
-      <Button type="submit" disabled={isSubmitting} size="lg" className="w-full gap-2">
+      <Button type="submit" disabled={isSubmitting} size="lg" className="w-full gap-2 h-11 md:h-9">
         {isSubmitting ? (
           <>Sending your request…</>
         ) : (

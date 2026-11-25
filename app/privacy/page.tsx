@@ -174,13 +174,13 @@ export default function PrivacyPage() {
         <h2>How long we keep it</h2>
         <ul>
           <li><strong>Your bar&rsquo;s operating data</strong> — for as long as the account is open. Payroll and sales history is retained because tax rules generally require it.</li>
-          <li><strong>Demo accounts</strong> — deleted automatically 24 hours after creation, along with all their data.</li>
-          <li><strong>Rate-limit records</strong> — deleted within 24 hours.</li>
+          <li><strong>Demo accounts</strong> — deleted automatically within two days of creation, along with all their data.</li>
+          <li><strong>Rate-limit records</strong> — deleted within two days.</li>
           <li><strong>Uploaded files</strong> — never stored. Files are read in your browser, parsed, and discarded; only the extracted figures are saved.</li>
         </ul>
         <p>
-          Close your account and we will delete its data within 30 days, except
-          where we are required to keep records for longer.
+          Ask us to close your account and we will tell you what we must keep.
+          Records the law requires us to hold are kept for as long as it says.
         </p>
       </section>
 
@@ -189,7 +189,8 @@ export default function PrivacyPage() {
         <p>
           Depending on where you live, you may have the right to access, correct,
           export or delete your personal data, to object to processing, and to
-          complain to a data protection authority. Email us at{' '}
+          complain to a data protection authority. Requests are handled by
+          email: write to{' '}
           <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> and we will
           respond within 30 days. We will not charge you or degrade your service
           for exercising any of these rights.
