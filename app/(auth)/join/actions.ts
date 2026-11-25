@@ -96,7 +96,7 @@ export async function claimEmployeeAccount(
       eventType: 'staff.claim_pending',
       title:     'Someone wants a staff login',
       body:      `${typedName.trim()} signed up with the bar's join code and is waiting to be approved.`,
-      link:      '/app/employees',
+      link:      '/app/payroll/employees',
       payload:   { claimedName: typedName.trim() },
       // Keyed on the user, not the date: one person asking once is one alert,
       // and a repeated sign-up is the same ask rather than a new one.
