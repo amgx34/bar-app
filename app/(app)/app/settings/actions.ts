@@ -137,14 +137,6 @@ export async function updateInventoryDefaults(data: {
   await mergeBarSettings(org.id, data);
 }
 
-// ── Bar settings (legacy shim — used by bar-settings-form.tsx) ────────────────
-
-export async function updateBarSettings(data: Partial<BarSettings>) {
-  const { org, role } = await getCurrentOrg();
-  assertEditor(role);
-  await mergeBarSettings(org.id, data);
-}
-
 // ── Clover sync / disconnect ──────────────────────────────────────────────────
 
 export type SyncResult = { created: number; updated: number; skipped: number };
