@@ -319,7 +319,9 @@ export default function DaySplitTab({
       };
     }
     return computeSplit(
-      data.employees, states, data.totalTips, data.openerBonus, data.barbackFraction,
+      // The pool is shared from what is left after individual and sales_pct staff
+      // take theirs, the same as the pay run.
+      data.employees, states, data.totalTips - data.keptTips, data.openerBonus, data.barbackFraction,
       data.barbackSplitMethod, data.barbackTiers,
     );
   }, [data, states]);
@@ -424,6 +426,11 @@ export default function DaySplitTab({
             <div className="rounded-xl border bg-card p-4">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Tips</p>
               <p className="text-2xl font-bold tabular-nums mt-1">${data.totalTips.toFixed(2)}</p>
+              {data.keptTips > 0 && (
+                <p className="text-xs text-muted-foreground tabular-nums">
+                  ${data.keptTips.toFixed(2)} kept by staff on their own tips
+                </p>
+              )}
             </div>
             <div className="rounded-xl border bg-card p-4 border-l-4 border-l-emerald-600 dark:border-l-emerald-400">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Bartender Pool</p>
@@ -618,6 +625,9 @@ export default function DaySplitTab({
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {emp.excludedReason}
+                        {data.keptByEmployee[emp.id] > 0 && (
+                          <span className="tabular-nums"> · ${data.keptByEmployee[emp.id].toFixed(2)} tonight</span>
+                        )}
                       </span>
                     </span>
                   </div>

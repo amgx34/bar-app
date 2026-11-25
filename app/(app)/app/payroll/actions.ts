@@ -1030,6 +1030,15 @@ export interface DaySplitData {
   /** How the barback cut is divided. Sent so this screen cannot diverge. */
   barbackSplitMethod: BarbackSplitMethod;
   totalTips: number;
+  /**
+   * What individual-mode and sales_pct employees keep out of totalTips, from the
+   * same carveOutKeptTips the pay run uses. The pool is shared from
+   * totalTips - keptTips; sharing the full total made this screen promise
+   * bartenders more than the pay run pays them.
+   */
+  keptTips: number;
+  /** employeeId -> what they keep tonight, for showing beside their name. */
+  keptByEmployee: Record<string, number>;
   totalSales: number;
   employees: DaySplitEmployee[];
   /**
@@ -1082,6 +1091,38 @@ export async function getDaySplitData(date: string): Promise<DaySplitData | null
 
   if (!shifts || shifts.length === 0) return null;
 
+  // Tips that individual and sales_pct staff keep come out before the pool is
+  // shared, exactly as in the pay run (lib/payroll/night-split.ts).
+  const { data: serverRows } = await supabase
+    .from('z_report_server_tips')
+    .select('employee_name, total_sales, tips_paid_out')
+    .eq('organization_id', org.id)
+    .eq('report_date', date);
+  const { data: keeperRows } = await supabase
+    .from('employees')
+    .select('id, name, tip_mode')
+    .eq('organization_id', org.id)
+    .in('tip_mode', ['individual', 'sales_pct']);
+  const zTotalTips = ((day?.cash_tips as number) ?? 0) + ((day?.cc_tips as number) ?? 0);
+  const carve = carveOutKeptTips({
+    dailyTips: zTotalTips,
+    serverTips: (serverRows ?? [])
+      .filter((r) => !DAY_SPLIT_EXCLUDED.has(String(r.employee_name).toLowerCase().trim()))
+      .map((r) => ({
+        name: r.employee_name as string,
+        totalSales: Number(r.total_sales) || 0,
+        tipsPaidOut: Number(r.tips_paid_out) || 0,
+      })),
+    keepers: (keeperRows ?? [])
+      .filter((e) => !DAY_SPLIT_EXCLUDED.has(String(e.name).toLowerCase().trim()))
+      .map((e) => ({
+        employeeId: e.id as string,
+        name: e.name as string,
+        mode: e.tip_mode as 'individual' | 'sales_pct',
+      })),
+  });
+  const keptTips = zTotalTips - carve.remainder;
+
   // Merge multiple shifts per employee and attach employee info
   const empMap = new Map<string, DaySplitEmployee>();
   for (const shift of shifts) {
@@ -1122,7 +1163,9 @@ export async function getDaySplitData(date: string): Promise<DaySplitData | null
 
   return {
     date,
-    totalTips: ((day?.cash_tips as number) ?? 0) + ((day?.cc_tips as number) ?? 0),
+    totalTips: zTotalTips,
+    keptTips,
+    keptByEmployee: Object.fromEntries(carve.kept),
     totalSales: (day?.total_sales as number) ?? 0,
     employees,
     openerBonus: openerBonusFromSettings(org.bar_settings ?? {}),
