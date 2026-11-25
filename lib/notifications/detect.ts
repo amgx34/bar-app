@@ -281,14 +281,14 @@ export function detectFeedStale(health: SyncHealth, provider: string | null | un
   const api = provider ? API_NAMES[provider] : undefined;
 
   const action = api
-    ? `Reconnect ${api} in Settings. If the bar was closed, nothing is wrong.`
-    : 'Check that the POS computer is on and the Rail agent is running. If the bar was closed, nothing is wrong.';
+    ? `Reconnect ${api} in Settings, POS Integration. If the bar was closed, nothing is wrong.`
+    : 'Check that the POS computer is on and the Rail program is running. If the bar was closed, nothing is wrong.';
 
   return {
     eventType: 'pos.feed_stale',
-    title:     when ? `No sales since ${when}` : 'No sales received yet',
+    title:     reauth && api ? `${api} needs reconnecting` : when ? `No sales since ${when}` : 'No sales received yet',
     body:      `${when ? `The last data arrived ${when}. ` : 'The POS has not sent anything yet. '}${action}`,
-    link:      '/app/settings',
+    link:      '/app/settings?tab=pos',
     payload:   { lastSyncAt, status },
     dedupeKey: `pos.feed_stale:${lastDay ?? 'never'}`,
   };

@@ -62,7 +62,7 @@ export const EVENT_LABELS: Record<EventType, { title: string; description: strin
   },
   'pos.feed_stale': {
     title:       'POS stopped sending sales',
-    description: 'When no sales have come in from the POS for a day or more, or its login needs reconnecting. Once per outage.',
+    description: 'No sales from the POS for a day or more, or its login needs reconnecting.',
   },
 };
 

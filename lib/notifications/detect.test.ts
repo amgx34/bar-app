@@ -278,12 +278,13 @@ describe('detectFeedStale', () => {
     expect(d?.title).toBe('No sales since Nov 24');
     expect(d?.body).not.toMatch(/—|fault|your fault|failed to/i);
     expect(d?.body).toContain('POS');
-    expect(d?.link).toBe('/app/settings');
+    expect(d?.link).toBe('/app/settings?tab=pos');
   });
 
   it('fires for a login Clover or Toast no longer accepts, however recent', () => {
     const h = assessSyncHealth({ merchant_id: 'm', last_sync_at: at(2), needs_reauth: true }, 'clover', NOW);
     const d = detectFeedStale(h, 'clover');
+    expect(d?.title).toBe('Clover needs reconnecting');
     expect(d?.body).toContain('Reconnect Clover');
   });
 
