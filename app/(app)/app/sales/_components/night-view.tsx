@@ -31,6 +31,7 @@ export function NightView({
   asOf,
   items,
   categories,
+  provider,
 }: {
   data: PeriodSalesData;
   title: string;
@@ -40,9 +41,10 @@ export function NightView({
   asOf: string | null;
   items: ItemMargin[];
   categories: CategoryMargin[];
+  provider?: string | null;
 }) {
   if (!data.capabilities.hasHourly || !data.daypart) {
-    return <MissingPanel title="When the money came in" capability="hasHourly" />;
+    return <MissingPanel title="When the money came in" capability="hasHourly" provider={provider} />;
   }
 
   const cumulative = buildCumulative(data.daypart);

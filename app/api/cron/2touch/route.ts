@@ -11,6 +11,7 @@ import { poll2TouchEmails } from '@/lib/2touch/poll-emails';
 import { purgeExpiredDemoUsers } from '@/lib/demo/purge';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { runDailyNotifications } from '@/lib/notifications/run-daily';
+import { runDailyProviderSync } from '@/lib/pos/run-daily-providers';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -27,6 +28,12 @@ export async function GET(req: NextRequest) {
   }
 
   const emails = await poll2TouchEmails();
+
+  // Clover and Toast bars are pulled, not pushed. Before notifications so
+  // last night's Z is in place when they read it. Never throws.
+  const posProviders = await runDailyProviderSync().catch((e) => ({
+    scanned: 0, synced: 0, failed: 0, skipped: 0, deferred: 0, errors: [String(e)],
+  }));
 
   // Housekeeping rides along on the one scheduled invocation the Hobby plan
   // allows. Both are isolated so a failure in either still lets the other run.
@@ -78,7 +85,7 @@ export async function GET(req: NextRequest) {
     }
   })();
 
-  const result = { emails, demoPurge, rateLimitRowsSwept, jsonbPruned, notifications };
+  const result = { emails, posProviders, demoPurge, rateLimitRowsSwept, jsonbPruned, notifications };
   console.log('[cron/2touch]', result);
   return NextResponse.json(result);
 }

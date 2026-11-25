@@ -216,3 +216,72 @@ describe('describeDuration', () => {
     }
   });
 });
+
+describe('assessSyncHealth for API providers (Clover, Toast)', () => {
+  const clover = (over: Record<string, unknown> = {}) => ({
+    merchant_id: 'M1', timezone: 'America/New_York', last_sync_at: agoMinutes(30), ...over,
+  });
+  const toastCfg = (over: Record<string, unknown> = {}) => ({
+    restaurant_guid: 'R1', timezone: 'America/Chicago', last_sync_at: agoMinutes(30), ...over,
+  });
+
+  it('is not configured until an id is stored', () => {
+    expect(assessSyncHealth({}, 'toast', NOW).status).toBe('not-configured');
+    expect(assessSyncHealth({ restaurant_guid: 'R1', needs_reauth: false }, 'clover', NOW).status).toBe('not-configured');
+  });
+
+  it('reports a recent sync as healthy for both providers', () => {
+    expect(assessSyncHealth(clover(), 'clover', NOW).status).toBe('healthy');
+    expect(assessSyncHealth(toastCfg(), 'toast', NOW).status).toBe('healthy');
+  });
+
+  it('does not call a daily-cadence bar stale after an hour or a day', () => {
+    expect(assessSyncHealth(clover({ last_sync_at: agoMinutes(90) }), 'clover', NOW).status).toBe('healthy');
+    expect(assessSyncHealth(clover({ last_sync_at: agoMinutes(35 * 60) }), 'clover', NOW).status).toBe('healthy');
+  });
+
+  it('goes stale at 36 hours and down at 72', () => {
+    expect(assessSyncHealth(clover({ last_sync_at: agoMinutes(36 * 60) }), 'clover', NOW).status).toBe('stale');
+    expect(assessSyncHealth(clover({ last_sync_at: agoMinutes(72 * 60 - 1) }), 'clover', NOW).status).toBe('stale');
+    expect(assessSyncHealth(clover({ last_sync_at: agoMinutes(72 * 60) }), 'clover', NOW).status).toBe('down');
+  });
+
+  it('keeps the 2Touch thresholds untouched', () => {
+    expect(assessSyncHealth(agent({ last_sync_at: agoMinutes(90) }), '2touch', NOW).status).toBe('stale');
+  });
+
+  it('asks for a reconnect, ahead of every other status', () => {
+    const h = assessSyncHealth(
+      clover({ needs_reauth: true, last_sync_errors: ['api: boom'], last_sync_at: agoMinutes(5) }), 'clover', NOW,
+    );
+    expect(h.status).toBe('needs-reauth');
+    expect(h.message).toMatch(/Clover/);
+    expect(h.message).toMatch(/reconnect/i);
+    expect(assessSyncHealth(toastCfg({ needs_reauth: true }), 'toast', NOW).message).toMatch(/Toast/);
+  });
+
+  it('a connected bar that never synced is waiting, not broken, until the first night', () => {
+    const h = assessSyncHealth(clover({ last_sync_at: null }), 'clover', NOW);
+    expect(h.status).toBe('stale');
+    expect(h.message).toMatch(/not synced yet/i);
+  });
+
+  it('keeps the no-data warning when a sync brought nothing back', () => {
+    const h = assessSyncHealth(
+      clover({ last_sync_summary: { zReports: 0, ewReports: 0, itemAudit: 0 } }), 'clover', NOW,
+    );
+    expect(h.status).toBe('no-data');
+    expect(h.message).not.toMatch(/agent/i);
+  });
+
+  it('never calls an absent summary empty', () => {
+    expect(assessSyncHealth(clover(), 'toast', NOW).status).toBe('not-configured');
+    expect(assessSyncHealth(toastCfg({ last_sync_summary: null }), 'toast', NOW).status).toBe('healthy');
+  });
+
+  it('reports errors from an API sync', () => {
+    const h = assessSyncHealth(toastCfg({ last_sync_errors: ['api: orders: 403'] }), 'toast', NOW);
+    expect(h.status).toBe('errors');
+    expect(h.errors).toEqual(['api: orders: 403']);
+  });
+});

@@ -31,10 +31,10 @@ const POS = [
   {
     value: 'clover' as const,
     name: 'Clover',
-    tagline: 'Full two-way integration',
+    tagline: 'Read-only API sync',
     description:
-      "Connect your Clover account via OAuth to automatically sync your item catalog and inventory counts. Sales data flows directly from Clover — no manual imports needed.",
-    features: ['Live inventory sync from Clover', 'Auto item catalog import', 'Sales data pull', 'OAuth 2.0 connection'],
+      'Connect your Clover account through Clover\'s own sign-in. Rail reads your sales once a night and when you open the app, and never writes to Clover or sees your Clover password.',
+    features: ['Nightly sales, tips and cash/card totals', 'Items sold, which deplete stock', 'Hourly and per-server sales', 'Employee hours'],
     status: 'setup',
     statusLabel: 'Requires connection',
     Icon: Leaf,

@@ -182,6 +182,7 @@ export default async function SalesPage({
           asOf={asOf}
           items={legacy.items}
           categories={legacy.categories}
+          provider={org.pos_provider}
         />
       ) : (
         <>
@@ -416,7 +417,7 @@ export default async function SalesPage({
           <CardContent><ServerTable servers={data.servers} /></CardContent>
         </Card>
       ) : (
-        <MissingPanel title="Who was pouring" capability="hasServer" />
+        <MissingPanel title="Who was pouring" capability="hasServer" provider={org.pos_provider} />
       )}
     </div>
   );

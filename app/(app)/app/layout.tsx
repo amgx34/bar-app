@@ -1,4 +1,7 @@
 import { redirect } from 'next/navigation';
+import { after } from 'next/server';
+import { runProviderSync } from '@/lib/pos/sync-run';
+import { isStaleOnView } from '@/lib/pos/sync-cooldown';
 import { getAuthUser, getCurrentOrg } from '@/lib/org';
 import { hasAcceptedCurrentTerms } from '@/lib/terms';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
@@ -9,6 +12,7 @@ import { BottomNav } from '@/app/(app)/app/_components/bottom-nav';
 import { MobileFab } from '@/app/(app)/app/_components/mobile-fab';
 import { RouteFocus } from '@/app/(app)/app/_components/route-focus';
 import { getOrgAccess, getOrgBilling } from '@/lib/billing/store';
+import type { PosConfigShape } from '@/lib/pos/sync-health';
 import { Breadcrumbs } from '@/app/(app)/app/_components/breadcrumbs';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -33,6 +37,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // everyone out of their own bar.
   if (user && !accepted) {
     redirect('/accept-terms');
+  }
+
+  // Clover and Toast are pulled, so a bar that opens the app with data older
+  // than 30 minutes gets a refresh after the response is sent. The lease inside
+  // runProviderSync keeps two tabs from syncing at once; a failure is recorded
+  // in the sync strip by the run itself, so it is only logged here.
+  if (isStaleOnView(org.pos_provider, (org.pos_config ?? {}) as PosConfigShape, new Date())) {
+    after(() => runProviderSync(org.id).catch((e) => console.warn('[pos] stale-on-view sync failed:', e)));
   }
 
   // Off unless BILLING_ENFORCE=true; demo orgs exempt; never throws (see lib/billing/store.ts).

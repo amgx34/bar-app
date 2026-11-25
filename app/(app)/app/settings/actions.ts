@@ -11,6 +11,8 @@ import type { BarSettings, HourlyRates } from '@/lib/org';
 import { deleteCredentials } from '@/lib/pos/credentials';
 import type { PosConfig } from '@/lib/pos/pos-config';
 import { runProviderSync } from '@/lib/pos/sync-run';
+import { syncCooldownMessage } from '@/lib/pos/sync-cooldown';
+import type { PosConfigShape } from '@/lib/pos/sync-health';
 import { NeedsReauthError } from '@/lib/pos/providers/types';
 import { openCloverClient } from '@/lib/pos/providers/clover/adapter';
 import { openToastClient } from '@/lib/pos/providers/toast/adapter';
@@ -162,6 +164,8 @@ async function pullSales(provider: 'clover' | 'toast', name: string, days: numbe
   const { org, role } = await getCurrentOrg();
   assertEditor(role);
   if (org.pos_provider !== provider) throw new Error(`Not connected to ${name}`);
+  const cooling = syncCooldownMessage(org.pos_config as PosConfigShape, new Date());
+  if (cooling) throw new Error(cooling);
 
   const r = await runProviderSync(org.id, { days: Math.min(Math.max(1, Math.trunc(days) || 1), 31) });
   if (!r.ran) throw new Error(r.reason === 'already-running' ? 'A sync is already running. Try again in a minute.' : `Not connected to ${name}`);

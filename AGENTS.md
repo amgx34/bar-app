@@ -467,12 +467,41 @@ booked as plain hours so the pay run applies its weekly rule once.
 Unverified until a sandbox answers: dollars versus cents (`TOAST_AMOUNTS_IN_CENTS`
 flips it), whether `refundAmount` excludes tax, and the paging and scope list.
 
+**Clover and Toast are pulled, and "live" means daily plus on view.** Neither has
+an agent, so a run is `runProviderSync(orgId)` (`lib/pos/sync-run.ts`): take the
+lease on `pos_credentials.sync_lease_until`, let the adapter fetch and map, apply
+through the shared `applyNormalized`, then write `last_sync_at`,
+`last_sync_summary` and `last_sync_errors` through the `pos-config.ts` builders on
+a config read *after* the work. Four callers share it and it is idempotent, so
+overlap is safe: the daily cron (`runDailyProviderSync`, one try and one time
+limit per org, 40s budget, oldest `last_sync_at` first, 3-date lookback so a
+skipped bar catches up), "Sync now" (owner or manager, refused inside two
+minutes), a refresh after the response when a connected bar opens the app and the
+last sync is over 30 minutes old (`isStaleOnView`, in the app layout), and the
+optional Clover webhook. The webhook carries ids only and is a hint; it is
+inert without `CLOVER_WEBHOOK_KEY` and its org lookup is the one cross-org read.
+
+`assessSyncHealth` is provider aware: API bars go stale at 36 hours and down at
+72, because a daily cron is silent for hours by design, and 2Touch thresholds are
+unchanged. A rejected login sets `pos_config.needs_reauth` and the status
+`needs-reauth` outranks everything; the cron skips such a bar until someone
+reconnects. A sync that brought nothing back is still `no-data`, and an absent
+summary still means "cannot say". Panels hide through `sales-capabilities` on
+row counts, with no provider branch; only the help copy differs.
+
+Clover and Toast are built and tested against fixtures only. Neither has run
+against a real or sandbox account, and neither belongs on the public front page
+until one has (`docs/go-to-market/claims-register.md`, A20 to A22). Owner steps:
+`docs/integrations/clover.md` and `docs/integrations/toast.md`.
+
 ## Env vars (`.env.local`)
 
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
 `GROQ_API_KEY`, `DD_ENCRYPTION_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
 `TWILIO_FROM_NUMBER`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `TWOTOUCH_INGEST_SECRET`,
-`CLOVER_CLIENT_ID`, `CLOVER_REDIRECT_URI`, `CLOVER_SANDBOX`. Plus `CRON_SECRET` on Vercel.
+`CLOVER_CLIENT_ID`, `CLOVER_CLIENT_SECRET`, `CLOVER_REDIRECT_URI`, `OAUTH_STATE_SECRET`,
+`CLOVER_SANDBOX`. Plus `CRON_SECRET` on Vercel. Optional for Clover: `CLOVER_API_REGION`,
+`CLOVER_WEBHOOK_KEY`.
 Optional for Toast: `TOAST_API_HOST` (the host Toast issues; defaults to production),
 `TOAST_AMOUNTS_IN_CENTS=true` (only if a sandbox shows cents, not dollars).
 

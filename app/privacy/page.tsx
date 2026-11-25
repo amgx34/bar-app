@@ -162,6 +162,11 @@ export default function PrivacyPage() {
               <td>POS integration, only if you connect it</td>
               <td>Authorisation to read your sales and item data</td>
             </tr>
+            <tr>
+              <td>Toast</td>
+              <td>POS integration, only if you connect it</td>
+              <td>Your Toast API credentials, to read your sales, item, employee and shift data</td>
+            </tr>
           </tbody>
         </table>
         <p>

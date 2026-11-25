@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   Leaf, Flame, Monitor, CheckCircle, AlertTriangle,
@@ -10,6 +11,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { assessSyncHealth, describeAge, type PosConfigShape } from '@/lib/pos/sync-health';
+import { friendlySyncError } from '@/lib/pos/sync-errors';
 import {
   syncCloverInventory, syncCloverSales,
   syncToastSales, syncToastInventory,
@@ -210,6 +217,45 @@ function TwoTouchPanel({
   );
 }
 
+// ── Sync status for a pulled provider (Clover, Toast) ───────────────────────
+
+/**
+ * What the last sync did, in words. Rail pulls these POS systems once a night
+ * and when someone opens the app, so "last synced" is the figure that matters.
+ */
+function PullStatus({ provider, posConfig }: { provider: 'clover' | 'toast'; posConfig: Record<string, unknown> }) {
+  const health = assessSyncHealth(posConfig as PosConfigShape, provider);
+  const bad = health.status === 'errors' || health.status === 'down' || health.status === 'needs-reauth';
+  const warn = health.status === 'stale' || health.status === 'no-data';
+  const Icon = bad || warn ? AlertTriangle : CheckCircle;
+  const tone = bad ? 'text-destructive' : warn ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300';
+  const s = health.summary;
+  const counts = [
+    s.zReports ? `${s.zReports} ${s.zReports === 1 ? 'night' : 'nights'} of sales` : null,
+    s.ewReports ? `${s.ewReports} shifts` : null,
+    s.itemAudit ? `${s.itemAudit} items sold` : null,
+  ].filter(Boolean).join(', ');
+
+  return (
+    <div className="rounded-lg border bg-muted/30 p-3 space-y-2" role="status">
+      <p className={`flex items-start gap-2 text-sm ${tone}`}>
+        <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+        <span>{health.message}</span>
+      </p>
+      <p className="text-xs text-muted-foreground tabular-nums">
+        {health.lastSyncAt ? `Last sync ${describeAge(health.minutesAgo)}${counts ? `: ${counts}` : ''}.` : 'No sync has run yet.'}
+      </p>
+      {health.errors.length > 0 && (
+        <ul className="space-y-1.5">
+          {health.errors.map((e, i) => (
+            <li key={i} className="text-xs leading-relaxed text-foreground">{friendlySyncError(e)}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashConnected, flashError }: Props) {
@@ -217,6 +263,8 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
   const [syncingInv,    setSyncingInv]    = useState(false);
   const [syncingSales,  setSyncingSales]  = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [confirmOpen,   setConfirmOpen]   = useState(false);
+  const router = useRouter();
 
   const canManage         = role === 'owner' || role === 'manager';
   // The login itself lives in the encrypted credentials store, not here. A zone
@@ -255,10 +303,10 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
   async function handleCloverSyncSales() {
     setSyncingSales(true);
     try {
-      const res = await syncCloverSales(7);
+      const res = await syncCloverSales(3);
       toast.success(`Sales synced — ${res.upserted} day${res.upserted !== 1 ? 's' : ''} updated`);
     } catch (err) { toast.error(err instanceof Error ? err.message : 'Sync failed'); }
-    finally { setSyncingSales(false); }
+    finally { setSyncingSales(false); router.refresh(); }
   }
 
   // ── Toast handlers ──────────────────────────────────────────────────────────
@@ -266,10 +314,10 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
   async function handleToastSyncSales() {
     setSyncingSales(true);
     try {
-      const res = await syncToastSales(7);
+      const res = await syncToastSales(3);
       toast.success(`Sales synced — ${res.upserted} day${res.upserted !== 1 ? 's' : ''} updated`);
     } catch (err) { toast.error(err instanceof Error ? err.message : 'Sync failed'); }
-    finally { setSyncingSales(false); }
+    finally { setSyncingSales(false); router.refresh(); }
   }
 
   async function handleToastSyncInv() {
@@ -283,13 +331,16 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
 
   // ── Disconnect ──────────────────────────────────────────────────────────────
 
-  async function handleDisconnect() {
-    if (!confirm(`Disconnect ${POS_META[provider as keyof typeof POS_META]?.name ?? 'POS'}? This clears the stored credentials.`)) return;
+  function handleDisconnect() { setConfirmOpen(true); }
+
+  async function confirmDisconnect() {
     setDisconnecting(true);
     try {
       await disconnectPOS();
       setProvider(null);
+      setConfirmOpen(false);
       toast.success('POS disconnected');
+      router.refresh();
     } catch (err) { toast.error(err instanceof Error ? err.message : 'Failed to disconnect'); }
     finally { setDisconnecting(false); }
   }
@@ -368,29 +419,31 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
             ) : (
               <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
                 <AlertTriangle className="h-3.5 w-3.5" />
-                CLOVER_CLIENT_ID and CLOVER_REDIRECT_URI must be set in .env.local
+                CLOVER_CLIENT_ID, CLOVER_CLIENT_SECRET, CLOVER_REDIRECT_URI and OAUTH_STATE_SECRET must be set in the server environment
               </p>
             )
           ) : (
             <div className="space-y-3">
+              <PullStatus provider="clover" posConfig={posConfig} />
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={handleCloverSyncInv} disabled={busy} className="gap-2">
-                  <RefreshCw className={`h-3.5 w-3.5 ${syncingInv ? 'animate-spin' : ''}`} />
-                  {syncingInv ? 'Syncing…' : 'Sync Inventory'}
-                </Button>
-                <Button size="sm" variant="outline" onClick={handleCloverSyncSales} disabled={busy} className="gap-2">
+                <Button size="sm" onClick={handleCloverSyncSales} disabled={busy} className="min-h-11 gap-2 sm:min-h-0">
                   <RefreshCw className={`h-3.5 w-3.5 ${syncingSales ? 'animate-spin' : ''}`} />
-                  {syncingSales ? 'Syncing…' : 'Sync Sales (7 days)'}
+                  {syncingSales ? 'Syncing…' : 'Sync now'}
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleCloverSyncInv} disabled={busy} className="min-h-11 gap-2 sm:min-h-0">
+                  <RefreshCw className={`h-3.5 w-3.5 ${syncingInv ? 'animate-spin' : ''}`} />
+                  {syncingInv ? 'Syncing…' : 'Import item catalog'}
                 </Button>
                 {role === 'owner' && (
-                  <Button size="sm" variant="outline" onClick={handleDisconnect} disabled={disconnecting} className="gap-2 text-muted-foreground">
+                  <Button size="sm" variant="outline" onClick={handleDisconnect} disabled={disconnecting} className="min-h-11 gap-2 text-muted-foreground sm:min-h-0">
                     <Unplug className="h-3.5 w-3.5" /> Disconnect
                   </Button>
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                <strong>Sync Inventory</strong> imports your Clover item catalog.{' '}
-                <strong>Sync Sales</strong> pulls the last 7 nights of orders into the Dashboard &amp; Books.
+                Rail pulls sales, tips, items sold, hourly and per-server sales, and hours from Clover once a night, and
+                again when you open the app after a while. <strong>Sync now</strong> pulls the last 3 nights right away.{' '}
+                <strong>Import item catalog</strong> adds your Clover items and prices; stock moves with sales, not with the catalog.
               </p>
             </div>
           )}
@@ -417,25 +470,26 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
               {typeof posConfig.toast_restaurant_name === 'string' && (
                 <p className="text-xs text-muted-foreground">Connected to <strong>{posConfig.toast_restaurant_name}</strong>.</p>
               )}
+              <PullStatus provider="toast" posConfig={posConfig} />
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={handleToastSyncSales} disabled={busy} className="gap-2">
+                <Button size="sm" onClick={handleToastSyncSales} disabled={busy} className="min-h-11 gap-2 sm:min-h-0">
                   <RefreshCw className={`h-3.5 w-3.5 ${syncingSales ? 'animate-spin' : ''}`} />
-                  {syncingSales ? 'Syncing…' : 'Sync Sales (7 days)'}
+                  {syncingSales ? 'Syncing…' : 'Sync now'}
                 </Button>
-                <Button size="sm" variant="outline" onClick={handleToastSyncInv} disabled={busy} className="gap-2">
+                <Button size="sm" variant="outline" onClick={handleToastSyncInv} disabled={busy} className="min-h-11 gap-2 sm:min-h-0">
                   <RefreshCw className={`h-3.5 w-3.5 ${syncingInv ? 'animate-spin' : ''}`} />
                   {syncingInv ? 'Syncing…' : 'Sync Menu / Inventory'}
                 </Button>
                 {role === 'owner' && (
-                  <Button size="sm" variant="outline" onClick={handleDisconnect} disabled={disconnecting} className="gap-2 text-muted-foreground">
+                  <Button size="sm" variant="outline" onClick={handleDisconnect} disabled={disconnecting} className="min-h-11 gap-2 text-muted-foreground sm:min-h-0">
                     <Unplug className="h-3.5 w-3.5" /> Disconnect
                   </Button>
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                <strong>Sync Sales</strong> pulls the last 7 nights of totals, tips, items sold, hourly and per-server
-                sales, and employee hours into the Dashboard, Books and Payroll. Rail also does this once a night.{' '}
-                <strong>Sync Menu</strong> imports your Toast menu items as inventory. Stock itself moves with sales,
+                Rail pulls totals, tips, items sold, hourly and per-server sales, and employee hours into the Dashboard,
+                Books and Payroll once a night, and again when you open the app after a while.{' '}
+                <strong>Sync now</strong> pulls the last 3 nights right away. <strong>Sync Menu / Inventory</strong> imports your Toast menu items as inventory. Stock itself moves with sales,
                 not with the menu.
               </p>
             </div>
@@ -453,6 +507,23 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
           role={role}
         />
       )}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect {POS_META[provider as keyof typeof POS_META]?.name ?? 'your POS'}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Rail stops syncing and deletes the saved login. Sales, hours and stock already recorded stay as they are.
+              You can connect again at any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={disconnecting}>Keep connected</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDisconnect} disabled={disconnecting}>
+              {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

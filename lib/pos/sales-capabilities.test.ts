@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { assessCapabilities, CAPABILITY_HELP } from './sales-capabilities';
+import { assessCapabilities, capabilityHelp, CAPABILITY_HELP } from './sales-capabilities';
 
 describe('assessCapabilities', () => {
   it('reports every capability when all the data is present', () => {
@@ -41,6 +41,23 @@ describe('assessCapabilities', () => {
   it('has help text for every capability', () => {
     for (const key of ['hasHourly', 'hasServer', 'hasTickets'] as const) {
       expect(CAPABILITY_HELP[key].length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('capabilityHelp', () => {
+  it('keeps the agent wording for 2Touch and for an unknown provider', () => {
+    for (const p of ['2touch', null, undefined]) {
+      expect(capabilityHelp('hasHourly', p)).toBe(CAPABILITY_HELP.hasHourly);
+    }
+  });
+  it('never sends a Clover or Toast bar to an agent on a bar PC', () => {
+    for (const p of ['clover', 'toast']) {
+      for (const key of ['hasHourly', 'hasServer', 'hasTickets'] as const) {
+        const text = capabilityHelp(key, p);
+        expect(text).not.toMatch(/agent|bar PC/i);
+        expect(text).toMatch(p === 'clover' ? /Clover/ : /Toast/);
+      }
     }
   });
 });
