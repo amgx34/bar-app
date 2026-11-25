@@ -17,6 +17,7 @@ export const EVENT_TYPES = [
   'payroll.approval_needed',
   'payroll.approved',
   'payroll.changes_requested',
+  'pos.feed_stale',
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];
@@ -59,6 +60,10 @@ export const EVENT_LABELS: Record<EventType, { title: string; description: strin
     title:       'Payroll sent back',
     description: 'A pay period you submitted needs changes.',
   },
+  'pos.feed_stale': {
+    title:       'POS stopped sending sales',
+    description: 'When no sales have come in from the POS for a day or more, or its login needs reconnecting. Once per outage.',
+  },
 };
 
 /**
@@ -87,6 +92,7 @@ export const ROLE_DEFAULTS: Record<Role, readonly EventType[]> = {
     'payroll.approval_needed',
     'payroll.approved',
     'payroll.changes_requested',
+    'pos.feed_stale',
   ],
   manager: [
     'inventory.low_stock',
@@ -96,6 +102,7 @@ export const ROLE_DEFAULTS: Record<Role, readonly EventType[]> = {
     'staff.claim_pending',
     'payroll.approved',
     'payroll.changes_requested',
+    'pos.feed_stale',
   ],
   accountant: [
     'sales.tax_daily',

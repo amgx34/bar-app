@@ -3,9 +3,10 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { dispatch, getOrgRecipients, getLastNotificationPayload } from './deliver';
 import {
   detectLowStock, detectZReportClosed, detectSalesAnomaly,
-  detectSalesTax, detectHourlyTips,
+  detectSalesTax, detectHourlyTips, detectFeedStale,
   type StockItem, type ZDay,
 } from './detect';
+import { assessSyncHealth, type PosConfigShape } from '@/lib/pos/sync-health';
 import { salesTaxFromSettings } from '@/lib/books/sales-tax';
 
 /**
@@ -64,7 +65,7 @@ export async function runDailyNotifications(): Promise<DailyRunResult> {
   // organization by design. Each query inside the loop is scoped to one org.
   const { data: orgs, error } = await supabase
     .from('organizations')
-    .select('id, name, bar_settings');
+    .select('id, name, bar_settings, pos_provider, pos_config');
   if (error) {
     result.errors.push(`org list failed: ${error.message}`);
     return result;
@@ -88,6 +89,14 @@ export async function runDailyNotifications(): Promise<DailyRunResult> {
         .eq('organization_id', orgId);
       const preferences = prefs ?? [];
       const opts = { recipients, preferences };
+
+      // ── POS feed went quiet ───────────────────────────────────────────────
+      // Reads the org row already fetched above, so no extra query to scope.
+      const feed = detectFeedStale(
+        assessSyncHealth((org.pos_config ?? null) as PosConfigShape | null, org.pos_provider as string | null),
+        org.pos_provider as string | null,
+      );
+      if (feed) result.notified += await dispatch(orgId, feed, opts);
 
       // ── Low stock ──────────────────────────────────────────────────────────
       const { data: items } = await supabase

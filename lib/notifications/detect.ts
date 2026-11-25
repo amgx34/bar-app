@@ -1,5 +1,6 @@
 import { isBelowPar, parRatio, type ParCheckable } from '@/lib/inventory/par';
 import { splitRevenue, type SalesTaxConfig } from '@/lib/books/sales-tax';
+import type { SyncHealth } from '@/lib/pos/sync-health';
 import { tipsPerHour } from '@/lib/pos/tip-rate';
 import type { NotificationDraft } from './types';
 
@@ -243,5 +244,52 @@ export function detectHourlyTips(night: TipNight): NotificationDraft | null {
     link:      '/app/tips',
     payload:   { reportDate: night.report_date, tips, hours: night.hoursWorked, rate },
     dedupeKey: `tips.hourly:${night.report_date}`,
+  };
+}
+
+// ── POS feed went quiet ──────────────────────────────────────────────────────
+
+/** A POS box switched off overnight is ordinary; a full day of silence is not. */
+export const FEED_QUIET_AFTER_MINUTES = 24 * 60;
+
+const API_NAMES: Record<string, string> = { clover: 'Clover', toast: 'Toast' };
+
+/**
+ * Tell the owner the POS stopped sending, once per episode.
+ *
+ * Reads assessSyncHealth's output, so it shares that function's judgement:
+ * `no-data` (amber, maybe a closed bar), `errors` (a different message),
+ * `healthy` and `not-configured` never fire, and an absent last_sync_summary
+ * is "cannot say" upstream so it cannot fire here either. Only silence of a
+ * day or more, or a login the POS no longer accepts, does.
+ *
+ * The dedupe key is the day of the last sync that worked: it is the same for
+ * every nightly pass while the bar stays silent, and different once the feed
+ * recovers and later stalls again. A re-login that fails again the same day
+ * shares a key and is not re-announced; that is the cost of one key per episode.
+ */
+export function detectFeedStale(health: SyncHealth, provider: string | null | undefined): NotificationDraft | null {
+  const { status, minutesAgo, lastSyncAt } = health;
+  const reauth = status === 'needs-reauth';
+  const silent = status === 'stale' || status === 'down';
+  if (!reauth && !(silent && (minutesAgo === null || minutesAgo >= FEED_QUIET_AFTER_MINUTES))) return null;
+
+  const lastDay = lastSyncAt ? lastSyncAt.slice(0, 10) : null;
+  const when = lastDay
+    ? new Date(`${lastDay}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+    : null;
+  const api = provider ? API_NAMES[provider] : undefined;
+
+  const action = api
+    ? `Reconnect ${api} in Settings. If the bar was closed, nothing is wrong.`
+    : 'Check that the POS computer is on and the Rail agent is running. If the bar was closed, nothing is wrong.';
+
+  return {
+    eventType: 'pos.feed_stale',
+    title:     when ? `No sales since ${when}` : 'No sales received yet',
+    body:      `${when ? `The last data arrived ${when}. ` : 'The POS has not sent anything yet. '}${action}`,
+    link:      '/app/settings',
+    payload:   { lastSyncAt, status },
+    dedupeKey: `pos.feed_stale:${lastDay ?? 'never'}`,
   };
 }
