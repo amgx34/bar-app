@@ -45,3 +45,22 @@ describe('tieOut', () => {
     expect(tieOut({ ...base, tipsPaidOut: 250 }).tipsUnpaid).toBe(150);
   });
 });
+
+describe('tieOut when cash tips were never entered', () => {
+  it('does not call a short on a night whose cash tips are an unentered 0', () => {
+    const r = tieOut({ ...base, cashTips: 0, cashTipsCounted: false, countedCash: 900 });
+    expect(r.state).toBe('cannot-tie-out');
+    expect(r.reason).toBe('tips-not-entered');
+    expect(r.gap).toBeNull();
+  });
+
+  it('still ties out once a person entered the tips, even if the figure is 0', () => {
+    const r = tieOut({ ...base, cashTips: 0, cashTipsCounted: true, countedCash: 1000 });
+    expect(r.state).toBe('balanced');
+  });
+
+  it('no-cash-split still wins over tips-not-entered', () => {
+    const r = tieOut({ ...base, cashSales: null, cashTips: 0, cashTipsCounted: false });
+    expect(r.reason).toBe('no-cash-split');
+  });
+});
