@@ -1,6 +1,7 @@
 /**
  * Decides whether a `supabase` CLI invocation may run, so a stray `db push`
  * cannot reach the live project. Pure: callers pass the refs in.
+ * With no --project-ref/--db-url the linked project (supabase/.temp/project-ref) is the real target.
  * shortcut: a bare `supabase` on the PATH bypasses this; use `npm run supabase --`.
  */
 
@@ -23,6 +24,8 @@ export function assertSupabaseAllowed(opts: {
   targetRef: string;
   liveRef: string;
   allowLive: boolean;
+  /** Ref from supabase/.temp/project-ref, '' when the CLI is not linked. */
+  linkedRef?: string;
 }): void {
   const { args, liveRef, allowLive } = opts;
   const words = args.filter((a) => !a.startsWith('-'));
@@ -33,9 +36,18 @@ export function assertSupabaseAllowed(opts: {
   if (readOnly || !mutating || args.includes('--local') || allowLive) return;
 
   const explicit = flagValue(args, '--project-ref')?.toLowerCase();
-  const ref = explicit || opts.targetRef;
+  const linked = (opts.linkedRef ?? '').trim().toLowerCase();
+  // With no explicit target the CLI acts on the linked project, so that is what we judge.
+  const useLinked = !explicit && !!linked && flagValue(args, '--db-url') === undefined;
+  const ref = explicit || (useLinked ? linked : opts.targetRef);
   const hitsLive = !!liveRef && (ref === liveRef || (flagValue(args, '--db-url') ?? '').toLowerCase().includes(liveRef));
   const name = `supabase ${command || args[0]}`;
+  if (useLinked && !hitsLive && linked !== opts.targetRef) {
+    throw new Error(
+      `Refusing \`${name}\`: the CLI is linked to project ${linked} but the env target is ${opts.targetRef || 'unknown'}.\n` +
+        'Re-link to the dev project (`npm run supabase -- link --project-ref <dev-ref>`) or fix the env so both agree.',
+    );
+  }
   if (hitsLive) {
     throw new Error(
       `Refusing \`${name}\`: target project ${liveRef} is the LIVE project in .env.local.\n` +

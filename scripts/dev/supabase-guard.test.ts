@@ -56,6 +56,33 @@ describe('assertSupabaseAllowed', () => {
   it('allows --local', () => {
     expect(() => run(['db', 'reset', '--local'], { targetRef: '', liveRef: '' })).not.toThrow();
   });
+  describe('linked project (supabase/.temp/project-ref)', () => {
+    it('refuses a plain db push when the CLI is linked to live, even with env dev', () => {
+      expect(() => run(['db', 'push'], { linkedRef: live })).toThrow(/LIVE/);
+    });
+    it('allows linked dev with env dev', () => {
+      expect(() => run(['db', 'push'], { linkedRef: dev })).not.toThrow();
+    });
+    it('refuses linked dev when env points at live, naming both refs', () => {
+      expect(() => run(['db', 'push'], { linkedRef: dev, targetRef: live })).toThrow(/abcddev[\s\S]*abcdlive|abcdlive[\s\S]*abcddev/);
+    });
+    it('refuses a linked ref that differs from the env target', () => {
+      expect(() => run(['db', 'push'], { linkedRef: 'abcdother' })).toThrow(/abcdother[\s\S]*abcddev|abcddev[\s\S]*abcdother/);
+    });
+    it('falls back to the env target when nothing is linked', () => {
+      expect(() => run(['db', 'push'], { linkedRef: '' })).not.toThrow();
+      expect(() => run(['db', 'push'], { linkedRef: '', targetRef: live })).toThrow(/LIVE/);
+    });
+    it('lets an explicit --project-ref win over the linked file', () => {
+      expect(() => run(['link', '--project-ref', 'abcdother'], { linkedRef: live })).not.toThrow();
+      expect(() => run(['link', '--project-ref', live], { linkedRef: dev })).toThrow(/LIVE/);
+    });
+    it('still allows read-only commands when linked to live', () => {
+      for (const args of [['migration', 'list'], ['db', 'push', '--dry-run']]) {
+        expect(() => run(args, { linkedRef: live })).not.toThrow();
+      }
+    });
+  });
   it('lets live through when allowLive is set', () => {
     expect(() => run(['db', 'push'], { targetRef: live, allowLive: true })).not.toThrow();
   });

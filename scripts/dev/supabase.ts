@@ -15,10 +15,12 @@ const liveRef = existsSync(localFile)
   : '';
 const targetRef =
   process.env.SUPABASE_PROJECT_REF?.trim().toLowerCase() || projectRefFromUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
+const linkedFile = resolve(root, 'supabase/.temp/project-ref');
+const linkedRef = existsSync(linkedFile) ? readFileSync(linkedFile, 'utf8').trim().toLowerCase() : '';
 const args = process.argv.slice(2);
 
 try {
-  assertSupabaseAllowed({ args, targetRef, liveRef, allowLive: process.env.RAIL_ALLOW_LIVE_SUPABASE === '1' });
+  assertSupabaseAllowed({ args, targetRef, liveRef, linkedRef, allowLive: process.env.RAIL_ALLOW_LIVE_SUPABASE === '1' });
 } catch (error) {
   console.error(`\n${(error as Error).message}\n`);
   process.exit(1);

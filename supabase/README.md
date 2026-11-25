@@ -13,7 +13,8 @@ Written for the owner. Nothing here has been run; items marked **OWNER TO CONFIR
    is the live project (the one in `.env.local`), or when it cannot tell which project it is.
    Read-only commands (`--version`, `migration list`, any `--dry-run`) always run. Set
    `SUPABASE_PROJECT_REF` or the dev `NEXT_PUBLIC_SUPABASE_URL` so the wrapper knows the target.
-   A bare `supabase` bypasses the guard.
+   The guard also reads the linked project from `supabase/.temp/project-ref`: a plain `db push` is judged
+   by that ref, and is refused if it is live or differs from the env target. A bare `supabase` bypasses the guard.
 4. Once, on dev: run `npm run supabase -- migration list`, compare it with what dev's database
    actually has, and repair history (`migration repair --status applied|reverted <version>`) until the two agree.
 5. Before any push: `npm run supabase -- db push --dry-run`, read the list, then push to dev.
