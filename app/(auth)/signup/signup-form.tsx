@@ -15,7 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 const FIELD = 'h-11 bg-white/10 border-white/20 text-white placeholder:text-white/30 focus-visible:ring-white/30';
 
-export function SignupForm() {
+export function SignupForm({ fromDemo = false }: { fromDemo?: boolean }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [trap, setTrap] = useState('');
@@ -30,7 +30,7 @@ export function SignupForm() {
     if (!pw.ok) { setMessage(pw.reason); return; }
     setLoading(true);
     try {
-      const r = await signUpOwner(email, password, trap);
+      const r = await signUpOwner(email, password, trap, fromDemo);
       if (r.ok) setSent(true); else setMessage(r.message);
     } catch {
       setMessage('Could not reach Rail. Check your connection and try again.');
@@ -51,6 +51,11 @@ export function SignupForm() {
           <CheckEmail email={email.trim().toLowerCase()} onReset={() => { setSent(false); setPassword(''); }} />
         ) : (
           <form onSubmit={submit} className="space-y-4" noValidate>
+            {fromDemo && (
+              <p className="rounded-md border border-white/20 bg-white/10 p-3 text-sm text-white/80">
+                We will carry over the tip, pay and pour settings you chose in the demo. Sample sales and staff are not copied.
+              </p>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-white/80">Email</Label>
               <Input id="email" type="email" autoComplete="email" required value={email}

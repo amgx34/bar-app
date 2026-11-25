@@ -13,6 +13,8 @@ import { MobileFab } from '@/app/(app)/app/_components/mobile-fab';
 import { RouteFocus } from '@/app/(app)/app/_components/route-focus';
 import { getOrgAccess, getOrgBilling } from '@/lib/billing/store';
 import type { PosConfigShape } from '@/lib/pos/sync-health';
+import { DemoBanner } from '@/app/(app)/app/_components/demo-banner';
+import { isDemoOrg } from '@/lib/billing/store';
 import { Breadcrumbs } from '@/app/(app)/app/_components/breadcrumbs';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -65,6 +67,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset>
+          {isDemoOrg(org.slug) && <DemoBanner createdAt={user?.created_at} />}
           <AppHeader
             email={user?.email ?? ''}
             posProvider={org.pos_provider}

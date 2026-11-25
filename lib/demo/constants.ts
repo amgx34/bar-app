@@ -14,3 +14,9 @@ export const DEMO_EMAIL_SUFFIX = '@rail.demo';
 
 /** Demo organizations. seedDemoOrg() appends a base-36 timestamp. */
 export const DEMO_SLUG_PREFIX = 'demo-tipsy-tavern-';
+
+/** How long a demo lives. lib/demo/purge.ts keeps its own copy of this number; change both. */
+export const DEMO_TTL_HOURS = 24;
+
+/** Set in the browser while a demo is open, so a silent expiry can be explained at /login. */
+export const DEMO_COOKIE = 'rail_demo';

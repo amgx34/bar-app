@@ -6,6 +6,9 @@ import { checkRateLimit, clientIp, RATE_LIMITS, type RateLimitRule } from '@/lib
 import { checkPassword } from '@/lib/auth/password';
 import { signupAnswer, type SignupAnswer } from '@/lib/auth/signup-result';
 import { SIGNUP_OPEN } from '@/lib/auth/signup-open';
+import { getAuthUser, getCurrentOrg } from '@/lib/org';
+import { DEMO_EMAIL_SUFFIX } from '@/lib/demo/constants';
+import { pickDemoPrefill } from '@/lib/demo/prefill';
 import { isBotRequest } from '@/lib/auth/bot-check';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -25,6 +28,7 @@ export async function signUpOwner(
   email: string,
   password: string,
   honeypot: string,
+  fromDemo = false,
 ): Promise<SignupAnswer> {
   if (!SIGNUP_OPEN) return signupAnswer('closed');
   // A filled hidden field is a script: same screen as a real sign-up, no account.
@@ -40,8 +44,20 @@ export async function signUpOwner(
   const retry = await limited(RATE_LIMITS.signup, 'signup', addr);
   if (retry !== null) return signupAnswer('throttled', { retryAfterSeconds: retry });
 
+  // Read on the server from the visitor's own demo org, never taken from the browser.
+  // It rides on the new account as metadata; /setup re-validates it before use.
+  let prefill = {};
+  if (fromDemo) {
+    try {
+      const u = await getAuthUser();
+      if (u?.email?.endsWith(DEMO_EMAIL_SUFFIX)) prefill = pickDemoPrefill((await getCurrentOrg()).org.bar_settings);
+    } catch { /* no carry-over is better than no sign-up */ }
+  }
+
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({ email: addr, password });
+  const { data, error } = await supabase.auth.signUp({
+    email: addr, password, ...(Object.keys(prefill).length ? { options: { data: { prefill } } } : {}),
+  });
   if (error) {
     console.warn('[auth] signup failed:', error.message);
     return signupAnswer('provider_error');

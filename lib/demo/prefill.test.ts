@@ -33,7 +33,7 @@ describe('demoTimeLeft', () => {
     expect(demoTimeLeft(created, new Date('2026-11-25T23:50:00Z'))).toEqual({ expired: false, urgent: true, label: '10 minutes' });
   });
   it('is expired at and after 24 hours', () => {
-    expect(demoTimeLeft(created, new Date('2026-11-26T00:00:00Z')).expired).toBe(true);
+    expect(demoTimeLeft(created, new Date('2026-11-26T00:00:00Z'))?.expired).toBe(true);
   });
   it('treats an unreadable date as no clock at all', () => {
     expect(demoTimeLeft('nope', new Date())).toBeNull();

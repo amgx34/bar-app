@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
+import { DEMO_COOKIE } from '@/lib/demo/constants';
 import { isGatedPath } from '@/lib/auth/gated-path';
 import { NextResponse, type NextRequest } from 'next/server';
 
@@ -29,6 +30,8 @@ export async function proxy(request: NextRequest) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
     loginUrl.searchParams.set('next', request.nextUrl.pathname);
+    // A demo user is deleted after 24 hours; this browser remembers it had one.
+    if (request.cookies.has(DEMO_COOKIE)) loginUrl.searchParams.set('demo', 'expired');
     return NextResponse.redirect(loginUrl);
   }
 

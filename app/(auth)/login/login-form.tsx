@@ -1,9 +1,10 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { DEMO_COOKIE } from '@/lib/demo/constants';
 import { SIGNUP_OPEN } from '@/lib/auth/signup-open';
 import { toast } from 'sonner';
 import { signInWithPassword, sendMagicLink } from './actions';
@@ -24,6 +25,12 @@ export function LoginForm() {
   const next = safeNext(params.get('next'), '/app/dashboard');
   const errorParam = params.get('error');
   const linkError = isAuthErrorCode(errorParam) ? AUTH_ERROR_MESSAGES[errorParam] : null;
+
+  const demoEnded = params.get('demo') === 'expired';
+  // Said once: drop the marker so a later real session expiry is not blamed on the demo.
+  useEffect(() => {
+    if (demoEnded) document.cookie = `${DEMO_COOKIE}=; path=/; max-age=0`;
+  }, [demoEnded]);
 
   const emailRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState('');
@@ -93,6 +100,12 @@ export function LoginForm() {
         <CardDescription className="text-white/60">Access your bar&apos;s dashboard</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {demoEnded && (
+          <p role="status" className="rounded-md border border-white/20 bg-white/10 p-3 text-sm text-white/80">
+            Your demo ended.{' '}
+            {SIGNUP_OPEN ? <><Link href="/signup" className="underline">Create your account</Link> or start again below.</> : 'Start again below.'}
+          </p>
+        )}
         <form onSubmit={handlePasswordLogin} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email" className="text-white/80">Email</Label>
