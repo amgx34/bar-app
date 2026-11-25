@@ -74,7 +74,7 @@ describe('detectWeeklySummary', () => {
   });
 
   it('shows dollars only when the base is under the floor', () => {
-    const days = [night('2026-11-15', 50), night('2026-11-16', 90)];
+    const days = [night('2026-11-09', 50), night('2026-11-16', 90)];
     const r = detectWeeklySummary(input({ days }))!;
     expect(r.summary.change.text).toBe('Up $40 on the week before');
   });
@@ -102,8 +102,8 @@ describe('detectWeeklySummary', () => {
   });
 
   it('leads with the stale feed text when the feed is stale', () => {
-    const health = assessSyncHealth({ last_sync_at: '2026-11-18T10:00:00Z' } as never, 'twotouch', new Date('2026-11-23T13:00:00Z'));
-    const stale = detectFeedStale(health, 'twotouch')!;
+    const health = assessSyncHealth({ agent_token: 't', last_sync_at: '2026-11-18T10:00:00Z' }, '2touch', new Date('2026-11-23T13:00:00Z'));
+    const stale = detectFeedStale(health, '2touch')!;
     const r = detectWeeklySummary(input({ feedNote: stale.title }))!;
     expect(r.summary.feedNote).toBe(stale.title);
     expect(r.draft.body.startsWith(stale.title)).toBe(true);

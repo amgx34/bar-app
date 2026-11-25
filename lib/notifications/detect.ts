@@ -2,6 +2,7 @@ import { isBelowPar, parRatio, type ParCheckable } from '@/lib/inventory/par';
 import { splitRevenue, type SalesTaxConfig } from '@/lib/books/sales-tax';
 import type { SyncHealth } from '@/lib/pos/sync-health';
 import { tipsPerHour } from '@/lib/pos/tip-rate';
+import { periodDelta } from '@/lib/pos/deltas';
 import type { NotificationDraft } from './types';
 
 // ── Low stock ────────────────────────────────────────────────────────────────
@@ -291,5 +292,134 @@ export function detectFeedStale(health: SyncHealth, provider: string | null | un
     link:      '/app/settings?tab=pos',
     payload:   { lastSyncAt, status },
     dedupeKey: `pos.feed_stale:${lastDay ?? 'never'}`,
+  };
+}
+
+// ── Weekly owner summary ─────────────────────────────────────────────────────
+
+export type WeekWindow = { start: string; end: string; priorStart: string; priorEnd: string };
+
+const shiftISO = (iso: string, days: number): string => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+
+/** The Monday-to-Sunday week ending on `sundayISO`, plus the week before it. Null for any other day. */
+export function weekEndingOn(sundayISO: string): WeekWindow | null {
+  if (new Date(`${sundayISO}T00:00:00Z`).getUTCDay() !== 0) return null;
+  return {
+    start: shiftISO(sundayISO, -6), end: sundayISO,
+    priorStart: shiftISO(sundayISO, -13), priorEnd: shiftISO(sundayISO, -7),
+  };
+}
+
+export type WeeklyDay = {
+  report_date: string;
+  total_sales: number | null;
+  cash_tips: number | null;
+  cc_tips: number | null;
+};
+
+export type WeeklyInput = {
+  week: WeekWindow;
+  /** Z days for both weeks. */
+  days: readonly WeeklyDay[];
+  /** Bar-wide hours for the week. Never per person. */
+  hoursThisWeek: number;
+  items: readonly StockItem[];
+  pendingPayrollRuns: number;
+  /** Title of the pos.feed_stale alert when the feed is stale, else null. */
+  feedNote: string | null;
+};
+
+export type WeeklySummary = {
+  weekStart: string;
+  weekLabel: string;
+  salesText: string;
+  nightsReported: number;
+  change: { text: string; tone: 'up' | 'down' | 'flat' | 'unknown' };
+  tipsPerHour: string | null;
+  hoursText: string | null;
+  lowStock: number;
+  pendingApprovals: number;
+  feedNote: string | null;
+};
+
+const longDay = (iso: string) =>
+  new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+
+/** One plain sentence per figure; the same lines feed the inbox body and the email. */
+export function weeklyLines(s: WeeklySummary): string[] {
+  const lines: string[] = [];
+  if (s.feedNote) lines.push(s.feedNote);
+  lines.push(`Sales ${s.salesText} over ${s.nightsReported} ${s.nightsReported === 1 ? 'night' : 'nights'}. ${s.change.text}.`);
+  if (s.tipsPerHour) lines.push(`Tips ${s.tipsPerHour}.`);
+  if (s.hoursText) lines.push(`${s.hoursText} worked.`);
+  lines.push(s.lowStock === 0 ? 'Nothing is below par.' : `${s.lowStock} ${s.lowStock === 1 ? 'item is' : 'items are'} below par.`);
+  if (s.pendingApprovals > 0) lines.push('A pay run is waiting for approval.');
+  return lines;
+}
+
+export function detectWeeklySummary(input: WeeklyInput): { draft: NotificationDraft; summary: WeeklySummary } | null {
+  const { week } = input;
+  const inWeek = (d: WeeklyDay, a: string, b: string) => d.report_date >= a && d.report_date <= b && d.total_sales !== null;
+  const cur = input.days.filter((d) => inWeek(d, week.start, week.end));
+  const prev = input.days.filter((d) => inWeek(d, week.priorStart, week.priorEnd));
+  if (cur.length === 0 && prev.length === 0) return null;
+
+  const sum = (ds: readonly WeeklyDay[], k: 'total_sales' | 'cash_tips' | 'cc_tips') =>
+    ds.reduce((t, d) => t + (Number(d[k]) > 0 ? Number(d[k]) : 0), 0);
+  const total = sum(cur, 'total_sales');
+
+  // Same weekdays reported in both weeks. A bar shut on Mondays still compares;
+  // a missing Sunday does not, because it would read as a collapse.
+  const weekdays = (ds: readonly WeeklyDay[]) =>
+    [...new Set(ds.map((d) => new Date(`${d.report_date}T00:00:00Z`).getUTCDay()))].sort().join();
+  const comparable = cur.length > 0 && cur.length === prev.length && weekdays(cur) === weekdays(prev);
+  const delta = periodDelta({ current: total, prior: sum(prev, 'total_sales'), comparable });
+
+  let change: WeeklySummary['change'];
+  if (delta.kind === 'incomplete') {
+    change = { text: 'Not compared with the week before, because a night is missing from one of the weeks', tone: 'unknown' };
+  } else {
+    const dir = delta.amount > 0 ? 'Up' : delta.amount < 0 ? 'Down' : null;
+    const size = delta.percent !== null ? `${Math.abs(delta.percent)}%` : money(Math.abs(delta.amount));
+    change = !dir || size === '0%'
+      ? { text: 'Flat on the week before', tone: 'flat' }
+      : { text: `${dir} ${size} on the week before`, tone: dir === 'Up' ? 'up' : 'down' };
+  }
+
+  const tph = tipsPerHour(sum(cur, 'cash_tips'), sum(cur, 'cc_tips'), input.hoursThisWeek);
+  const lowStock = input.items.filter(isBelowPar).length;
+  const hours = input.hoursThisWeek > 0 ? Math.round(input.hoursThisWeek * 10) / 10 : 0;
+
+  const summary: WeeklySummary = {
+    weekStart: week.start,
+    weekLabel: `${longDay(week.start)} to ${longDay(week.end)}`,
+    salesText: cur.length ? money(total) : 'not reported',
+    nightsReported: cur.length,
+    change,
+    tipsPerHour: tph === null ? null : `${tph.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} an hour`,
+    hoursText: hours > 0 ? `${hours} labour hours` : null,
+    lowStock,
+    pendingApprovals: input.pendingPayrollRuns,
+    feedNote: input.feedNote,
+  };
+
+  return {
+    summary,
+    draft: {
+      eventType: 'weekly.summary',
+      title:     cur.length ? `Last week: ${money(total)}` : 'Last week: no sales reported',
+      body:      weeklyLines(summary).join(' '),
+      link:      '/app/dashboard',
+      payload: {
+        weekStart: week.start, totalSales: total, nightsReported: cur.length,
+        priorWeekComparable: comparable, hoursWorked: input.hoursThisWeek,
+        lowStock, pendingApprovals: input.pendingPayrollRuns,
+      },
+      dedupeKey: `weekly.summary:${week.start}`,
+    },
   };
 }

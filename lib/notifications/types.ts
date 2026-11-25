@@ -18,6 +18,7 @@ export const EVENT_TYPES = [
   'payroll.approved',
   'payroll.changes_requested',
   'pos.feed_stale',
+  'weekly.summary',
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];
@@ -64,6 +65,10 @@ export const EVENT_LABELS: Record<EventType, { title: string; description: strin
     title:       'POS stopped sending sales',
     description: 'No sales from the POS for a day or more, or its login needs reconnecting.',
   },
+  'weekly.summary': {
+    title:       'Weekly summary',
+    description: 'Monday: last week’s sales and how they compare, tips per hour, labour hours, low stock and anything awaiting approval. Bar totals only.',
+  },
 };
 
 /**
@@ -93,6 +98,7 @@ export const ROLE_DEFAULTS: Record<Role, readonly EventType[]> = {
     'payroll.approved',
     'payroll.changes_requested',
     'pos.feed_stale',
+    'weekly.summary',
   ],
   manager: [
     'inventory.low_stock',

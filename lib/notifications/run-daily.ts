@@ -4,8 +4,12 @@ import { dispatch, getOrgRecipients, getLastNotificationPayload } from './delive
 import {
   detectLowStock, detectZReportClosed, detectSalesAnomaly,
   detectSalesTax, detectHourlyTips, detectFeedStale,
+  detectWeeklySummary, weekEndingOn,
   type StockItem, type ZDay,
 } from './detect';
+import { deliverWeekly, type WeeklyDeps } from './weekly';
+import { sendEmail } from '@/lib/reps/email';
+import { SITE_URL } from '@/lib/site';
 import { assessSyncHealth, type PosConfigShape } from '@/lib/pos/sync-health';
 import { salesTaxFromSettings } from '@/lib/books/sales-tax';
 
@@ -57,6 +61,12 @@ function sameWeekdayWindow(iso: string, weeks = 4): string[] {
   return out;
 }
 
+/**
+ * Weekly summaries stay OFF until the owner sets WEEKLY_SUMMARY_ENABLED=true:
+ * they send real email through the shared Gmail login.
+ */
+const weeklyEnabled = () => process.env.WEEKLY_SUMMARY_ENABLED === 'true';
+
 export async function runDailyNotifications(): Promise<DailyRunResult> {
   const supabase = createAdminClient();
   const result: DailyRunResult = { orgsScanned: 0, notified: 0, errors: [] };
@@ -72,6 +82,9 @@ export async function runDailyNotifications(): Promise<DailyRunResult> {
   }
 
   const businessDate = yesterdayISO();
+  // Yesterday a Sunday means today is Monday: the week just closed.
+  const week = weeklyEnabled() ? weekEndingOn(businessDate) : null;
+  const emailBudget = { left: 50 };
 
   for (const org of orgs ?? []) {
     const orgId = org.id as string;
@@ -112,6 +125,56 @@ export async function runDailyNotifications(): Promise<DailyRunResult> {
         businessDate,
       );
       if (lowStock) result.notified += await dispatch(orgId, lowStock, opts);
+
+      // ── Weekly owner summary (Mondays, only when switched on) ───────────────
+      if (week) {
+        const [{ data: wDays }, { data: wShifts }, { count: pending }] = await Promise.all([
+          supabase.from('z_report_days')
+            .select('report_date, total_sales, cash_tips, cc_tips')
+            .eq('organization_id', orgId)
+            .gte('report_date', week.priorStart).lte('report_date', week.end),
+          supabase.from('employee_shifts')
+            .select('regular_hours, overtime_hours')
+            .eq('organization_id', orgId)
+            .gte('shift_date', week.start).lte('shift_date', week.end),
+          supabase.from('payroll_runs')
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', orgId)
+            .eq('status', 'pending_approval'),
+        ]);
+        const hours = (wShifts ?? []).reduce((t, r) => {
+          const n = (x: unknown) => (Number.isFinite(Number(x)) && Number(x) > 0 ? Number(x) : 0);
+          return t + n(r.regular_hours) + n(r.overtime_hours);
+        }, 0);
+        const built = detectWeeklySummary({
+          week, days: wDays ?? [], hoursThisWeek: hours,
+          items: (items ?? []) as StockItem[],
+          pendingPayrollRuns: pending ?? 0,
+          feedNote: feed?.title ?? null,
+        });
+        if (built) {
+          const weeklyDeps: WeeklyDeps = {
+            dispatch: (draft) => dispatch(orgId, draft, opts),
+            alreadySent: async (key) => {
+              const { count } = await supabase.from('notifications')
+                .select('id', { count: 'exact', head: true })
+                .eq('organization_id', orgId).eq('dedupe_key', key);
+              return (count ?? 0) > 0;
+            },
+            emailFor: async (userId) => {
+              // admin-scope-ok: userId comes from this org's memberships (recipients above).
+              const { data } = await supabase.auth.admin.getUserById(userId);
+              return data.user?.email ?? null;
+            },
+            sendEmail: (to, subject, html) => sendEmail(to, subject, html),
+            siteUrl: SITE_URL,
+            emailBudget,
+          };
+          const w = await deliverWeekly(built, recipients, preferences, weeklyDeps);
+          result.notified += w.notified;
+          result.errors.push(...w.errors.map((e) => `${org.name ?? orgId}: ${e}`));
+        }
+      }
 
       // ── Nightly sales + anomaly ────────────────────────────────────────────
       const window = sameWeekdayWindow(businessDate);
