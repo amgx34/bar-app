@@ -26,7 +26,7 @@ const POS = [
     activeBg: 'bg-blue-500/15',
     iconColor: 'text-blue-400',
     iconBg: 'bg-blue-500/15',
-    statusColor: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30',
+    statusColor: 'text-amber-400 bg-amber-400/10 border-amber-400/30',
     cta: 'Get started with 2Touch',
   },
   {
@@ -112,7 +112,7 @@ export default function POSSelector({ orgId: _ }: Props) {
 
   return (
     <main className="relative min-h-dvh flex flex-col items-center justify-center p-6 overflow-hidden bg-sidebar text-sidebar-foreground">
-      <div className="absolute inset-0 bg-gradient-to-b from-sidebar-accent via-sidebar to-background dark:to-black" />
+      <div className="absolute inset-0 bg-gradient-to-b from-sidebar-accent via-sidebar to-black" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(168,85,247,0.06),transparent_60%)]" />
 
       <div className="relative z-10 w-full max-w-4xl space-y-8">
@@ -127,7 +127,7 @@ export default function POSSelector({ orgId: _ }: Props) {
             </div>
           </div>
           <h1 className="text-2xl font-bold text-white">Choose your POS system</h1>
-          <p className="text-white/40 text-sm">Step 2 of 2 — this determines how Rail imports your data</p>
+          <p className="text-white/70 text-sm">Step 2 of 2 — this determines how Rail imports your data</p>
         </div>
 
         {/* POS cards */}
@@ -181,8 +181,8 @@ export default function POSSelector({ orgId: _ }: Props) {
                   'flex items-center gap-1.5 text-xs font-medium transition-opacity',
                   active ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'
                 )}>
-                  <CheckCircle className={cn('h-3.5 w-3.5', active ? pos.iconColor : 'text-white/40')} />
-                  <span className={active ? pos.iconColor : 'text-white/40'}>
+                  <CheckCircle className={cn('h-3.5 w-3.5', active ? pos.iconColor : 'text-white/70')} />
+                  <span className={active ? pos.iconColor : 'text-white/70'}>
                     {active ? 'Selected' : 'Select this'}
                   </span>
                 </div>
@@ -205,13 +205,13 @@ export default function POSSelector({ orgId: _ }: Props) {
           >
             {loading ? 'Setting up…' : (
               <>
-                {selected === 'clover' ? 'Continue to Clover setup' : selected === 'toast' ? 'Continue to Toast setup' : 'Finish setup'}
+                {selected === 'clover' ? 'Continue to Clover setup' : selected === 'toast' ? 'Continue to Toast setup' : 'Continue'}
                 <ArrowRight className="h-4 w-4" />
               </>
             )}
           </button>
           {!selected && (
-            <p className="text-white/25 text-xs">Select a POS above to continue</p>
+            <p className="text-white/70 text-xs">Select a POS above to continue</p>
           )}
         </div>
       </div>
