@@ -15,3 +15,4 @@ Started 2026-11-25. The owner delegated every open decision to reasoning agents:
 ## Entries
 
 - **N1 done** (sonnet): no-access page uses `BUSINESS.email`; join notification link now `/app/payroll/employees`. 2 commits. Gates green (tsc, 1014 tests, audit:scope). Not browser-checked.
+- **N2 done** (sonnet): deleted unused `updateBarSettings`; lint 60/27 -> 45/12 (new baseline for later items). 2 commits. Gates green.
