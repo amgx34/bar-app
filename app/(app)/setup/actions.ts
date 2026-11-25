@@ -62,7 +62,7 @@ export async function createOrgWithSettings(data: SetupInput): Promise<SetupResu
   if (decision.kind === 'existing') return { ok: true, orgId: decision.orgId, existing: true };
 
   const limit = await checkRateLimit(RATE_LIMITS.createOrg, clientIp(await headers()));
-  if (!limit.allowed) return fail('rate_limited', 'Too many bars created from this connection today. Try again tomorrow.');
+  if (!limit.allowed) return fail('rate_limited', 'Too many bars created from this connection today. Try again tomorrow, or contact us from the Rail website if you are stuck.');
 
   const admin = createAdminClient();
   const settings = buildBarSettings(
@@ -115,4 +115,23 @@ export async function createOrgWithSettings(data: SetupInput): Promise<SetupResu
 
   revalidatePath('/app');
   return { ok: true, orgId: org.id, existing: false };
+}
+
+/** Re-sends the confirmation link to the signed-in, still-unconfirmed address. */
+export async function resendConfirmation(): Promise<{ ok: boolean; message: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user?.email) return { ok: false, message: 'You are signed out. Sign in again to get a new link.' };
+  if (user.email_confirmed_at) return { ok: true, message: 'Your email is already confirmed. Reload this page.' };
+
+  const h = await headers();
+  const limit = await checkRateLimit(RATE_LIMITS.signupResend, `resend:${user.id}`);
+  if (!limit.allowed) return { ok: false, message: 'You have asked for a few links already. Check your spam folder, then try again in an hour.' };
+
+  const origin = h.get('origin') ?? `https://${h.get('host')}`;
+  const { error } = await supabase.auth.resend({
+    type: 'signup', email: user.email, options: { emailRedirectTo: `${origin}/auth/confirm?next=/setup` },
+  });
+  if (error) return { ok: false, message: 'We could not send the link. Try again in a minute.' };
+  return { ok: true, message: `Sent. Check ${user.email} and open the newest link.` };
 }

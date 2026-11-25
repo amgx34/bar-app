@@ -67,24 +67,24 @@ export function SetupForm() {
     setLoading(false);
   }
 
-  const inputCls = 'bg-white/10 border-white/20 text-white placeholder:text-white/25 focus-visible:ring-primary/50 h-11';
-  const labelCls = 'text-white/70 text-xs';
+  const inputCls = 'bg-white/10 border-white/20 text-white placeholder:text-white/55 focus-visible:ring-white/70 data-[size=default]:h-11! h-11';
+  const labelCls = 'text-white/80 text-xs';
 
   return (
     <main className="relative min-h-dvh flex items-center justify-center p-6 overflow-hidden bg-sidebar text-sidebar-foreground">
-      <div className="absolute inset-0 bg-gradient-to-br from-sidebar-accent via-sidebar to-background dark:to-black" />
+      <div className="absolute inset-0 bg-gradient-to-br from-sidebar-accent via-sidebar to-sidebar" />
       <div className="relative z-10 w-full max-w-lg pb-8">
         <div className="text-center mb-8">
           <p className="text-white font-black text-3xl tracking-[0.25em] uppercase mb-3">Rail</p>
           <h1 className="text-2xl font-bold text-white">Set up your bar</h1>
-          <p className="text-white/60 text-sm mt-1">Step 1 of 3</p>
+          <p className="text-white/80 text-sm mt-1">Tell us about your bar</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
+          <div className="rounded-2xl border border-white/20 bg-white/5 p-5 space-y-4">
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-primary" />
-              <span className="text-white/70 text-xs font-semibold uppercase tracking-widest">Your bar</span>
+              <span className="text-white/80 text-xs font-semibold uppercase tracking-widest">Your bar</span>
             </div>
 
             <div className="space-y-1.5">
@@ -103,7 +103,7 @@ export function SetupForm() {
                 <Label className={labelCls}>State</Label>
                 <Select value={state} onValueChange={(v) => setState(v ?? '')}>
                   <SelectTrigger aria-label="State" className={cn(inputCls, 'w-full')}>
-                    <span className="text-sm text-white/80">{state || <span className="text-white/50">Select</span>}</span>
+                    <span className="text-sm text-white/80">{state || <span className="text-white/60">Select</span>}</span>
                   </SelectTrigger>
                   <SelectContent className="max-h-60">
                     {US_STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -117,7 +117,7 @@ export function SetupForm() {
               <Select value={timezone} onValueChange={(v) => setTzChoice(v ?? '')}>
                 <SelectTrigger aria-label="Time zone" className={cn(inputCls, 'w-full')}>
                   <span className="text-sm text-white/80">
-                    {timezone ? TZ_LABEL[timezone] ?? timezone : <span className="text-white/50">Choose your time zone</span>}
+                    {timezone ? TZ_LABEL[timezone] ?? timezone : <span className="text-white/60">Choose your time zone</span>}
                   </span>
                 </SelectTrigger>
                 <SelectContent>
@@ -141,15 +141,15 @@ export function SetupForm() {
 
           {/* Consent sits directly above the button that creates the bar. Links open in a
               new tab so reading them does not discard the form. */}
-          <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-4 cursor-pointer">
+          <label className="flex items-start gap-3 rounded-xl border border-white/20 bg-white/5 p-4 cursor-pointer">
             <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)}
               className="mt-0.5 h-5 w-5 shrink-0 accent-primary cursor-pointer" />
-            <span className="text-sm leading-relaxed text-white/70">
+            <span className="text-sm leading-relaxed text-white/80">
               I agree to the{' '}
               <a href="/terms" target="_blank" rel="noopener" className="text-white underline underline-offset-2">Terms of Service</a>{' '}
               and{' '}
               <a href="/privacy" target="_blank" rel="noopener" className="text-white underline underline-offset-2">Privacy Policy</a>
-              , and I am authorised to accept them for this business.
+              , and I am authorized to accept them for this business.
             </span>
           </label>
 
@@ -157,11 +157,17 @@ export function SetupForm() {
             <p role="alert" className="rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>
           )}
 
+          {!ready && !loading && (
+            <p className="text-center text-sm text-white/80">
+              {!name.trim() ? 'Enter your bar name to continue.' : !state ? 'Choose a state to continue.'
+                : !timezone ? 'Choose a time zone to continue.' : 'Agree to the terms to continue.'}
+            </p>
+          )}
           <Button type="submit" disabled={loading || !ready}
-            className="w-full h-12 text-base font-semibold bg-cta text-cta-foreground hover:brightness-95">
+            className="w-full h-12 text-base font-semibold disabled:opacity-100 disabled:bg-white/15 disabled:text-white/70 bg-cta text-cta-foreground hover:brightness-95">
             {loading ? 'Creating your bar…' : 'Create my bar'}
           </Button>
-          <p className="text-center text-xs text-white/60">
+          <p className="text-center text-xs text-white/80">
             Tip rules and pay rates come next, from your checklist. Nothing here is final.
           </p>
         </form>
