@@ -193,7 +193,7 @@ export default async function SalesPage({
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Stat label="Revenue" value={money(legacy.summary.revenue)} sub={`${legacy.summary.itemCount} items sold`}
-                  chip={comparison && (
+                  chip={comparison && legacy.summary.itemCount > 0 && (
                     <DeltaChip delta={comparison.delta} label={comparison.label} partial={today <= period.end} />
                   )} />
             <Stat label="Cost to pour" value={money(legacy.summary.cost)} sub="Ingredient cost" />

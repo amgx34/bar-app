@@ -36,14 +36,19 @@ export function Stat({
 /** "Up 8% on last week", or why there is no figure. Colour is never the only signal. */
 export function DeltaChip({ delta, label, partial }: { delta: PeriodDelta; label: string; partial: boolean }) {
   if (delta.kind === 'incomplete') {
-    return <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Not compared: a night is missing from one of the periods</p>;
+    return (
+      <p className="mt-1 flex items-start gap-1 text-sm text-amber-700 dark:text-amber-400">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+        <span>Not compared: a night is missing from one of the periods. Check Z reports for the missing night.</span>
+      </p>
+    );
   }
   const dir = delta.amount > 0 ? 'Up' : delta.amount < 0 ? 'Down' : null;
   const size = delta.percent !== null ? `${Math.abs(delta.percent)}%` : money(Math.abs(delta.amount));
   const text = !dir || size === '0%' ? `Flat on ${label}` : `${dir} ${size} on ${label}`;
   return (
-    <p className="mt-1 text-xs font-medium text-muted-foreground">
-      {dir === 'Up' ? '▲ ' : dir === 'Down' ? '▼ ' : ''}{text}
+    <p className="mt-1 text-sm font-medium text-muted-foreground">
+      {dir === 'Up' ? <span aria-hidden>▲ </span> : dir === 'Down' ? <span aria-hidden>▼ </span> : null}Z-report sales {text.charAt(0).toLowerCase() + text.slice(1)}
       {partial && <span className="font-normal"> (same nights so far)</span>}
     </p>
   );
