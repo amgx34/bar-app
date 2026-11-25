@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
+import { SIGNUP_OPEN } from '@/lib/auth/signup-open';
 
 /**
  * The public site's navigation on phones.
@@ -81,13 +82,15 @@ export function MobileNav({
           >
             Sign in
           </Link>
-          <Link
-            href="/signup"
-            onClick={() => setOpen(false)}
-            className="py-3 text-sm font-medium text-muted-foreground hover:text-primary transition-colors duration-200"
-          >
-            Create an account
-          </Link>
+          {SIGNUP_OPEN && (
+            <Link
+              href="/signup"
+              onClick={() => setOpen(false)}
+              className="py-3 text-sm font-medium text-muted-foreground hover:text-primary transition-colors duration-200"
+            >
+              Create an account
+            </Link>
+          )}
         </nav>
       </div>
     </div>

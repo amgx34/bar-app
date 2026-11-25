@@ -100,7 +100,7 @@ export function SignupClosed() {
           Request access
         </Link>
         <p className="text-center text-sm text-white/60">
-          Already have an account? <Link href="/login" className="text-white underline underline-offset-4">Log in</Link>
+          Already have an account? <Link href="/login" className="inline-flex min-h-11 items-center text-white underline underline-offset-4">Log in</Link>
         </p>
       </CardContent>
     </Card>

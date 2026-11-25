@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { SIGNUP_OPEN } from '@/lib/auth/signup-open';
 import { SITE_NAME } from '@/lib/site';
 
 export const metadata: Metadata = {
@@ -33,11 +34,20 @@ export default function PricingPage() {
       </div>
       <p className="mt-6 text-sm text-muted-foreground">
         {SITE_NAME} does not file taxes, withhold taxes, or hold or move your money.
-        Sign up, then subscribe from Settings, Billing. You can cancel any time from the same screen.
+        {SIGNUP_OPEN ? 'Sign up, then subscribe from Settings, Billing.' : 'Rail is invite only right now. Request access and we will set up your bar.'} You can cancel any time from Settings, Billing.
       </p>
       <div className="mt-6 flex flex-wrap gap-3">
-        <Link href="/signup" className="inline-flex min-h-11 items-center rounded-lg bg-primary px-5 font-medium text-primary-foreground">Create an account to subscribe</Link>
-        <Link href="/login" className="inline-flex min-h-11 items-center rounded-lg border px-5 font-medium">Sign in</Link>
+        {SIGNUP_OPEN ? (
+          <>
+            <Link href="/signup" className="inline-flex min-h-11 items-center rounded-lg bg-primary px-5 font-medium text-primary-foreground">Create an account to subscribe</Link>
+            <Link href="/login" className="inline-flex min-h-11 items-center rounded-lg border px-5 font-medium">Sign in</Link>
+          </>
+        ) : (
+          <>
+            <Link href="/login" className="inline-flex min-h-11 items-center rounded-lg bg-primary px-5 font-medium text-primary-foreground">Sign in</Link>
+            <Link href="/#contact" className="inline-flex min-h-11 items-center rounded-lg border px-5 font-medium">Request access</Link>
+          </>
+        )}
         <Link href="/#contact" className="inline-flex min-h-11 items-center rounded-lg border px-5 font-medium">Book a demo</Link>
       </div>
     </main>
