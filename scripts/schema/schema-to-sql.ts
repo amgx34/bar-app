@@ -92,6 +92,18 @@ function columnLine(c: SchemaExport['columns'][number]): string {
 }
 
 /**
+ * Tables whose row level security is off, in name order. The baseline copies the
+ * source schema faithfully, so it will not add protection that was never there;
+ * this lets the CLI say so out loud instead of staying silent about it.
+ */
+export function tablesWithoutRls(s: SchemaExport): string[] {
+  return s.tables
+    .filter((t) => !t.rls)
+    .map((t) => t.name)
+    .sort();
+}
+
+/**
  * True when a function's signature (everything before its body) names one of the
  * tables, meaning it returns or takes that table's row type. Postgres needs the
  * table to exist before such a function can be created. The match is on whole

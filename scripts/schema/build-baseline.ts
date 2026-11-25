@@ -4,7 +4,7 @@
 // empty Supabase project. Makes no network or database connection.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { loadExport, schemaToSql } from './schema-to-sql.ts';
+import { loadExport, schemaToSql, tablesWithoutRls } from './schema-to-sql.ts';
 
 const input = process.argv[2];
 if (!input) {
@@ -36,6 +36,14 @@ console.log(
     `functions ${exported.functions.length} | triggers ${exported.triggers.length} | ` +
     `enums ${exported.enums.length} | sequences ${exported.sequences.length}`,
 );
+const unprotected = tablesWithoutRls(exported);
+if (unprotected.length > 0) {
+  console.warn(
+    `\nROW LEVEL SECURITY IS OFF on ${unprotected.length} table(s). The baseline copies that faithfully; it does not fix it.\n` +
+      '  Whether the public API can reach them depends on table grants, which this export does not contain.\n' +
+      `  ${unprotected.join(', ')}`,
+  );
+}
 if (exported.uncovered.length > 0) {
   console.warn('\nNOT recreated by this baseline (add by hand if the app needs them):');
   for (const u of exported.uncovered) console.warn(`  ${u.kind}: ${u.name}`);

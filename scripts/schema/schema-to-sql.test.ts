@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import Papa from 'papaparse';
-import { loadExport, quoteIdent, schemaToSql, type SchemaExport } from './schema-to-sql';
+import { loadExport, quoteIdent, schemaToSql, tablesWithoutRls, type SchemaExport } from './schema-to-sql';
 
 const empty = (over: Partial<SchemaExport> = {}): SchemaExport => ({
   enums: [],
@@ -68,6 +68,23 @@ describe('loadExport', () => {
 
   it('survives a leading byte-order mark', () => {
     expect(loadExport('﻿' + JSON.stringify(rows)).tables).toHaveLength(1);
+  });
+});
+
+describe('tablesWithoutRls', () => {
+  it('lists, in name order, the tables whose row level security is off', () => {
+    const s = empty({
+      tables: [
+        { name: 'orders', rls: true },
+        { name: 'sales', rls: false },
+        { name: 'audit_log', rls: false },
+      ],
+    });
+    expect(tablesWithoutRls(s)).toEqual(['audit_log', 'sales']);
+  });
+
+  it('is empty when every table has row level security on', () => {
+    expect(tablesWithoutRls(empty({ tables: [{ name: 'orders', rls: true }] }))).toEqual([]);
   });
 });
 
