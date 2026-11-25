@@ -23,6 +23,9 @@ import { checkRateLimit, clientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 
+// Seeds three orgs serially (createUser + 3x seedDemoOrg + sign-in); the platform default is too tight for a cold start.
+export const maxDuration = 60;
+
 export const DEMO_TTL_HOURS = 24;
 export { DEMO_EMAIL_SUFFIX, DEMO_SLUG_PREFIX } from '@/lib/demo/constants';
 
