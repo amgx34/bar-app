@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { BUSINESS } from '@/lib/site';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { signOut } from '../../(app)/app/actions';
@@ -22,9 +22,9 @@ export default async function NoAccessPage() {
           contact support.
         </p>
         <div className="flex gap-2 justify-center">
-          <Button variant="outline" render={<Link href="mailto:support@yourdomain.com" />}>
+          <a href={`mailto:${BUSINESS.email}`} className={buttonVariants({ variant: 'outline' })}>
             Contact support
-          </Button>
+          </a>
           <form action={signOut}>
             <Button type="submit" variant="ghost">Log out</Button>
           </form>
