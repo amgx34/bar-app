@@ -12,7 +12,7 @@ export type CountResult =
 
 /** Counted figures are in STOCK units. Never throws on bad input: returns a message. */
 export async function saveCount(
-  input: { item_id: string; counted: number | null }[],
+  input: { item_id: string; counted: number | null; matches?: boolean }[],
 ): Promise<CountResult> {
   const { org, role } = await getCurrentOrg();
   if (!canAdjustStock(role)) return { ok: false, error: 'You do not have permission to count stock.' };
@@ -37,6 +37,7 @@ export async function saveCount(
       name: byId.get(String(r.item_id))?.name ?? 'Item',
       expected: Number(byId.get(String(r.item_id))?.current_stock ?? 0),
       counted: r.counted === null ? null : Number(r.counted),
+      matches: r.matches === true,
     })),
     new Set(byId.keys()),
   );

@@ -1,4 +1,7 @@
-export type CountRow = { item_id: string; name: string; expected: number; counted: number | null };
+export type CountRow = { item_id: string; name: string; expected: number; counted: number | null;
+  /** The person tapped Matches: no change, whatever stock reads now. */
+  matches?: boolean;
+};
 export type CountAdjustment = {
   item_id: string;
   new_stock: number;
@@ -28,6 +31,7 @@ export function planCount(rows: CountRow[], orgItemIds: Set<string>): CountPlan 
     if (seen.has(r.item_id)) return { ok: false, error: `${r.name} appears twice in this count.` };
     seen.add(r.item_id);
 
+    if (r.matches) { unchanged++; continue; }
     if (r.counted === null) { skipped++; continue; }
     if (!Number.isFinite(r.counted) || r.counted < 0) {
       return { ok: false, error: `${r.name}: a count cannot be below zero.` };
