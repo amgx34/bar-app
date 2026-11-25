@@ -169,3 +169,21 @@ describe('isPayoutMethod', () => {
     expect(isPayoutMethod(undefined)).toBe(false);
   });
 });
+
+describe('summarizePayouts and sub-cent residue', () => {
+  // planBulkPayout rounds each payment to the cent and calls a balance of
+  // half a cent or less "already paid". The summary must agree, or the payout bar
+  // says "5 of 7, still owed $0.01" while the Pay dialog says everyone is settled.
+  it('counts someone as paid when the balance is under half a cent', () => {
+    const s = summarizePayouts([entry('1', 1234.564)], map(paid('1', 1234.56)));
+    expect(s.paidCount).toBe(1);
+    expect(s.outstanding).toBe(0);
+    expect(s.allPaid).toBe(true);
+  });
+
+  it('still counts a real cent as owed', () => {
+    const s = summarizePayouts([entry('1', 100.01)], map(paid('1', 100)));
+    expect(s.paidCount).toBe(0);
+    expect(s.outstanding).toBeCloseTo(0.01, 5);
+  });
+});

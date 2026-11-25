@@ -8,7 +8,7 @@ import { PayoutDialog } from './payout-dialog';
 import { PayEveryoneDialog } from './pay-everyone-dialog';
 import { deletePayout } from '../payout-actions';
 import {
-  PAYOUT_METHOD_LABEL, totalPaidTo,
+  PAYOUT_METHOD_LABEL, SETTLED_WITHIN, totalPaidTo,
   type BulkPayableEntry, type Payout, type PayoutSummary,
 } from '@/lib/payroll/payouts';
 
@@ -286,8 +286,10 @@ export function PayoutCell({
 
   const paidSoFar = totalPaidTo(payouts);
   const balance = Math.max(0, amount - paidSoFar);
-  const fullyPaid = payouts.length > 0 && balance <= 0;
-  const partly = payouts.length > 0 && balance > 0;
+  // Same tolerance as the summary and the bulk planner (lib/payroll/payouts.ts):
+  // a few thousandths of float residue is not money still owed.
+  const fullyPaid = payouts.length > 0 && balance <= SETTLED_WITHIN;
+  const partly = payouts.length > 0 && balance > SETTLED_WITHIN;
 
   function undoLast() {
     const last = payouts[payouts.length - 1];
