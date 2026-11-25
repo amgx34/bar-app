@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, TrendingDown, DollarSign, Truck, ShoppingCart }
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
+import { rankTopSellers } from '@/lib/inventory/usage-rank';
 import type { ShipmentSummary } from '../shipment-actions';
 
 export type DashboardUsageLog = {
@@ -106,17 +107,7 @@ export function InventoryDashboard({
 }) {
   const [open, setOpen] = useState(true);
 
-  const topSellers = useMemo<ChartEntry[]>(() => {
-    const map = new Map<string, ChartEntry>();
-    for (const log of usageLogs) {
-      if (log.reason === 'delivery' || log.reason === 'recount') continue;
-      const name = log.inventory_items?.name ?? 'Unknown';
-      const existing = map.get(log.item_id);
-      if (existing) existing.total += log.quantity;
-      else map.set(log.item_id, { name, total: log.quantity });
-    }
-    return Array.from(map.values()).sort((a, b) => b.total - a.total).slice(0, 5);
-  }, [usageLogs]);
+  const topSellers = useMemo<ChartEntry[]>(() => rankTopSellers(usageLogs), [usageLogs]);
 
   const biggestLosses = useMemo<ChartEntry[]>(() => {
     const map = new Map<string, ChartEntry>();
@@ -252,7 +243,7 @@ export function InventoryDashboard({
             </CardHeader>
             <CardContent>
               {topSellers.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-4 text-center">No usage data yet</p>
+                <p className="text-xs text-muted-foreground py-4 text-center">No POS sales recorded yet — this counts what sold through the POS</p>
               ) : (
                 <>
                 <div className="sm:hidden">
