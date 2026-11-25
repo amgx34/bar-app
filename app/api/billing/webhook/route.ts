@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     if (SUB_EVENTS.includes(event.type)) sub = event.data.object;
     else if (event.type === 'checkout.session.completed' && event.data.object.subscription) {
       sub = await stripeApi<Obj>('GET', `/subscriptions/${event.data.object.subscription}`);
-      sub!.metadata = { ...sub!.metadata, organization_id: sub!.metadata?.organization_id ?? event.data.object.client_reference_id };
+      sub!.metadata = { ...sub!.metadata, organization_id: sub!.metadata?.organization_id ?? event.data.object.client_reference_id! };
     }
     if (sub) {
       const row = subscriptionToRow(sub, priceMap());
