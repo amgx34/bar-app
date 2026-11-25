@@ -1,0 +1,38 @@
+{
+  "data": {
+    "user": {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "email": "owner@example.com"
+    },
+    "memberships": [
+      {
+        "orgId": "00000000-0000-4000-8000-0000000000a1",
+        "orgName": "Fixture Bar One",
+        "role": "owner",
+        "destinations": [
+          "today",
+          "stock",
+          "sales",
+          "team-pay",
+          "books"
+        ]
+      },
+      {
+        "orgId": "00000000-0000-4000-8000-0000000000a2",
+        "orgName": "Fixture Bar Two",
+        "role": "accountant",
+        "destinations": [
+          "sales",
+          "books"
+        ]
+      }
+    ],
+    "activeOrgId": null,
+    "staff": {
+      "kind": "none"
+    }
+  },
+  "meta": {
+    "asOf": "2026-11-25T12:00:00.000Z"
+  }
+}
