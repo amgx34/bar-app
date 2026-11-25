@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "node scripts/dev/run-vitest.mjs run",
     "test:watch": "node scripts/dev/run-vitest.mjs",
     "audit:scope": "node scripts/audit-admin-scope.mjs",

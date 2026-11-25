@@ -15,7 +15,9 @@ One org = one bar; users join orgs via a `memberships` table.
 npm run dev          # next dev
 npm run build        # next build
 npm run lint         # eslint
-npx tsc --noEmit     # typecheck
+npm run typecheck    # next typegen, then tsc --noEmit. A bare tsc reads .next/types,
+                     # which only a build or typegen refreshes, so it fails on pages
+                     # deleted since the last build.
 npm test             # vitest, unit tests for the pure money functions in lib/
                      # Always via npm: a bare `npx vitest` from a lowercase `c:\` shell
                      # (VS Code's default) fails every file. See scripts/dev/run-vitest.mjs.
