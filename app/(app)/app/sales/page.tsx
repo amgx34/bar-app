@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getSalesData, getPeriodSalesData } from './actions';
+import { getSalesData, getPeriodSalesData, getSalesComparison } from './actions';
 import { getCurrentOrg } from '@/lib/org';
 import { canManagePayroll } from '@/lib/permissions';
 import { PeriodToggle } from '../_components/period-toggle';
@@ -12,7 +12,7 @@ import { NightView } from './_components/night-view';
 import { MenuQuadrant } from './_components/menu-quadrant';
 import { TrendChart } from './_components/trend-chart';
 import { TonightClock } from './_components/tonight-clock';
-import { Stat, CostCoverageNotice, TaxInclusiveNotice, SizeSplit, money, pct } from './_components/sales-bits';
+import { Stat, DeltaChip, CostCoverageNotice, TaxInclusiveNotice, SizeSplit, money, pct } from './_components/sales-bits';
 import { rankByMargin } from '@/lib/pos/sales-analytics';
 import { assessSyncHealth, describeAge } from '@/lib/pos/sync-health';
 import { cutoffHourFromSettings } from '@/lib/business-date';
@@ -98,9 +98,12 @@ export default async function SalesPage({
   const hourKnown = view === 'tonight' && Number.isInteger(rawHour) && rawHour >= 0 && rawHour <= 23;
   const upToHour = hourKnown ? rawHour : undefined;
 
-  const [data, legacy] = await Promise.all([
+  const [data, legacy, comparison] = await Promise.all([
     getPeriodSalesData(view, period.start, period.end, upToHour),
     getSalesData('custom', period.start, period.end),
+    view === 'week' || view === 'month'
+      ? getSalesComparison(view, period.start, period.end, today)
+      : Promise.resolve(null),
   ]);
 
   const prev = shiftSalesPeriod(view, period.start, period.end, 'prev');
@@ -189,7 +192,10 @@ export default async function SalesPage({
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label="Revenue" value={money(legacy.summary.revenue)} sub={`${legacy.summary.itemCount} items sold`} />
+            <Stat label="Revenue" value={money(legacy.summary.revenue)} sub={`${legacy.summary.itemCount} items sold`}
+                  chip={comparison && (
+                    <DeltaChip delta={comparison.delta} label={comparison.label} partial={today <= period.end} />
+                  )} />
             <Stat label="Cost to pour" value={money(legacy.summary.cost)} sub="Ingredient cost" />
             <Stat label="Margin" value={money(legacy.summary.margin)} tone="good" />
             <Stat label="Margin %" value={pct(legacy.summary.marginPct)}
@@ -367,9 +373,13 @@ export default async function SalesPage({
               </p>
             </CardHeader>
             <CardContent>
-              {legacy.slowMovers.length === 0 ? (
+              {legacy.summary.itemCount === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
-                  Nothing stands out — every stocked item is moving.
+                  No sales in this window, so there is nothing to rank yet.
+                </p>
+              ) : legacy.slowMovers.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Nothing stands out. Every stocked item is moving.
                 </p>
               ) : (
                 <div className="space-y-2">

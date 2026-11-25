@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import { AlertTriangle } from 'lucide-react';
+import type { PeriodDelta } from '@/lib/pos/deltas';
 
 export const money = (n: number) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
@@ -8,8 +9,9 @@ export const pct = (n: number | null) => (n === null ? '—' : `${n.toFixed(1)}%
 
 /** One headline figure. */
 export function Stat({
-  label, value, sub, tone = 'default',
+  label, value, sub, tone = 'default', chip,
 }: {
+  chip?: React.ReactNode;
   label: string;
   value: string;
   sub?: string;
@@ -26,7 +28,24 @@ export function Stat({
         {value}
       </p>
       {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
+      {chip}
     </div>
+  );
+}
+
+/** "Up 8% on last week", or why there is no figure. Colour is never the only signal. */
+export function DeltaChip({ delta, label, partial }: { delta: PeriodDelta; label: string; partial: boolean }) {
+  if (delta.kind === 'incomplete') {
+    return <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Not compared: a night is missing from one of the periods</p>;
+  }
+  const dir = delta.amount > 0 ? 'Up' : delta.amount < 0 ? 'Down' : null;
+  const size = delta.percent !== null ? `${Math.abs(delta.percent)}%` : money(Math.abs(delta.amount));
+  const text = !dir || size === '0%' ? `Flat on ${label}` : `${dir} ${size} on ${label}`;
+  return (
+    <p className="mt-1 text-xs font-medium text-muted-foreground">
+      {dir === 'Up' ? '▲ ' : dir === 'Down' ? '▼ ' : ''}{text}
+      {partial && <span className="font-normal"> (same nights so far)</span>}
+    </p>
   );
 }
 

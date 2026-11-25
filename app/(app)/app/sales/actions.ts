@@ -13,6 +13,7 @@ import {
   resolveDateRange, todayIso, addDays, type DateRange, type SalesView,
 } from '@/lib/date-range';
 import { cutoffHourFromSettings } from '@/lib/business-date';
+import { comparisonWindows, compareSales, type PeriodDelta } from '@/lib/pos/deltas';
 import { assessCapabilities, type SalesCapabilities } from '@/lib/pos/sales-capabilities';
 import { buildDaypart, type Daypart } from '@/lib/pos/daypart';
 import { summariseTickets, type TicketMetrics } from '@/lib/pos/tickets';
@@ -475,4 +476,25 @@ export async function getPeriodSalesData(
     menu,
     night,
   };
+}
+
+/**
+ * Change in Z-report sales against the prior week or month, or null when there
+ * is nothing finished to compare. Both sides read z_report_days, so the chip
+ * compares like with like (it can differ from the item-audit revenue shown).
+ */
+export async function getSalesComparison(
+  view: 'week' | 'month', start: string, end: string, today: string,
+): Promise<{ delta: PeriodDelta; label: string } | null> {
+  const w = comparisonWindows(view, start, end, today);
+  if (!w) return null;
+  const { org } = await getCurrentOrg();
+  const { data } = await createAdminClient()
+    .from('z_report_days')
+    .select('report_date, total_sales')
+    .eq('organization_id', org.id)
+    .gte('report_date', w.prior.start)
+    .lte('report_date', w.cur.end);
+  const days = (data ?? []).map((r) => ({ date: r.report_date as string, total: Number(r.total_sales) || 0 }));
+  return { delta: compareSales(w, days, days), label: view === 'week' ? 'last week' : 'last month' };
 }
