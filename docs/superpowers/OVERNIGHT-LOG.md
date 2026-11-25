@@ -27,3 +27,18 @@ Started 2026-11-25. The owner delegated every open decision to reasoning agents:
 
 ## Queue complete
 All nine items done (N1 to N9, plus N3b). See `2026-11-25-manager-plan.md` for what was deliberately not done tonight.
+
+## Final gates (end of the night)
+`tsc` clean · 1105 tests across 65 files · `audit:scope` 0 unjustified · lint 45 problems / 12 errors (was 64 / 30 at the Plan 1 baseline) · `npm run build` exit 0 · `audit:tokens` fails on exactly 2 known pairs (see below).
+
+## For the owner, in the morning (only a human can do these)
+1. **Apply the migration to dev**, then live before deploying: `supabase/migrations/20261125000000_employees_archived_at.sql`. Then tell Claude to test archive and restore in the browser. Until it is applied, Archive says so plainly and nothing breaks.
+2. **Rotate the Gmail, Twilio and Groq keys** (they were printed to a session terminal and one real Groq call was made before the dev guard existed). Order and steps are in `2026-11-25-decisions.md` item 5.
+3. **Two real-data checks** for the tips fix (queries in `2026-11-25-decisions.md` item 1): does any real bar have `individual` or `sales_pct` staff, and do agent-fed per-server tips sum to the Z total?
+4. **Payroll Review money-integrity findings** (two reviewers agreed; see `findings/critique/summary.md`): a local-only "Confirm Payroll" button beside the real approval, and an Approved badge over live recomputed figures with the diff running only while pending. Decide the approval rules before anyone changes this screen.
+5. **Books shows $0 COGS as 0.0% pour cost / 87.4% profit** with no warning. Needs a rule for "no cost data".
+6. **Nudge `--border-strong` and `--input` (light) slightly darker** than `#7C93B5` to clear 3:1 against the page background (now 2.997:1); then `npm run audit:tokens` passes.
+7. **Supabase CLI**: install it and link it to the DEV project only, then use `npm run supabase -- ...` (guard refuses anything aimed at live). Read `supabase/README.md`; the migration history on dev needs a one-time repair.
+8. **Navigation rebuild (Plan 2 Task 7 steps 3-4)** stays deferred until you confirm `findings/navigation-validation.md` (notably Reps under Stock) and can watch the result at 1280 and 390 as owner and accountant.
+9. **Decisions parked as DEFER by the manager:** org switcher (needs the two-membership query on live), unused UI primitives and the Radix/cmdk dependencies, the `/api/poll-2touch` gate (any signed-in user, including a demo account, can trigger the cross-bar mailbox poll; `/api/cron/2touch` is open when `CRON_SECRET` is unset), and the 12 remaining lint errors (8 `no-explicit-any` on the pay and import path, 4 set-state-in-effect).
+10. **Review the money-touching commits** (each is separate and revertable): payout tolerance `aa986f4`, routing validation `8cb1f33`, tips carve-out and day split `6f8d000`/`e49b661`/`525e769`, archive `4c035ef`, Top Sellers `c34a5a7`.
