@@ -579,6 +579,9 @@ export default function HomePage() {
                   {label}
                 </a>
               ))}
+              <Link href="/pricing" className="hover:text-sidebar-foreground transition-colors duration-200">
+                Pricing
+              </Link>
               <Link href="/privacy" className="hover:text-sidebar-foreground transition-colors duration-200">
                 Privacy
               </Link>

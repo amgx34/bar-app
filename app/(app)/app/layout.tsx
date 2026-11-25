@@ -8,6 +8,7 @@ import { AppHeader } from '@/app/(app)/app/_components/app-header';
 import { BottomNav } from '@/app/(app)/app/_components/bottom-nav';
 import { MobileFab } from '@/app/(app)/app/_components/mobile-fab';
 import { RouteFocus } from '@/app/(app)/app/_components/route-focus';
+import { getOrgAccess, getOrgBilling } from '@/lib/billing/store';
 import { Breadcrumbs } from '@/app/(app)/app/_components/breadcrumbs';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -19,7 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Run concurrently: the org lookup and the consent check are independent, and
   // awaiting them in sequence put two network round trips in front of every
   // authenticated page for no reason.
-  const [{ org, allMemberships }, accepted] = await Promise.all([
+  const [{ org, role, allMemberships }, accepted] = await Promise.all([
     getCurrentOrg(),
     user ? hasAcceptedCurrentTerms(user.id) : Promise.resolve(true),
   ]);
@@ -33,6 +34,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (user && !accepted) {
     redirect('/accept-terms');
   }
+
+  // Off unless BILLING_ENFORCE=true; demo orgs exempt; never throws (see lib/billing/store.ts).
+  const access = await getOrgAccess(org);
+  const hasCustomer = !access.allowed && role === 'owner' ? !!(await getOrgBilling(org.id))?.stripe_customer_id : false;
 
   return (
     <>
@@ -78,7 +83,30 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 Deliberately a BLOCK, not another flex column: a flex child is
                 itself a flex item and inherits the same `min-width: auto`, so
                 wrapping flex-in-flex changed nothing. */}
-            <div className="w-full min-w-0 flex-1">{children}</div>
+            <div className="w-full min-w-0 flex-1">
+              {access.allowed ? children : (
+                <div className="mx-auto max-w-lg p-6 space-y-4">
+                  <h1 className="text-2xl font-bold">Subscription needed</h1>
+                  <p className="text-muted-foreground">
+                    {role === 'owner'
+                      ? 'This bar has no active Rail subscription. Your data is safe and will be here when you subscribe.'
+                      : 'This bar has no active Rail subscription. Ask the owner to renew it.'}
+                  </p>
+                  {role === 'owner' && (
+                    hasCustomer ? (
+                      <form method="post" action="/api/billing/portal">
+                        <button className="min-h-11 rounded-lg bg-primary px-4 font-medium text-primary-foreground">Manage billing</button>
+                      </form>
+                    ) : (
+                      <form method="post" action="/api/billing/checkout" className="flex flex-wrap gap-3">
+                        <button name="plan" value="close" className="min-h-11 rounded-lg border px-4 font-medium">Subscribe to Close</button>
+                        <button name="plan" value="whole_bar" className="min-h-11 rounded-lg bg-primary px-4 font-medium text-primary-foreground">Subscribe to Whole bar</button>
+                      </form>
+                    )
+                  )}
+                </div>
+              )}
+            </div>
           </main>
         </SidebarInset>
       </SidebarProvider>

@@ -10,6 +10,9 @@ import { canEditInventory } from '@/lib/permissions';
 import { TeamTab } from './_components/team-tab';
 import { listTeamMembers } from './team-actions';
 import ImportTab from '../payroll/_components/import-tab';
+import { BillingTab } from './_components/billing-tab';
+import { getOrgBilling, isDemoOrg } from '@/lib/billing/store';
+import { stripeConfigured } from '@/lib/billing/stripe';
 import { NotificationsTab } from './_components/notifications-tab';
 import { getNotificationPreferences, getRegisteredDevices } from '../actions/notifications';
 
@@ -23,6 +26,7 @@ const TABS = [
   { key: 'pos',         label: 'POS Integration' },
   { key: 'notifications', label: 'Notifications' },
   { key: 'team',        label: 'Team' },
+  { key: 'billing',     label: 'Billing' },
 ];
 
 function buildCloverAuthUrl(orgId: string): string | null {
@@ -54,6 +58,8 @@ export default async function SettingsPage({
   const tab      = params.tab ?? 'general';
   const settings = org.bar_settings ?? { tip_split_percent: 15, default_hourly_rate: 15 };
   const team     = tab === 'team' ? await listTeamMembers() : null;
+
+  const billing = tab === 'billing' ? await getOrgBilling(org.id) : null;
 
   // Same pattern as the tabs above: fetched only for the tab that renders it.
   const notifications = tab === 'notifications'
@@ -97,6 +103,10 @@ export default async function SettingsPage({
 
       {/* Tab content */}
       {tab === 'general'     && <GeneralTab  orgName={org.name} role={role} settings={settings} />}
+      {tab === 'billing' && (
+        <BillingTab billing={billing} isOwner={role === 'owner'} configured={stripeConfigured()}
+          flash={params.billing} isDemo={isDemoOrg(org.slug)} />
+      )}
       {tab === 'tip-pay'     && <TipPayTab   role={role}         settings={settings} />}
       {tab === 'inventory'   && <InventoryTab role={role}         settings={settings} />}
       {tab === 'import-data' && (

@@ -452,6 +452,10 @@ Web Push (all three, or push silently no-ops and only the in-app bell works):
 Rotating them invalidates every stored `push_subscriptions` row — devices must
 re-enable.
 
+Billing (all optional; with no `STRIPE_SECRET_KEY` billing is a no-op, see `docs/billing/README.md`):
+`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_CLOSE`, `STRIPE_PRICE_WHOLE_BAR`,
+`NEXT_PUBLIC_PRICE_LABEL_CLOSE`, `NEXT_PUBLIC_PRICE_LABEL_WHOLE_BAR`, `BILLING_ENFORCE` (`true` blocks unpaid bars; default off).
+
 Agent release manifest (`GET /api/agent/manifest`, Vercel only — the route returns
 `204` until all three are set, which every agent reads as "you are current"):
 `AGENT_LATEST_VERSION`, `AGENT_DOWNLOAD_URL`, `AGENT_SHA256`, plus optional
