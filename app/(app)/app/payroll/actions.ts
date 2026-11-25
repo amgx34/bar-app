@@ -1,5 +1,6 @@
 'use server';
 
+import { canManagePayroll } from '@/lib/permissions';
 import { carveOutKeptTips, type Keeper } from '@/lib/payroll/night-split';
 import { revalidatePath } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -55,6 +56,8 @@ export interface Employee {
   role: string | null;
   hourly_rate: number | null;
   tip_mode: TipMode;
+  /** NULL or absent means active. Set when the employee is archived. */
+  archived_at?: string | null;
   /** 'hourly' means paid a wage instead of a tip cut. Barbacks only, in practice. */
   pay_type?: BarbackPayType | null;
   /** NULL is unclassified: a question nobody has answered, not a 1099. */
@@ -135,31 +138,52 @@ export async function saveEmployee(payload: SaveEmployeePayload): Promise<Employ
   return data;
 }
 
-export async function deleteEmployee(employeeId: string): Promise<void> {
+/**
+ * Archive or restore an employee. There is deliberately no delete: removing the
+ * row cascades to payouts, adjustments, shifts and direct-deposit accounts, and
+ * the POS sync would re-create the person by name anyway. Archived staff drop off
+ * the roster, the setup alerts and the add-to-shift list; payroll, tax and
+ * withholding still see them for any period in which they have history.
+ */
+async function setEmployeeArchived(employeeId: string, archived: boolean): Promise<void> {
   const supabase = await createClient();
-  const { org } = await getCurrentOrg();
+  const { org, role } = await getCurrentOrg();
 
   if (!org?.id) {
     throw new Error('Organization not found');
   }
+  if (!canManagePayroll(role)) {
+    throw new Error('Only an owner or manager can archive or restore staff.');
+  }
 
-  const { data: deleted, error } = await supabase
+  const { data: changed, error } = await supabase
     .from('employees')
-    .delete()
+    .update({ archived_at: archived ? new Date().toISOString() : null })
     .eq('id', employeeId)
     .eq('organization_id', org.id)
     .select('id');
 
   if (error) {
-    throw new Error(`Failed to delete employee: ${error.message}`);
+    if (/archived_at/.test(error.message)) {
+      throw new Error('Archiving needs a database update that has not been applied yet (employees.archived_at).');
+    }
+    throw new Error(`Failed to ${archived ? 'archive' : 'restore'} employee: ${error.message}`);
   }
-  // Row-level security can refuse a delete by matching zero rows and returning no
-  // error, which used to surface as "removed" while the row stayed after a reload.
-  if (!deleted || deleted.length === 0) {
-    throw new Error('Could not remove this employee. They may already be gone, or you may not have permission.');
+  // Row-level security can refuse an update by matching zero rows without an error.
+  if (!changed || changed.length === 0) {
+    throw new Error('Could not change this employee. They may already be gone, or you may not have permission.');
   }
 
   revalidatePath('/app/payroll');
+  revalidatePath('/app/payroll/employees');
+}
+
+export async function archiveEmployee(employeeId: string): Promise<void> {
+  return setEmployeeArchived(employeeId, true);
+}
+
+export async function restoreEmployee(employeeId: string): Promise<void> {
+  return setEmployeeArchived(employeeId, false);
 }
 
 export async function bulkSetTipMode(

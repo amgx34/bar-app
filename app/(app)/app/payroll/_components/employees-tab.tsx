@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Employee, deleteEmployee, bulkSetTipMode } from '../actions';
+import { Employee, archiveEmployee, restoreEmployee, bulkSetTipMode } from '../actions';
 import {
   Table,
   TableBody,
@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import EmployeeSetupDialog from './employee-setup-dialog';
-import { Plus, Trash2, UserCheck, AlertTriangle, Users } from 'lucide-react';
+import { Plus, Archive, ArchiveRestore, UserCheck, AlertTriangle, Users } from 'lucide-react';
 
 const ROLE_STYLES: Record<string, string> = {
   bartender: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
@@ -44,26 +44,44 @@ export default function EmployeesTab({ employees: initialEmployees, canEditTax =
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const handleDelete = async (employee: Employee) => {
-    if (!confirm(`Remove ${employee.name} from the employee list? This will also delete their shift history.`)) return;
+  // Archiving, not deleting: a delete would erase what the person was paid. They
+  // leave the roster, but their pay, tips and payouts stay in the books.
+  const handleArchive = async (employee: Employee) => {
+    if (!confirm(`Archive ${employee.name}? They leave the roster and the add-to-shift list. Their past pay, tips and payouts stay in the books, and you can restore them later.`)) return;
 
-    setDeletingId(employee.id);
+    setBusyId(employee.id);
     try {
-      await deleteEmployee(employee.id);
-      setEmployees((prev) => prev.filter((e) => e.id !== employee.id));
-      toast.success(`${employee.name} removed`);
+      await archiveEmployee(employee.id);
+      setEmployees((prev) => prev.map((e) => (e.id === employee.id ? { ...e, archived_at: new Date().toISOString() } : e)));
+      toast.success(`${employee.name} archived`);
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to remove employee');
+      toast.error(err instanceof Error ? err.message : 'Failed to archive employee');
     } finally {
-      setDeletingId(null);
+      setBusyId(null);
     }
   };
 
-  const configured = employees.filter((e) => e.role && e.hourly_rate !== null);
-  const unconfigured = employees.filter((e) => !e.role || e.hourly_rate === null);
+  const handleRestore = async (employee: Employee) => {
+    setBusyId(employee.id);
+    try {
+      await restoreEmployee(employee.id);
+      setEmployees((prev) => prev.map((e) => (e.id === employee.id ? { ...e, archived_at: null } : e)));
+      toast.success(`${employee.name} restored`);
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to restore employee');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const roster = employees.filter((e) => !e.archived_at);
+  const archived = employees.filter((e) => !!e.archived_at);
+  const configured = roster.filter((e) => e.role && e.hourly_rate !== null);
+  const unconfigured = roster.filter((e) => !e.role || e.hourly_rate === null);
 
   const handleBulkTipMode = async (mode: 'pool' | 'individual' | 'sales_pct') => {
     const labels = { pool: 'Tip Pool', individual: 'Individual Tips', sales_pct: 'Sales %' };
@@ -101,7 +119,7 @@ export default function EmployeesTab({ employees: initialEmployees, canEditTax =
           </div>
           <div>
             <p className="text-sm font-medium">
-              {employees.length} {employees.length === 1 ? 'employee' : 'employees'}
+              {roster.length} {roster.length === 1 ? 'employee' : 'employees'}
             </p>
             <p className="text-xs text-muted-foreground">
               {configured.length} configured
@@ -114,7 +132,7 @@ export default function EmployeesTab({ employees: initialEmployees, canEditTax =
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {employees.length > 0 && (
+          {roster.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1">
               <span className="text-xs text-muted-foreground pr-1">Set all tips:</span>
               <button
@@ -144,7 +162,7 @@ export default function EmployeesTab({ employees: initialEmployees, canEditTax =
         </div>
       </div>
 
-      {employees.length === 0 ? (
+      {roster.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
             <Users className="h-6 w-6 text-muted-foreground" />
@@ -177,7 +195,7 @@ export default function EmployeesTab({ employees: initialEmployees, canEditTax =
               </TableRow>
             </TableHeader>
             <TableBody>
-              {employees.map((employee) => {
+              {roster.map((employee) => {
                 const incomplete = !employee.role || employee.hourly_rate === null;
                 return (
                   <TableRow
@@ -265,11 +283,12 @@ export default function EmployeesTab({ employees: initialEmployees, canEditTax =
                           className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
                           // Named per row: a screen reader hears seven identical
                           // "button" nodes otherwise, with no way to tell whose.
-                          aria-label={`Delete ${employee.name}`}
-                          onClick={() => handleDelete(employee)}
-                          disabled={deletingId === employee.id}
+                          aria-label={`Archive ${employee.name}`}
+                          title="Archive"
+                          onClick={() => handleArchive(employee)}
+                          disabled={busyId === employee.id}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Archive className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </TableCell>
@@ -279,6 +298,31 @@ export default function EmployeesTab({ employees: initialEmployees, canEditTax =
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {archived.length > 0 && (
+        <details className="rounded-xl border">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
+            Archived ({archived.length})
+          </summary>
+          <ul className="divide-y border-t">
+            {archived.map((employee) => (
+              <li key={employee.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                <span className="min-w-0 truncate text-muted-foreground">{employee.name}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 gap-1.5 px-2.5 text-xs"
+                  aria-label={`Restore ${employee.name}`}
+                  onClick={() => handleRestore(employee)}
+                  disabled={busyId === employee.id}
+                >
+                  <ArchiveRestore className="h-3.5 w-3.5" /> Restore
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
 
       {(editingEmployee || isAddingNew) && (

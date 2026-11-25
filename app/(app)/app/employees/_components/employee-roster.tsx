@@ -12,7 +12,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import EmployeeSetupDialog from '../../payroll/_components/employee-setup-dialog';
-import { deleteEmployee } from '../../payroll/actions';
+import { archiveEmployee } from '../../payroll/actions';
 import type { Employee, PayrollEntry } from '../../payroll/actions';
 
 // Role hues stay categorical — collapsing them into the brand navy would
@@ -92,15 +92,15 @@ export default function EmployeeRoster({ employees: initialEmployees, payroll }:
   });
 
   async function handleDelete(emp: Employee) {
-    if (!confirm(`Remove ${emp.name}? This also deletes their shift history.`)) return;
+    if (!confirm(`Archive ${emp.name}? They leave the roster; their past pay and tips stay in the books.`)) return;
     setDeletingId(emp.id);
     try {
-      await deleteEmployee(emp.id);
+      await archiveEmployee(emp.id);
       setEmployees((prev) => prev.filter((e) => e.id !== emp.id));
-      toast.success(`${emp.name} removed`);
+      toast.success(`${emp.name} archived`);
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to remove');
+      toast.error(err instanceof Error ? err.message : 'Failed to archive');
     } finally {
       setDeletingId(null);
     }

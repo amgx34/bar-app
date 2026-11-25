@@ -451,7 +451,8 @@ export async function getShiftRoster(shiftDate: string): Promise<RosterEntry[]> 
   const [{ data: employees }, { data: shifts }] = await Promise.all([
     supabase
       .from('employees')
-      .select('id, name, role')
+      // '*' and an in-memory filter: works before employees.archived_at exists.
+      .select('*')
       .eq('organization_id', org.id)
       .order('name'),
     supabase
@@ -468,13 +469,17 @@ export async function getShiftRoster(shiftDate: string): Promise<RosterEntry[]> 
     ]),
   );
 
-  return (employees ?? []).map((e) => ({
-    employeeId: e.id,
-    name: e.name,
-    role: e.role,
-    hours: byEmployee.get(e.id) ?? 0,
-    onShift: byEmployee.has(e.id),
-  }));
+  // An archived employee is not offered for a new shift unless they already have
+  // hours that night, which must stay editable.
+  return (employees ?? [])
+    .filter((e) => !(e as { archived_at?: string | null }).archived_at || byEmployee.has(e.id))
+    .map((e) => ({
+      employeeId: e.id,
+      name: e.name,
+      role: e.role,
+      hours: byEmployee.get(e.id) ?? 0,
+      onShift: byEmployee.has(e.id),
+    }));
 }
 
 /**

@@ -98,7 +98,7 @@ export default async function PayrollPage({
           startDate={startDate}
           endDate={endDate}
           payrollEntries={payrollEntries}
-          employees={employees as never}
+          employees={employees.filter((e) => !(e as { archived_at?: string | null }).archived_at) as never}
           weeklyTrend={weeklyTrend}
           payouts={payouts}
           overtime={overtimeCfg}

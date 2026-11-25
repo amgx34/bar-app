@@ -126,8 +126,10 @@ export default async function DashboardPage() {
     supabase.from('z_report_days')
       .select('report_date, total_sales, cash_tips, cc_tips, cash_tips_source')
       .eq('organization_id', orgId).order('report_date', { ascending: false }).limit(14),
+    // select('*') and an in-memory archived filter below, so this keeps working
+    // on a database that has not yet had employees.archived_at added.
     supabase.from('employees')
-      .select('id, name, role, hourly_rate')
+      .select('*')
       .eq('organization_id', orgId),
     // select('*') — never fails on missing columns.
     // is_active filtered in-memory below to handle NULL values correctly.
@@ -266,7 +268,8 @@ export default async function DashboardPage() {
 
   const EXCLUDED = new Set(['front door']);
   const unconfiguredEmployees = (employees ?? []).filter(
-    (e) => !EXCLUDED.has(e.name.toLowerCase()) && (!e.role || e.hourly_rate === null),
+    (e) => !(e as { archived_at?: string | null }).archived_at
+      && !EXCLUDED.has(e.name.toLowerCase()) && (!e.role || e.hourly_rate === null),
   );
 
   // Top movers — what SOLD plus what was logged as lost, over the last 30 days.
