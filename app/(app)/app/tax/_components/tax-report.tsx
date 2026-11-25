@@ -315,16 +315,16 @@ export default function TaxReport({ orgName }: { orgName: string }) {
       )}
 
       {data?.ficaUnavailableReason && (
-        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-5 py-4 text-xs text-amber-300/80 leading-relaxed">
-          <span className="font-semibold text-amber-300">FICA not shown:</span>{' '}
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-5 py-4 text-xs text-accent-text leading-relaxed">
+          <span className="font-semibold text-accent-text">FICA not shown:</span>{' '}
           {data.ficaUnavailableReason}
         </div>
       )}
 
       {/* Sales tax note */}
       {rateDecimal > 0 && data && salesTaxOwed > 0 && (
-        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-5 py-4 text-xs text-amber-300/80 leading-relaxed">
-          <span className="font-semibold text-amber-300">Sales Tax Reminder:</span>{' '}
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-5 py-4 text-xs text-accent-text leading-relaxed">
+          <span className="font-semibold text-accent-text">Sales Tax Reminder:</span>{' '}
           The estimated <strong>{fmtMoney(salesTaxOwed)}</strong> in sales tax was collected from your customers and must be remitted to{' '}
           {state ? US_STATES.find(s => s.code === state)?.name ?? 'your state' : 'your state'} on your required filing schedule.
           This is not bar income — it is a pass-through liability. Verify the exact amount against your POS sales tax reports before filing.

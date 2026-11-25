@@ -130,9 +130,9 @@ export default function Form1099({ availableYears, employees, orgName }: Props) 
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border bg-amber-500/5 border-amber-500/20 p-4 text-sm text-amber-300 space-y-1">
+      <div className="rounded-xl border bg-amber-500/5 border-amber-500/20 p-4 text-sm text-accent-text space-y-1">
         <p className="font-semibold">Before generating 1099-NECs:</p>
-        <p className="text-amber-300/70 text-xs leading-relaxed">
+        <p className="text-accent-text text-xs leading-relaxed">
           1099-NEC forms are for <strong>independent contractors</strong> (non-employees) paid $600 or more.
           Regular bar staff on the payroll receive W-2s, not 1099s. Misclassifying employees as contractors carries serious IRS penalties.
           Have a tax professional confirm worker classification before filing.

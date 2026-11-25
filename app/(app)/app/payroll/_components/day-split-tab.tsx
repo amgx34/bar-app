@@ -666,7 +666,7 @@ export default function DaySplitTab({
 
       {/* No tips warning */}
           {data.totalTips === 0 && (
-            <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm text-yellow-400">
+            <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm text-accent-text">
               No tip data for this date — import a Z report to see tip distributions.
             </div>
           )}

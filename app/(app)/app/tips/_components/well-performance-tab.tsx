@@ -156,16 +156,16 @@ export default function WellPerformanceTab() {
   return (
     <div className="space-y-6">
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         {/* Date navigation */}
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => navigateDate('prev')} disabled={!canGoPrev}>
+          <Button variant="outline" size="sm" aria-label="Previous day" className="h-8 w-8 p-0" onClick={() => navigateDate('prev')} disabled={!canGoPrev}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="text-sm font-medium min-w-[200px] text-center">
             {fmtDate(selectedDate)}
           </span>
-          <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => navigateDate('next')} disabled={!canGoNext}>
+          <Button variant="outline" size="sm" aria-label="Next day" className="h-8 w-8 p-0" onClick={() => navigateDate('next')} disabled={!canGoNext}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
