@@ -57,3 +57,7 @@ next-env.d.ts
 
 # Isolated workspaces for subagent-driven plan execution
 .worktrees/
+
+# Graphify and execution workspace output
+graphify-out/
+.superpowers/

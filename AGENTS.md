@@ -17,6 +17,8 @@ npm run build        # next build
 npm run lint         # eslint
 npx tsc --noEmit     # typecheck
 npm test             # vitest, unit tests for the pure money functions in lib/
+                     # Always via npm: a bare `npx vitest` from a lowercase `c:\` shell
+                     # (VS Code's default) fails every file. See scripts/dev/run-vitest.mjs.
 ```
 
 Sibling codebases have their own toolchains:

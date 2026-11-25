@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node --no-warnings scripts/dev/check-dev-env.ts",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "node scripts/dev/run-vitest.mjs run",
+    "test:watch": "node scripts/dev/run-vitest.mjs",
     "audit:scope": "node scripts/audit-admin-scope.mjs"
   },
   "dependencies": {
