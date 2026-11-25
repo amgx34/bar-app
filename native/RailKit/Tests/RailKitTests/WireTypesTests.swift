@@ -43,3 +43,45 @@ private func decode(_ json: String) throws -> WireDecimal {
         #expect(String(decoding: out, as: UTF8.self) == #"["1234.50"]"#)
     }
 }
+
+private func dec<T: Decodable>(_ t: T.Type, _ json: String) throws -> T {
+    try JSONDecoder().decode(t, from: Data(json.utf8))
+}
+private let posix = Locale(identifier: "en_US_POSIX")
+
+@Suite struct ScaledTypesTests {
+    @Test func moneyNeedsExactlyTwoPlaces() throws {
+        #expect(try dec(MoneyString.self, #""12.50""#).string == "12.50")
+        for bad in ["12.5", "12.500", "12"] {
+            #expect(throws: DecodingError.self) { try dec(MoneyString.self, "\"\(bad)\"") }
+            #expect(MoneyString(bad) == nil)
+        }
+    }
+
+    @Test func quantityNeedsExactlyFourPlaces() throws {
+        #expect(try dec(QuantityString.self, #""1.2345""#).string == "1.2345")
+        for bad in ["1.234", "1.23456", "1"] {
+            #expect(throws: DecodingError.self) { try dec(QuantityString.self, "\"\(bad)\"") }
+        }
+    }
+
+    @Test func negativeAndLargeKeepEveryDigit() throws {
+        let m = try dec(MoneyString.self, #""-0.50""#)
+        #expect(m.decimal == Decimal(string: "-0.5", locale: posix))
+        let big = "123456789012345678.1234"
+        let q = try dec(QuantityString.self, "\"\(big)\"")
+        #expect(q.decimal == Decimal(string: big, locale: posix))
+    }
+
+    @Test func roundTripsToSameString() throws {
+        let m = try dec(MoneyString.self, #""-1234.50""#)
+        #expect(String(decoding: try JSONEncoder().encode([m]), as: UTF8.self) == #"["-1234.50"]"#)
+        let q = try dec(QuantityString.self, #""0.0100""#)
+        #expect(String(decoding: try JSONEncoder().encode([q]), as: UTF8.self) == #"["0.0100"]"#)
+    }
+
+    @Test func jsonNumberFails() {
+        #expect(throws: DecodingError.self) { try dec(MoneyString.self, "12.50") }
+        #expect(throws: DecodingError.self) { try dec(QuantityString.self, "1.2345") }
+    }
+}

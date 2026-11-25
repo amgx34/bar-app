@@ -22,7 +22,10 @@
         "orgName": "Fixture Bar Two",
         "role": "accountant",
         "destinations": [
+          "today",
+          "stock",
           "sales",
+          "team-pay",
           "books"
         ]
       }

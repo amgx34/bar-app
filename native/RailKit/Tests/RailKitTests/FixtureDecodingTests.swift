@@ -33,7 +33,7 @@ private let user1 = "00000000-0000-4000-8000-000000000001"
     @Test func meTwoOrgs() throws {
         let r = try JSONDecoder().decode(MeResponse.self, from: fixture("me.two-orgs"))
         #expect(r.data.memberships.map(\.role) == [.owner, .accountant])
-        #expect(r.data.memberships[1].destinations == [.sales, .books])
+        #expect(r.data.memberships[1].destinations == [.today, .stock, .sales, .teamPay, .books])
         #expect(r.data.activeOrgId == nil)
     }
 

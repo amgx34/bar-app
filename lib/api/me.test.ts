@@ -118,10 +118,7 @@ describe('shared fixtures', () => {
   const run = async (n: string, over: Partial<MeDeps>) => {
     const f = fx(n);
     const r = await handleMe(deps({ verify: async () => ({ user: f.data.user }), ...over }));
-    // The accountant fixture lists 2 destinations; visibleDestinations() still returns all five
-    // (documented in destinations.ts), so compare destinations by schema, everything else exactly.
-    const norm = (b: J) => ({ ...b, data: { ...b.data, memberships: b.data.memberships.map((x: J) => ({ ...x, destinations: x.destinations.length > 0 })) } });
-    expect(norm(r.body as J)).toEqual(norm(f));
+    expect(r.body).toEqual(f);
   };
   it('me.member', () => run('me.member', { load: async () => ({ membershipRows: [m(A1, 'Fixture Bar One', 'manager')], accountRow: null }) }));
   it('me.two-orgs', () => run('me.two-orgs', { load: async () => ({ membershipRows: [m(A1, 'Fixture Bar One', 'owner'), m(A2, 'Fixture Bar Two', 'accountant')], accountRow: null }) }));

@@ -31,8 +31,41 @@ public struct WireDecimal: Sendable, Equatable, Hashable, Codable {
     }
 }
 
-public typealias MoneyString = WireDecimal
-public typealias QuantityString = WireDecimal
+/// A `WireDecimal` that also has exactly `places` fractional digits, as the Zod contract requires.
+private func scaled(_ s: String, _ places: Int) -> WireDecimal? {
+    guard let d = WireDecimal(s), d.string.split(separator: ".", omittingEmptySubsequences: false).last!.count == places,
+          d.string.contains(".") else { return nil }
+    return d
+}
+
+private func decodeScaled(_ decoder: any Decoder, _ places: Int) throws -> WireDecimal {
+    let c = try decoder.singleValueContainer()
+    let s = try c.decode(String.self)
+    guard let v = scaled(s, places) else {
+        throw DecodingError.dataCorruptedError(in: c, debugDescription: "not a decimal string with exactly \(places) fractional digits")
+    }
+    return v
+}
+
+/// Money: exactly 2 decimal places.
+public struct MoneyString: Sendable, Equatable, Hashable, Codable {
+    public let value: WireDecimal
+    public var string: String { value.string }
+    public var decimal: Decimal { value.decimal }
+    public init?(_ string: String) { guard let v = scaled(string, 2) else { return nil }; value = v }
+    public init(from decoder: any Decoder) throws { value = try decodeScaled(decoder, 2) }
+    public func encode(to encoder: any Encoder) throws { try value.encode(to: encoder) }
+}
+
+/// Stock quantity: exactly 4 decimal places.
+public struct QuantityString: Sendable, Equatable, Hashable, Codable {
+    public let value: WireDecimal
+    public var string: String { value.string }
+    public var decimal: Decimal { value.decimal }
+    public init?(_ string: String) { guard let v = scaled(string, 4) else { return nil }; value = v }
+    public init(from decoder: any Decoder) throws { value = try decodeScaled(decoder, 4) }
+    public func encode(to encoder: any Encoder) throws { try value.encode(to: encoder) }
+}
 
 /// ISO 8601 instants with offset, with or without fractional seconds.
 enum WireInstant {
