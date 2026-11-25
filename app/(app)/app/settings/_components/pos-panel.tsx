@@ -317,7 +317,9 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
   const [disconnecting, setDisconnecting] = useState(false);
 
   const canManage         = role === 'owner' || role === 'manager';
-  const isCloverConnected = provider === 'clover' && !!(posConfig.access_token);
+  // The login itself lives in the encrypted credentials store, not here. A zone
+  // is required: without one Rail cannot say which night a sale belongs to.
+  const isCloverConnected = provider === 'clover' && !!posConfig.merchant_id && !!posConfig.timezone && !posConfig.needs_reauth;
   const isToastConnected  = provider === 'toast'  && !!(posConfig.client_id);
   const isConnected       = isCloverConnected || isToastConnected;
 
@@ -330,6 +332,7 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
         clover_token_failed:    'Clover rejected the authorization — try again',
         clover_invalid_token:   'Clover returned an invalid token',
         clover_save_failed:     'Connected but failed to save — contact support',
+        clover_timezone:        'Connected, but Clover did not report your time zone. Authorize again and pick one.',
       };
       toast.error(messages[flashError] ?? `Connection error: ${flashError}`);
     }
@@ -458,7 +461,9 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
             cloverAuthUrl ? (
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">
-                  You&apos;ll be redirected to Clover to approve access. Rail never stores your Clover password.
+                  {posConfig.needs_reauth
+                    ? 'Clover no longer accepts the saved login. Authorize again to resume syncing.'
+                    : 'You\u2019ll be redirected to Clover to approve access. Rail never stores your Clover password.'}
                 </p>
                 <a href={cloverAuthUrl}>
                   <Button size="sm" className="gap-2 bg-green-500 hover:bg-green-600 text-white">

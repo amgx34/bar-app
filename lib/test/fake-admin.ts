@@ -54,6 +54,7 @@ export function createFakeAdmin(respond: Respond = () => undefined) {
     b.update = (p: unknown, o?: unknown) => setOp('update', p, o);
     b.delete = () => setOp('delete');
     b.eq = (c: string, v: unknown) => (q.filters.push(`eq ${c}=${JSON.stringify(v)}`), b);
+    b.or = (expr: string) => (q.filters.push(`or ${expr}`), b);
     b.in = (c: string, v: unknown) => (q.filters.push(`in ${c}=${JSON.stringify(v)}`), b);
     b.single = b.maybeSingle = () => ((q.single = true), b);
     b.then = (resolve: (r: Reply) => unknown, reject?: (e: unknown) => unknown) => {

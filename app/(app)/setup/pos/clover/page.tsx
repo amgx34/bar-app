@@ -1,19 +1,24 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
 import { getCurrentOrg } from '@/lib/org';
-import { Leaf, ExternalLink, ArrowRight, CheckCircle, Shield, Zap, Package } from 'lucide-react';
+import { Leaf, ExternalLink, ArrowRight, Shield, Zap, Package } from 'lucide-react';
 import Link from 'next/link';
+import { startCloverConnect } from './actions';
 
 export const metadata: Metadata = { title: 'Connect Clover' };
+
+const TIME_ZONES: [string, string][] = [
+  ['America/New_York', 'Eastern'], ['America/Chicago', 'Central'], ['America/Denver', 'Mountain'],
+  ['America/Phoenix', 'Arizona'], ['America/Los_Angeles', 'Pacific'], ['America/Anchorage', 'Alaska'],
+  ['Pacific/Honolulu', 'Hawaii'], ['America/Toronto', 'Toronto'], ['America/Vancouver', 'Vancouver'],
+  ['Europe/London', 'London'], ['Europe/Dublin', 'Dublin'], ['Europe/Berlin', 'Central Europe'],
+];
 
 export default async function CloverConnectPage() {
   const { org } = await getCurrentOrg();
 
-  // Already connected — go to dashboard
-  const cfg = org.pos_config as { access_token?: string } | null;
-  if (cfg?.access_token) redirect('/app/dashboard');
-
-  const authUrl = buildCloverAuthUrl(org.id);
+  const cfg = (org.pos_config ?? {}) as { merchant_id?: string; clover_region?: string; cutoff_hour?: number; timezone?: string };
+  const ready = !!(process.env.CLOVER_CLIENT_ID && process.env.CLOVER_REDIRECT_URI && process.env.OAUTH_STATE_SECRET);
+  const sandbox = process.env.CLOVER_SANDBOX === 'true';
 
   return (
     <main className="relative min-h-dvh flex items-center justify-center p-6 overflow-hidden bg-sidebar text-sidebar-foreground">
@@ -56,8 +61,9 @@ export default async function CloverConnectPage() {
             <p className="text-xs font-semibold text-white/40 uppercase tracking-widest">Rail will be able to</p>
             <ul className="space-y-2">
               {[
-                { icon: Package, text: 'Read your item catalog and inventory counts' },
-                { icon: Zap, text: 'Pull nightly sales and tip totals' },
+                { icon: Package, text: 'Read your item catalog' },
+                { icon: Zap, text: 'Pull nightly sales, tips, cash and card totals, and items sold' },
+                { icon: Package, text: 'Read employees and shifts, when your account allows it' },
                 { icon: Shield, text: 'Never write to or modify your Clover data' },
               ].map(({ icon: Icon, text }) => (
                 <li key={text} className="flex items-center gap-2.5 text-sm text-white/55">
@@ -68,15 +74,50 @@ export default async function CloverConnectPage() {
             </ul>
           </div>
 
-          {/* Connect button */}
-          {authUrl ? (
-            <a href={authUrl} className="flex items-center justify-center gap-2 w-full h-12 rounded-xl bg-green-500 hover:bg-green-400 text-white font-semibold transition-colors text-sm">
-              <ExternalLink className="h-4 w-4" />
-              Authorize with Clover
-            </a>
+          {cfg.merchant_id && (
+            <p className="text-xs text-amber-400">
+              A Clover account is already connected. Authorizing again replaces its stored login.
+            </p>
+          )}
+
+          {ready ? (
+            <form action={startCloverConnect} className="space-y-4">
+              {!sandbox && (
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-semibold text-white/40 uppercase tracking-widest">Clover region</span>
+                  <select name="region" defaultValue={cfg.clover_region ?? 'na'} className="w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-white">
+                    <option value="na">United States and Canada</option>
+                    <option value="eu">Europe</option>
+                    <option value="la">Latin America</option>
+                  </select>
+                </label>
+              )}
+              <label className="block space-y-1.5">
+                <span className="text-xs font-semibold text-white/40 uppercase tracking-widest">Business day ends at (hour)</span>
+                <input name="cutoff_hour" type="number" min={0} max={12} defaultValue={cfg.cutoff_hour ?? 4}
+                  className="w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-white" />
+                <span className="block text-xs text-white/35">
+                  Clover has no business day. Sales before this hour count toward the night before. 4 suits most bars.
+                </span>
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-semibold text-white/40 uppercase tracking-widest">Time zone</span>
+                <select name="timezone" defaultValue={cfg.timezone ?? ''} className="w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-white">
+                  <option value="">Use the one Clover reports</option>
+                  {TIME_ZONES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                </select>
+                <span className="block text-xs text-white/35">
+                  Only used if Clover does not report your zone. Without one Rail cannot tell which night a sale belongs to.
+                </span>
+              </label>
+              <button type="submit" className="flex items-center justify-center gap-2 w-full h-12 rounded-xl bg-green-500 hover:bg-green-400 text-white font-semibold transition-colors text-sm">
+                <ExternalLink className="h-4 w-4" />
+                Authorize with Clover
+              </button>
+            </form>
           ) : (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
-              <strong>CLOVER_CLIENT_ID</strong> and <strong>CLOVER_REDIRECT_URI</strong> must be set in your environment before connecting.
+              <strong>CLOVER_CLIENT_ID</strong>, <strong>CLOVER_REDIRECT_URI</strong> and <strong>OAUTH_STATE_SECRET</strong> must be set in your environment before connecting.
             </div>
           )}
         </div>
@@ -94,22 +135,4 @@ export default async function CloverConnectPage() {
       </div>
     </main>
   );
-}
-
-function buildCloverAuthUrl(orgId: string): string | null {
-  const clientId = process.env.CLOVER_CLIENT_ID;
-  const redirectUri = process.env.CLOVER_REDIRECT_URI;
-  if (!clientId || !redirectUri) return null;
-
-  const base =
-    process.env.CLOVER_SANDBOX === 'true'
-      ? 'https://sandbox.dev.clover.com/oauth/v2/authorize'
-      : 'https://www.clover.com/oauth/v2/authorize';
-
-  const url = new URL(base);
-  url.searchParams.set('client_id', clientId);
-  url.searchParams.set('redirect_uri', redirectUri);
-  url.searchParams.set('response_type', 'code');
-  url.searchParams.set('state', orgId);
-  return url.toString();
 }

@@ -56,3 +56,12 @@ export function applyCredentialsEnc(cfg: PosConfig, enc: string): PosConfig {
   void _plaintext;
   return { ...rest, credentials_enc: enc };
 }
+
+/**
+ * Merges non-secret provider settings (merchant id, region, timezone, cutoff,
+ * needs_reauth) over the latest config. Spreads what it is handed, so the caller
+ * must pass the config as it stands NOW, never a copy read earlier in the request.
+ */
+export function applyProviderSettings(cfg: PosConfig, patch: PosConfig): PosConfig {
+  return { ...cfg, ...patch };
+}

@@ -8,6 +8,11 @@ import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
 import { SITE_URL } from '@/lib/site';
 import type { BarSettings, HourlyRates } from '@/lib/org';
+import { deleteCredentials } from '@/lib/pos/credentials';
+import type { PosConfig } from '@/lib/pos/pos-config';
+import { runProviderSync } from '@/lib/pos/sync-run';
+import { NeedsReauthError } from '@/lib/pos/providers/types';
+import { openCloverClient } from '@/lib/pos/providers/clover/adapter';
 
 // ── Shared helper: safely merge into pos_config without overwriting other keys ──
 async function mergePosConfig(orgId: string, updates: Record<string, unknown>) {
@@ -141,97 +146,37 @@ export async function updateInventoryDefaults(data: {
 
 export type SyncResult = { created: number; updated: number; skipped: number };
 
-/** Pull the last N days of Clover orders → z_report_days */
+/**
+ * Pull the last N business dates of Clover trade through the shared pipeline:
+ * Z totals net of tax, tips, cash/card split, hourly, per-server, hours and
+ * items (which deplete stock by delta). Same writer as the nightly cron.
+ */
 export async function syncCloverSales(days = 7): Promise<{ upserted: number }> {
-  const { org } = await getCurrentOrg();
+  const { org, role } = await getCurrentOrg();
+  assertEditor(role);
   if (org.pos_provider !== 'clover') throw new Error('Not connected to Clover');
 
-  const cfg = org.pos_config as { merchant_id: string; access_token: string };
-  if (!cfg.access_token || !cfg.merchant_id) throw new Error('Clover connection incomplete — please reconnect');
-
-  const base = process.env.CLOVER_SANDBOX === 'true' ? 'https://apisandbox.dev.clover.com' : 'https://api.clover.com';
-  const headers = { Authorization: `Bearer ${cfg.access_token}` };
-
-  // Build per-day buckets over the requested window
-  const now = new Date();
-  const dayMs = 24 * 60 * 60 * 1000;
-  const startMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - (days - 1) * dayMs;
-
-  // Paginate through all orders — a busy bar can have thousands per week
-  const endMs   = Date.now();
-  const PAGE    = 500;
-  const elements: Array<{
-    createdTime: number;
-    total?: number;
-    payments?: { elements?: Array<{ amount?: number; tipAmount?: number; result?: string }> };
-  }> = [];
-
-  let offset = 0;
-  for (;;) {
-    const url = `${base}/v3/merchants/${cfg.merchant_id}/orders`
-      + `?expand=payments`
-      + `&filter=createdTime>=${startMs}&filter=createdTime<=${endMs}`
-      + `&limit=${PAGE}&offset=${offset}`;
-    const res = await fetch(url, { headers });
-    if (!res.ok) throw new Error(`Clover API error: ${res.status}`);
-    const page = await res.json() as { elements?: typeof elements };
-    const batch = page.elements ?? [];
-    elements.push(...batch);
-    if (batch.length < PAGE) break; // last page
-    offset += PAGE;
-    if (offset > 50_000) break;     // safety cap: 50k orders max per sync
-  }
-
-  // Aggregate by calendar date (local date string YYYY-MM-DD)
-  const byDate = new Map<string, { sales: number; tips: number }>();
-  for (const order of elements) {
-    const d = new Date(order.createdTime);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    if (!byDate.has(key)) byDate.set(key, { sales: 0, tips: 0 });
-    const bucket = byDate.get(key)!;
-    bucket.sales += (order.total ?? 0) / 100;
-    for (const payment of order.payments?.elements ?? []) {
-      if (payment.result === 'SUCCESS') bucket.tips += (payment.tipAmount ?? 0) / 100;
-    }
-  }
-
-  if (!byDate.size) return { upserted: 0 };
-
-  const admin = createAdminClient();
-  const rows = [...byDate.entries()].map(([report_date, { sales, tips }]) => ({
-    organization_id: org.id,
-    report_date,
-    total_sales: Math.round(sales * 100) / 100,
-    cc_tips:     Math.round(tips * 100) / 100,
-    // cash_tips is deliberately absent. Clover reports card tips; it has no
-    // view of the jar. Sending a hard 0 overwrote whatever was there on every
-    // sync — including a manager's counted figure. Omitted, an existing row
-    // keeps its value and a new one takes the column default of 0.
-  }));
-
-  const { error } = await admin
-    .from('z_report_days')
-    .upsert(rows, { onConflict: 'organization_id,report_date' });
-
-  if (error) throw new Error(error.message);
+  const r = await runProviderSync(org.id, { days: Math.min(Math.max(1, Math.trunc(days) || 1), 31) });
+  if (!r.ran) throw new Error(r.reason === 'already-running' ? 'A sync is already running. Try again in a minute.' : 'Not connected to Clover');
+  if (r.needsReauth) throw new Error('Clover no longer accepts the saved login. Reconnect Clover in Settings.');
+  if (!r.ok && !r.summary?.zReports) throw new Error(r.errors[0] ?? 'Clover sync failed');
   revalidatePath('/app/dashboard');
-  return { upserted: rows.length };
+  return { upserted: r.summary?.zReports ?? 0 };
 }
 
 export async function syncCloverInventory(): Promise<SyncResult> {
   const { org } = await getCurrentOrg();
   if (org.pos_provider !== 'clover') throw new Error('Not connected to Clover');
 
-  const cfg = org.pos_config as { merchant_id: string; access_token: string; expires_at: number | null };
-  if (!cfg.access_token || !cfg.merchant_id) throw new Error('Clover connection is incomplete — please reconnect');
-  if (cfg.expires_at && Date.now() > cfg.expires_at) throw new Error('Clover access token has expired — please reconnect');
-
-  const base = process.env.CLOVER_SANDBOX === 'true' ? 'https://apisandbox.dev.clover.com' : 'https://api.clover.com';
-  const res  = await fetch(`${base}/v3/merchants/${cfg.merchant_id}/items?limit=1000&filter=hidden=false`, { headers: { Authorization: `Bearer ${cfg.access_token}` } });
-
-  if (!res.ok) throw new Error(`Clover API error: ${res.status}`);
-
-  const { elements = [] } = await res.json() as { elements: { id: string; name: string; price?: number; code?: string; stockCount?: number }[] };
+  // Token handling, refresh and the region host all live behind the client.
+  let elements: { id: string; name: string; price?: number; code?: string }[];
+  try {
+    elements = await openCloverClient(createAdminClient(), org.id, org.pos_config as PosConfig)
+      .list('/items', { filter: ['hidden=false'] });
+  } catch (e) {
+    if (e instanceof NeedsReauthError) throw new Error('Clover no longer accepts the saved login. Reconnect Clover in Settings.');
+    throw e;
+  }
   if (!elements.length) return { created: 0, updated: 0, skipped: 0 };
 
   const supabase = await createClient();
@@ -246,10 +191,10 @@ export async function syncCloverInventory(): Promise<SyncResult> {
     const match = (item.code && bySku.get(item.code)) ?? byName.get(item.name.toLowerCase());
     if (match) {
       // admin-scope-ok: match.id comes from `existing`, fetched with .eq('organization_id', org.id)
-      const { error } = await admin.from('inventory_items').update({ sale_price: item.price != null ? item.price / 100 : undefined, sku: item.code || match.sku || null, ...(item.stockCount != null ? { current_stock: item.stockCount } : {}) }).eq('id', match.id);
+      const { error } = await admin.from('inventory_items').update({ sale_price: item.price != null ? item.price / 100 : undefined, sku: item.code || match.sku || null }).eq('id', match.id);
       error ? result.skipped++ : result.updated++;
     } else {
-      const { error } = await admin.from('inventory_items').insert({ organization_id: org.id, name: item.name.trim(), sku: item.code || null, sale_price: item.price != null ? item.price / 100 : null, current_stock: item.stockCount ?? 0, unit: 'each' });
+      const { error } = await admin.from('inventory_items').insert({ organization_id: org.id, name: item.name.trim(), sku: item.code || null, sale_price: item.price != null ? item.price / 100 : null, current_stock: 0, unit: 'each' });
       error ? result.skipped++ : result.created++;
     }
   }
@@ -261,6 +206,8 @@ export async function disconnectPOS() {
   const { org, role } = await getCurrentOrg();
   if (role !== 'owner') throw new Error('Only owners can disconnect a POS');
   const admin = createAdminClient();
+  // The stored login goes first. If this fails the org stays connected and the owner can retry.
+  await deleteCredentials(admin, org.id);
   const { error } = await admin.from('organizations').update({ pos_provider: null, pos_config: {} }).eq('id', org.id);
   if (error) throw new Error(error.message);
   revalidatePath('/app/settings');

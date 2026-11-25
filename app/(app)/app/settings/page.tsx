@@ -29,21 +29,10 @@ const TABS = [
   { key: 'billing',     label: 'Billing' },
 ];
 
-function buildCloverAuthUrl(orgId: string): string | null {
-  const clientId    = process.env.CLOVER_CLIENT_ID;
-  const redirectUri = process.env.CLOVER_REDIRECT_URI;
-  if (!clientId || !redirectUri) return null;
-
-  const base = process.env.CLOVER_SANDBOX === 'true'
-    ? 'https://sandbox.dev.clover.com/oauth/v2/authorize'
-    : 'https://www.clover.com/oauth/v2/authorize';
-
-  const url = new URL(base);
-  url.searchParams.set('client_id',     clientId);
-  url.searchParams.set('redirect_uri',  redirectUri);
-  url.searchParams.set('response_type', 'code');
-  url.searchParams.set('state',         orgId);
-  return url.toString();
+/** Clover's redirect needs a signed state and a region, so it starts on the setup page. */
+function cloverSetupUrl(): string | null {
+  const ready = process.env.CLOVER_CLIENT_ID && process.env.CLOVER_REDIRECT_URI && process.env.OAUTH_STATE_SECRET;
+  return ready ? '/setup/pos/clover' : null;
 }
 
 export const metadata: Metadata = { title: 'Settings' };
@@ -135,7 +124,7 @@ export default async function SettingsPage({
             role={role}
             posProvider={org.pos_provider}
             posConfig={(org.pos_config ?? {}) as Record<string, unknown>}
-            cloverAuthUrl={buildCloverAuthUrl(org.id)}
+            cloverAuthUrl={cloverSetupUrl()}
             flashConnected={params.connected === 'clover'}
             flashError={params.error}
           />

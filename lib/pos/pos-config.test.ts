@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseAgentVersion, applyAgentVersion, applySyncOutcome } from './pos-config';
+import { parseAgentVersion, applyAgentVersion, applySyncOutcome, applyProviderSettings } from './pos-config';
 
 const NOW = '2026-10-13T22:00:00.000Z';
 
@@ -78,5 +78,13 @@ describe('pos_config writers', () => {
     const next = applySyncOutcome({}, [], null, NOW);
 
     expect(next.last_sync_summary).toBeNull();
+  });
+});
+
+describe('applyProviderSettings', () => {
+  it('merges over the latest config without dropping what a later writer stored', () => {
+    const afterOutcome = applySyncOutcome({ merchant_id: 'M1', agent_version: '1.4.0' }, [], null, '2026-11-25T00:00:00Z');
+    const next = applyProviderSettings(afterOutcome, { needs_reauth: true });
+    expect(next).toMatchObject({ merchant_id: 'M1', agent_version: '1.4.0', needs_reauth: true, last_sync_at: '2026-11-25T00:00:00Z' });
   });
 });
