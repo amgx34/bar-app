@@ -365,6 +365,11 @@ export default async function DashboardPage() {
   }
   const shownFeed = feedRows.slice(0, 4);
 
+  // The night the cash belongs to, not whatever day the pay screen opens on. The
+  // old ?tab=split link went through the legacy map and dropped the date.
+  const cashTipsHref = lastNight
+    ? `/app/payroll?view=day&date=${lastNight.report_date}`
+    : '/app/payroll?view=day';
   const bannerShowing = !!lastNight && cashTipsMissing && bannerDismissedFor !== lastNight.report_date;
 
   const stockTone: Tone = !parConfigured ? 'info'
@@ -379,7 +384,7 @@ export default async function DashboardPage() {
       />
       {/* Only when the banner is not already saying it. */}
       {cashTipsMissing && !bannerShowing && (
-        <StatusChip href="/app/payroll?tab=split" icon={Banknote} tone="warn" label="Tips" value="Cash not entered" />
+        <StatusChip href={cashTipsHref} icon={Banknote} tone="warn" label="Tips" value="Cash not entered" />
       )}
       {canSeeOpenRun(role) && (
         <StatusChip
@@ -430,7 +435,7 @@ export default async function DashboardPage() {
               <SectionError what="last night's sales" />
             ) : !lastNight ? (
               <p className="text-sm text-muted-foreground">
-                No Z reports yet. <Link href="/app/payroll?tab=import" className="text-primary underline underline-offset-2">Import Z reports</Link> to see last night here.
+                No Z reports yet. <Link href="/app/settings?tab=import-data" className="text-primary underline underline-offset-2">Import Z reports</Link> to see last night here.
               </p>
             ) : (
               <>
@@ -493,7 +498,7 @@ export default async function DashboardPage() {
                         </button>
                       </form>
                       <Link
-                        href="/app/payroll?tab=split"
+                        href={cashTipsHref}
                         className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-cta px-3 text-sm font-semibold text-cta-foreground hover:opacity-90 md:min-h-9 md:flex-none"
                       >
                         <Banknote className="h-4 w-4" aria-hidden /> Log cash tips
@@ -741,7 +746,7 @@ export default async function DashboardPage() {
                 <BarChart2 className="h-8 w-8 text-muted-foreground mx-auto mb-3" aria-hidden />
                 <p className="text-sm font-medium">No sales data yet</p>
                 <p className="text-xs text-muted-foreground mt-1 mb-4">Import Z Reports to see revenue trends</p>
-                <Link href="/app/payroll?tab=import" className="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors">
+                <Link href="/app/settings?tab=import-data" className="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors">
                   Import Z Reports
                 </Link>
               </CardContent>
