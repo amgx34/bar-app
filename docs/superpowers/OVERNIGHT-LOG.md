@@ -70,3 +70,7 @@ Same handoff rules: Fable manager decides, Sonnet implements, Opus debugs, every
 11. **Supabase CLI**: install and link to DEV only; use `npm run supabase -- ...`.
 12. **Two small design calls**: nudge `--border-strong` and `--input` (light) darker than `#7C93B5`; confirm whether an accountant should see all five destinations (the fixture and `visibleDestinations` currently say yes).
 13. **Review the money-touching commits** (each separate and revertable): `aa986f4`, `8cb1f33`, `6f8d000`, `e49b661`, `525e769`, `4c035ef`, `c34a5a7`, `dbf5390`.
+
+## 2026-11-25: value cycle results
+
+Pieces S1 to S6 and V1 are built, tested and committed; S5 is the one piece that still fails its audit (light-mode keyboard focus on the POS setup screens). Journey scores, open blockers, the ordered owner steps and everything unverified are in `docs/superpowers/findings/2026-11-25-cycle-results.md`. The final gates pass except the known lint baseline and two light-mode token pairs. Nothing was pushed, deployed or applied, and public sign-up stays off until `NEXT_PUBLIC_SIGNUP_OPEN=true`.
