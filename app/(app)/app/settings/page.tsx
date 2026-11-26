@@ -75,12 +75,13 @@ export default async function SettingsPage({
       </div>
 
       {/* Tab nav */}
-      <div className="border-b overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex gap-6 min-w-max">
+      <div className="border-b">
+        <nav aria-label="Settings sections" className="flex flex-wrap gap-x-6 gap-y-2">
           {TABS.map(({ key, label }) => (
             <a
               key={key}
               href={`/app/settings?tab=${key}`}
+              aria-current={tab === key ? 'page' : undefined}
               className={`px-1 pb-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 tab === key
                   ? 'border-primary text-primary'
@@ -90,7 +91,7 @@ export default async function SettingsPage({
               {label}
             </a>
           ))}
-        </div>
+        </nav>
       </div>
 
       {/* Tab content */}

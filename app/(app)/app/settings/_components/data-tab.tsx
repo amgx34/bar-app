@@ -9,8 +9,9 @@ const mail = <a href={`mailto:${LEGAL_CONTACT_EMAIL}`} className="underline">{LE
 function ExportButton() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [done, setDone] = useState(false);
   async function run() {
-    setBusy(true); setErr('');
+    setBusy(true); setErr(''); setDone(false);
     try {
       const res = await fetch('/api/account/export');
       if (!res.ok) {
@@ -23,6 +24,7 @@ function ExportButton() {
       a.download = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? 'rail-export.zip';
       a.click();
       URL.revokeObjectURL(url);
+      setDone(true);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'The export failed.');
     } finally { setBusy(false); }
@@ -34,6 +36,7 @@ function ExportButton() {
         {busy ? 'Preparing...' : 'Download export (zip)'}
       </button>
       {busy && <p role="status" className="text-sm text-muted-foreground">This can take a few seconds.</p>}
+      {done && <p role="status" className="text-sm text-muted-foreground">Export downloaded.</p>}
       {err && <p role="alert" className="text-sm text-destructive">{err} Try again, or email {mail}.</p>}
     </div>
   );
