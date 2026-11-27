@@ -13,7 +13,7 @@ import { PasswordInput } from '@/components/ui/password-input';
 import { FormStatus } from '@/components/ui/form-status';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-const FIELD = 'h-11 bg-white/10 border-white/20 text-white placeholder:text-white/30 focus-visible:ring-white/30';
+const FIELD = 'h-11 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus-visible:ring-white/30';
 
 export function SignupForm({ fromDemo = false }: { fromDemo?: boolean }) {
   const [email, setEmail] = useState('');

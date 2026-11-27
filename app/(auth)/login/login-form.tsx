@@ -60,7 +60,7 @@ export function LoginForm() {
       return;
     }
     setStatus('success');
-    setStatusMessage('Signed in — taking you to your dashboard.');
+    setStatusMessage('Signed in. Taking you to your dashboard.');
     router.push(next);
     router.refresh(); // forces server components to re-fetch with the new session
   }
@@ -112,7 +112,7 @@ export function LoginForm() {
             <Input
               id="email" ref={emailRef} type="email" autoComplete="email" required
               value={email} onChange={(e) => setEmail(e.target.value)}
-              className="h-11 bg-white/10 border-white/20 text-white placeholder:text-white/30 focus-visible:ring-white/30"
+              className="h-11 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus-visible:ring-white/30"
             />
           </div>
           <div className="space-y-2">
@@ -120,7 +120,7 @@ export function LoginForm() {
             <PasswordInput
               id="password" autoComplete="current-password" required
               value={password} onChange={(e) => setPassword(e.target.value)}
-              className="h-11 bg-white/10 border-white/20 text-white placeholder:text-white/30 focus-visible:ring-white/30"
+              className="h-11 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus-visible:ring-white/30"
               toggleClassName="text-white/50 hover:text-white"
             />
           </div>
@@ -148,7 +148,7 @@ export function LoginForm() {
             <span className="w-full border-t border-white/20" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-transparent px-2 text-white/40">or</span>
+            <span className="bg-transparent px-2 text-white/70">or</span>
           </div>
         </div>
 

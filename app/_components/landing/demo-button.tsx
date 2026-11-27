@@ -36,7 +36,7 @@ export function DemoButton({ size = 'default', className = '' }: Props) {
       // because otherwise landing on their own dashboard looks like the demo
       // failed to load.
       if (body?.alreadySignedIn) {
-        toast.info('You are already signed in — taking you to your own bar.');
+        toast.info('You are already signed in. Taking you to your own bar.');
       }
 
       window.location.href = body?.redirectTo ?? '/app/dashboard';

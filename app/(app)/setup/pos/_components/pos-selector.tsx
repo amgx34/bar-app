@@ -127,7 +127,7 @@ export default function POSSelector({ orgId: _ }: Props) {
             </div>
           </div>
           <h1 className="text-2xl font-bold text-white">Choose your POS system</h1>
-          <p className="text-white/70 text-sm">Step 2 of 2 — this determines how Rail imports your data</p>
+          <p className="text-white/70 text-sm">Step 2 of 2: this determines how Rail imports your data</p>
         </div>
 
         {/* POS cards */}

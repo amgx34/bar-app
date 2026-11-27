@@ -1,8 +1,11 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { findOwnedBar } from '@/lib/setup/owned-bar';
 import { VerifyEmail } from './_components/verify-email';
 import { SetupForm } from './_components/setup-form';
+
+export const metadata: Metadata = { title: 'Set up your bar' };
 
 export default async function SetupPage() {
   const supabase = await createClient();

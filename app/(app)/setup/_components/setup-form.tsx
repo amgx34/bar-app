@@ -34,6 +34,11 @@ const TZ_LABEL: Record<string, string> = {
   'America/Anchorage': 'Alaska', 'Pacific/Honolulu': 'Hawaii',
 };
 
+// Base UI renders a hidden input per Select; naming it keeps scanners quiet.
+function HiddenName({ id, children }: { id: string; children: string }) {
+  return <label htmlFor={`${id}-hidden-input`} className="sr-only">{children}</label>;
+}
+
 export function SetupForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -67,7 +72,7 @@ export function SetupForm() {
     setLoading(false);
   }
 
-  const inputCls = 'bg-white/10 border-white/20 text-white placeholder:text-white/55 focus-visible:ring-white/70 data-[size=default]:h-11! h-11';
+  const inputCls = 'bg-white/10 border-white/20 text-white placeholder:text-white/70 focus-visible:ring-white/70 data-[size=default]:h-11! h-11';
   const labelCls = 'text-white/80 text-xs';
 
   return (
@@ -101,34 +106,36 @@ export function SetupForm() {
               </div>
               <div className="space-y-1.5">
                 <Label className={labelCls}>State</Label>
-                <Select value={state} onValueChange={(v) => setState(v ?? '')}>
+                <Select id="bar-state" value={state} onValueChange={(v) => setState(v ?? '')}>
                   <SelectTrigger aria-label="State" className={cn(inputCls, 'w-full')}>
-                    <span className="text-sm text-white/80">{state || <span className="text-white/60">Select</span>}</span>
+                    <span className="text-sm text-white/80">{state || <span className="text-white/70">Select</span>}</span>
                   </SelectTrigger>
                   <SelectContent className="max-h-60">
                     {US_STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <HiddenName id="bar-state">State</HiddenName>
               </div>
             </div>
 
             <div className="space-y-1.5">
               <Label className={labelCls}>Time zone, used for your nightly close</Label>
-              <Select value={timezone} onValueChange={(v) => setTzChoice(v ?? '')}>
+              <Select id="bar-tz" value={timezone} onValueChange={(v) => setTzChoice(v ?? '')}>
                 <SelectTrigger aria-label="Time zone" className={cn(inputCls, 'w-full')}>
                   <span className="text-sm text-white/80">
-                    {timezone ? TZ_LABEL[timezone] ?? timezone : <span className="text-white/60">Choose your time zone</span>}
+                    {timezone ? TZ_LABEL[timezone] ?? timezone : <span className="text-white/70">Choose your time zone</span>}
                   </span>
                 </SelectTrigger>
                 <SelectContent>
                   {TIMEZONES.map((t) => <SelectItem key={t} value={t}>{TZ_LABEL[t] ?? t}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <HiddenName id="bar-tz">Time zone</HiddenName>
             </div>
 
             <div className="space-y-1.5">
               <Label className={labelCls}>Bar type</Label>
-              <Select value={barType} onValueChange={(v) => setBarType(v ?? 'bar')}>
+              <Select id="bar-kind" value={barType} onValueChange={(v) => setBarType(v ?? 'bar')}>
                 <SelectTrigger aria-label="Bar type" className={cn(inputCls, 'w-full')}>
                   <span className="text-sm text-white/80">{BAR_TYPES.find((b) => b.value === barType)?.label}</span>
                 </SelectTrigger>
@@ -136,6 +143,7 @@ export function SetupForm() {
                   {BAR_TYPES.map((b) => <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <HiddenName id="bar-kind">Bar type</HiddenName>
             </div>
           </div>
 

@@ -73,7 +73,7 @@ const SPEC: [string, string, 'text' | 'ui'][] = [
   ['accent-foreground', 'accent', T], ['cta-foreground', 'cta', T],
   ['accent-text', 'background', T], ['accent-text', 'card', T],
   ['destructive-foreground', 'destructive', T], ['destructive', 'background', T], ['destructive', 'card', T],
-  ['sidebar-foreground', 'sidebar', T], ['sidebar-primary', 'sidebar', T],
+  ['sidebar-foreground', 'sidebar', T], ['sidebar-primary', 'sidebar', T], ['sidebar-ring', 'sidebar', U],
   ['sidebar-accent-foreground', 'sidebar-accent', T],
   ['border-strong', 'card', U], ['border-strong', 'background', U], ['input', 'card', U],
   ['input', 'background', U], ['ring', 'card', U],
