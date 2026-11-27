@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Proxies over the Supabase client's untyped builder shapes */
 /**
  * Write guard for the shared sample bars. Every Supabase client the app builds
  * goes through guardClient, so a server action, API route or admin-client write

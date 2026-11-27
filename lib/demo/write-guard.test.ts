@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- tests drive a fake, untyped Supabase client */
 import { describe, it, expect, vi } from 'vitest';
 import { guardClient, isUniversalDemoEmail, DEMO_REFUSAL, assertNotDemo, blocksDemoApiWrite } from './write-guard';
 
