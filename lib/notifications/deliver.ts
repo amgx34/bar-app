@@ -1,5 +1,6 @@
 import 'server-only';
 import webpush from 'web-push';
+import { isDemoRequest } from '@/lib/demo/write-guard';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { resolveRecipients, type PreferenceRow, type Recipient } from './preferences';
 import type { NotificationDraft } from './types';
@@ -98,6 +99,7 @@ export async function dispatch(
   draft: NotificationDraft,
   options: { recipients?: Recipient[]; preferences?: PreferenceRow[] } = {},
 ): Promise<number> {
+  if (await isDemoRequest()) return 0; // sample bar: no alerts, no push
   const recipients  = options.recipients  ?? await getOrgRecipients(organizationId);
   const preferences = options.preferences ?? await getPreferences(organizationId);
 

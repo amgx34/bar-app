@@ -1,3 +1,4 @@
+import { assertNotDemo } from '@/lib/demo/write-guard';
 /**
  * Email via Gmail SMTP (nodemailer).
  *
@@ -51,6 +52,7 @@ export async function sendEmail(
   html: string,
   replyTo?: string,
 ): Promise<void> {
+  await assertNotDemo();
   const from = `"Rail Orders" <${process.env.GMAIL_USER}>`;
   await getTransporter().sendMail({
     from,

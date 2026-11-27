@@ -1,5 +1,7 @@
+import { assertNotDemo } from '@/lib/demo/write-guard';
 /** Send order SMS via Twilio REST API. */
 export async function sendOrderSms(phoneE164: string, message: string): Promise<void> {
+  await assertNotDemo();
   const sid   = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const from  = process.env.TWILIO_FROM_NUMBER;

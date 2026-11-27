@@ -1,3 +1,4 @@
+import { assertNotDemo } from '@/lib/demo/write-guard';
 /**
  * Direct deposit 2FA delivery — SMS (Twilio) or email (Gmail) fallback.
  * Never log the OTP code itself.
@@ -15,6 +16,7 @@ function getMailTransporter() {
 }
 
 export async function sendOTPEmail(toEmail: string, code: string): Promise<void> {
+  await assertNotDemo();
   const transporter = getMailTransporter();
   const from = `"Rail Payroll Security" <${process.env.GMAIL_USER}>`;
 
@@ -54,6 +56,7 @@ export async function sendOTPEmail(toEmail: string, code: string): Promise<void>
 }
 
 export async function sendConfirmationEmail(toEmail: string, action: string, last4: string): Promise<void> {
+  await assertNotDemo();
   try {
     const transporter = getMailTransporter();
     const from = `"Rail Payroll Security" <${process.env.GMAIL_USER}>`;
@@ -81,6 +84,7 @@ export function maskEmail(email: string): string {
 
 // ── SMS (primary) ─────────────────────────────────────────────────────────────
 export async function sendOTPSms(phoneE164: string, code: string): Promise<void> {
+  await assertNotDemo();
   const sid   = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const from  = process.env.TWILIO_FROM_NUMBER;
@@ -116,6 +120,7 @@ export async function sendOTPSms(phoneE164: string, code: string): Promise<void>
 }
 
 export async function sendConfirmationSms(phoneE164: string, action: string, last4: string): Promise<void> {
+  await assertNotDemo();
   const sid   = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const from  = process.env.TWILIO_FROM_NUMBER;

@@ -1,11 +1,13 @@
 import { createServerClient } from '@supabase/ssr';
 import { DEMO_COOKIE } from '@/lib/demo/constants';
+import { DEMO_HEADER, DEMO_REFUSAL, blocksDemoApiWrite, isUniversalDemoEmail } from '@/lib/demo/write-guard';
 import { isGatedPath } from '@/lib/auth/gated-path';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function proxy(request: NextRequest) {
   // Lets the app layout tell which page a blocked bar is asking for (see lib/billing/paywall.ts).
   const forwarded = new Headers(request.headers);
+  forwarded.delete(DEMO_HEADER); // never trust a client-sent copy
   forwarded.set('x-path-query', request.nextUrl.pathname + request.nextUrl.search);
   let response = NextResponse.next({ request: { headers: forwarded } });
 
@@ -27,6 +29,13 @@ export async function proxy(request: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
+
+  if (isUniversalDemoEmail(user?.email)) {
+    if (blocksDemoApiWrite(request.method, request.nextUrl.pathname))
+      return NextResponse.json({ error: DEMO_REFUSAL }, { status: 403 });
+    forwarded.set(DEMO_HEADER, '1');
+    response = NextResponse.next({ request: { headers: forwarded } });
+  }
 
   // Boundary rules live in isGatedPath: /app, /me and /setup, not /apple-icon or /setup-guide.
   if (!user && isGatedPath(request.nextUrl.pathname)) {
