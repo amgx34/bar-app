@@ -74,3 +74,7 @@ Same handoff rules: Fable manager decides, Sonnet implements, Opus debugs, every
 ## 2026-11-25: value cycle results
 
 Pieces S1 to S6 and V1 are built, tested and committed; S5 is the one piece that still fails its audit (light-mode keyboard focus on the POS setup screens). Journey scores, open blockers, the ordered owner steps and everything unverified are in `docs/superpowers/findings/2026-11-25-cycle-results.md`. The final gates pass except the known lint baseline and two light-mode token pairs. Nothing was pushed, deployed or applied, and public sign-up stays off until `NEXT_PUBLIC_SIGNUP_OPEN=true`.
+
+## 2026-11-26: fix pass results
+
+Fixes F1 to F5, demo prep, final gates, journey scores J1 to J14, the safe and avoid lists and outstanding owner steps are in `docs/superpowers/findings/2026-11-26-fix-pass-results.md`. Start a fresh demo before showing a bar owner; the cookie-jar demo has expired.
