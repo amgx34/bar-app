@@ -47,6 +47,13 @@ describe('POST /api/demo enters the shared sample bar', () => {
     expect(m.signIn).not.toHaveBeenCalled();
   });
 
+  it('moves someone still in an old per-visitor demo into the shared bar', async () => {
+    m.getUser.mockResolvedValue({ data: { user: { email: 'demo-abc@rail.demo' } } });
+    const { POST } = await import('./route');
+    expect(await (await POST(post())).json()).toEqual({ redirectTo: '/app/dashboard' });
+    expect(m.signIn).toHaveBeenCalled();
+  });
+
   it('says so plainly when the demo account is not set up', async () => {
     delete process.env.DEMO_USER_PASSWORD;
     const { POST } = await import('./route');
