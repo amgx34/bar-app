@@ -98,7 +98,7 @@ export function OrderDialog({ open, onOpenChange, rep, prefillItems, onSent }: P
         <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Send className="h-4 w-4 text-primary" />
-            New Order — {rep.name}
+            New order for {rep.name}
           </DialogTitle>
           <DialogDescription>{rep.company ?? ''}</DialogDescription>
         </DialogHeader>
@@ -124,7 +124,7 @@ export function OrderDialog({ open, onOpenChange, rep, prefillItems, onSent }: P
               ) : fields.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-8 text-center border border-dashed rounded-lg">
                   <Package className="h-8 w-8 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">No items — click &quot;Add item&quot; above</p>
+                  <p className="text-sm text-muted-foreground">No items yet. Tap &quot;Add item&quot; above.</p>
                 </div>
               ) : (
                 <div className="space-y-2">

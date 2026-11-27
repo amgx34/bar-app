@@ -42,7 +42,7 @@ export function OrderHistorySheet({ open, onOpenChange, rep }: Props) {
         <SheetHeader className="pb-4 border-b">
           <SheetTitle className="flex items-center gap-2">
             <History className="h-4 w-4 text-muted-foreground" />
-            Order history — {rep.name}
+            Order history for {rep.name}
           </SheetTitle>
         </SheetHeader>
 
