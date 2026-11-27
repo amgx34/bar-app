@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DEMO_PROFILES } from './profiles.ts';
+import { PLACEHOLDER_ICONS, placeholderIcon } from '../inventory/placeholder-image.ts';
 import { DEMO_SLUG_PREFIX } from './constants.ts';
 import {
   UNIVERSAL_SLUG_PREFIX, universalSlug, localDate, addDays, splitByWeights, buildBar, assertSeedTarget,
@@ -106,6 +107,11 @@ describe('buildBar', () => {
     const t = state(bars[0].bar);
     expect(t.low).toBeGreaterThanOrEqual(3); expect(t.out).toBeGreaterThanOrEqual(1); expect(t.over).toBeGreaterThanOrEqual(1);
     expect(state(bars[2].bar).low).toBeGreaterThan(t.low);
+  });
+  it('item names show off the placeholder icons: nearly all in the main bar, none falling back', () => {
+    const icons = new Set(bars[0].bar.items.map((i) => placeholderIcon(i.name, i.category)));
+    expect(icons.has('generic')).toBe(false);
+    expect(icons.size).toBeGreaterThanOrEqual(PLACEHOLDER_ICONS.length - 1);
   });
   it('shipment: two clocks stay separate, lines carry unit_cost, invoice total adds up', () => {
     const lounge = bars[1].bar; // the busy bar has the shipment with freight and tax
