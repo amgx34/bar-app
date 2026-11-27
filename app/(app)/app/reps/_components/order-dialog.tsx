@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useFieldArray, useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { Plus, Trash2, Loader2, Package, Send } from 'lucide-react';
+import { Plus, Trash2, Loader2, Package, Send, AlertTriangle } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { orderSchema, type OrderInput } from '@/lib/schemas/reps';
+import { outcomeMessage, plainOrderError, type Channel } from '@/lib/reps/order-status';
 import { sendRepOrder, getRepInventoryItems } from '../actions';
 import type { Rep, RepInventoryItem } from '../actions';
 
@@ -28,6 +29,7 @@ interface Props {
 export function OrderDialog({ open, onOpenChange, rep, prefillItems, onSent }: Props) {
   const [repItems, setRepItems]   = useState<RepInventoryItem[]>([]);
   const [loadingItems, setLoading] = useState(false);
+  const [failed, setFailed] = useState<Channel[] | null>(null);
 
   const { register, control, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm<OrderInput>({
     resolver: zodResolver(orderSchema),
@@ -48,6 +50,7 @@ export function OrderDialog({ open, onOpenChange, rep, prefillItems, onSent }: P
   // Load rep's inventory items when dialog opens
   useEffect(() => {
     if (!open) return;
+    setFailed(null);
     reset({
       po_number: '', delivery_date: '', notes: '',
       send_email: !!rep.email, send_sms: false, items: [],
@@ -76,17 +79,16 @@ export function OrderDialog({ open, onOpenChange, rep, prefillItems, onSent }: P
   async function onSubmit(values: OrderInput) {
     try {
       const result = await sendRepOrder(rep.id, values);
-      if (result.emailWarning) {
-        // Order saved — email just didn't send
-        toast.success(`Order recorded for ${rep.name}`);
-        toast.warning(`Email not sent: ${result.emailWarning}. Check GMAIL_APP_PASSWORD in settings.`, { duration: 8000 });
-      } else {
-        toast.success(`Order sent to ${rep.name}`);
-      }
       onSent();
+      if (result.failed.length > 0) {
+        // Stay open: a toast disappears, this stays until the owner closes it.
+        setFailed(result.failed);
+        return;
+      }
+      toast.success(result.status === 'sent' ? `Order sent to ${rep.name}` : `Order saved for ${rep.name}. Nothing was sent.`);
       onOpenChange(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to send order');
+      toast.error(plainOrderError(err));
     }
   }
 
@@ -111,7 +113,7 @@ export function OrderDialog({ open, onOpenChange, rep, prefillItems, onSent }: P
                 <Button
                   type="button" size="sm" variant="outline"
                   onClick={() => append({ name: '', quantity: 1, unit: 'each', note: '' })}
-                  className="h-7 text-xs gap-1"
+                  className="h-11 text-sm gap-1"
                 >
                   <Plus className="h-3.5 w-3.5" /> Add item
                 </Button>
@@ -126,46 +128,49 @@ export function OrderDialog({ open, onOpenChange, rep, prefillItems, onSent }: P
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {/* Header */}
-                  <div className="grid grid-cols-[1fr_80px_90px_1fr_32px] gap-2 px-1">
-                    {['Item name','Qty','Unit','Note',''].map((h,i) => (
-                      <span key={i} className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{h}</span>
-                    ))}
-                  </div>
                   {fields.map((field, index) => (
-                    <div key={field.id} className="grid grid-cols-[1fr_80px_90px_1fr_32px] gap-2 items-start">
+                    <div key={field.id} className="rounded-lg border p-3 space-y-2 sm:grid sm:grid-cols-[1fr_80px_90px_1fr_44px] sm:gap-2 sm:space-y-0 sm:border-0 sm:p-0 sm:items-start">
                       <div>
                         <Input
                           {...register(`items.${index}.name`)}
+                          aria-label={`Item ${index + 1} name`}
                           placeholder="Item name"
-                          className="h-8 text-sm"
+                          className="h-11 text-sm"
                         />
                         {errors.items?.[index]?.name && (
-                          <p className="text-[10px] text-destructive mt-0.5">{errors.items[index]?.name?.message}</p>
+                          <p className="text-xs text-destructive mt-0.5">{errors.items[index]?.name?.message}</p>
                         )}
                       </div>
-                      <Input
-                        {...register(`items.${index}.quantity`, { valueAsNumber: true })}
-                        type="number" min="0" step="0.01"
-                        className="h-8 text-sm tabular-nums"
-                      />
-                      <Input
-                        {...register(`items.${index}.unit`)}
-                        placeholder="each"
-                        className="h-8 text-sm"
-                      />
-                      <Input
-                        {...register(`items.${index}.note`)}
-                        placeholder="Optional note"
-                        className="h-8 text-sm"
-                      />
-                      <Button
-                        type="button" size="icon" variant="ghost"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => remove(index)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="grid grid-cols-2 gap-2 sm:contents">
+                        <Input
+                          {...register(`items.${index}.quantity`, { valueAsNumber: true })}
+                          aria-label={`Item ${index + 1} quantity`}
+                          type="number" min="0" step="0.01"
+                          className="h-11 text-sm tabular-nums"
+                        />
+                        <Input
+                          {...register(`items.${index}.unit`)}
+                          aria-label={`Item ${index + 1} unit`}
+                          placeholder="each"
+                          className="h-11 text-sm"
+                        />
+                      </div>
+                      <div className="flex gap-2 sm:contents">
+                        <Input
+                          {...register(`items.${index}.note`)}
+                          aria-label={`Item ${index + 1} note`}
+                          placeholder="Optional note"
+                          className="h-11 text-sm flex-1"
+                        />
+                        <Button
+                          type="button" size="icon" variant="ghost"
+                          aria-label={`Remove item ${index + 1}`}
+                          className="h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => remove(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -222,9 +227,16 @@ export function OrderDialog({ open, onOpenChange, rep, prefillItems, onSent }: P
             </div>
           </div>
 
+          {failed && (
+            <div role="alert" className="mx-6 mb-3 flex gap-2 rounded-lg border border-amber-600/40 bg-amber-500/10 p-3 text-sm shrink-0">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-700 dark:text-amber-300" />
+              <p><strong>Saved, not sent.</strong> {outcomeMessage(rep.name, failed)}</p>
+            </div>
+          )}
+
           <DialogFooter className="px-6 py-4 border-t shrink-0">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
-            <Button type="submit" disabled={isSubmitting} className="gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting} className="h-11">{failed ? 'Close' : 'Cancel'}</Button>
+            <Button type="submit" disabled={isSubmitting || !!failed} className="gap-2 h-11">
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               {isSubmitting ? 'Saving…' : (!sendEmail && !sendSms ? 'Record Order' : 'Send Order')}
             </Button>

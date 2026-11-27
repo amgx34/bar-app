@@ -5,6 +5,7 @@ import { History, Mail, MessageSquare, Package } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { orderStatusLabel } from '@/lib/reps/order-status';
 import { getRepOrders } from '../actions';
 import type { Rep, RepOrder } from '../actions';
 
@@ -19,7 +20,7 @@ const STATUS_COLORS: Record<string, string> = {
   confirmed: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
   delivered: 'bg-primary/15 text-primary border-primary/30',
   cancelled: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30',
-  draft:     'bg-muted text-muted-foreground',
+  draft:     'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-600/40',
 };
 
 export function OrderHistorySheet({ open, onOpenChange, rep }: Props) {
@@ -68,7 +69,7 @@ export function OrderHistorySheet({ open, onOpenChange, rep }: Props) {
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <Badge variant="outline" className={STATUS_COLORS[order.status] ?? ''}>
-                        {order.status}
+                        {orderStatusLabel(order.status)}
                       </Badge>
                       {order.send_email && <Mail className="h-3.5 w-3.5 text-muted-foreground" />}
                       {order.send_sms   && <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />}
