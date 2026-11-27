@@ -1,29 +1,36 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidatePath } from 'next/cache';
-import type { HourlyRates } from '@/lib/org';
 import { recordTermsAcceptance } from '@/lib/terms';
+import { checkRateLimit, clientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { barSlug, buildBarSettings, decideCreate } from '@/lib/setup/create-bar';
+import { parsePrefill } from '@/lib/setup/prefill';
+import { findOwnedBar } from '@/lib/setup/owned-bar';
+import { BOT_BLOCKED_MESSAGE, isBotRequest } from '@/lib/auth/bot-check';
 
 export type SetupInput = {
-  name:               string;
+  name:            string;
   /** Ticked on the setup form. The org is not created without it. */
-  accepted_terms?:    boolean;
-  bar_type?:          string;
-  bar_state?:         string;
-  bar_city?:          string;
-  tip_split_percent:  number;
-  barback_tip_pct?:   number;
-  default_hourly_rate: number;
-  hourly_rates?:      HourlyRates;
-  default_pour_oz?:   number;
+  accepted_terms?: boolean;
+  bar_type?:       string;
+  bar_state?:      string;
+  bar_city?:       string;
+  /** IANA zone, used for the nightly close. */
+  timezone?:       string;
 };
 
-// ── Default inventory categories seeded for every new org ─────────────────────
+/** Returned, not thrown: production Next replaces a thrown message with a generic one. */
+export type SetupResult =
+  | { ok: true; orgId: string; existing: boolean }
+  | { ok: false; code: 'signed_out' | 'unverified' | 'terms' | 'name' | 'rate_limited' | 'failed'; message: string };
+
+const fail = (code: Extract<SetupResult, { ok: false }>['code'], message: string): SetupResult => ({ ok: false, code, message });
+
 // Each carries its cost classification from the start. Seeding a "Supplies"
-// category without one is how napkins end up inside pour cost — the exact bug
-// migration 20260818000000 had to go back and repair.
+// category without one is how napkins end up inside pour cost.
 const DEFAULT_CATEGORIES: { name: string; cost_type: string }[] = [
   { name: 'Spirits',            cost_type: 'beverage_cogs' },
   { name: 'Beer',               cost_type: 'beverage_cogs' },
@@ -34,81 +41,99 @@ const DEFAULT_CATEGORIES: { name: string; cost_type: string }[] = [
   { name: 'Garnishes & Food',   cost_type: 'food_cogs' },
 ];
 
-// ── Default reps seeded as examples (user can edit/delete) ────────────────────
-const DEFAULT_REPS = [
-  { name: 'Your Spirits Rep', company: '', phone: '', email: '', notes: 'Edit with your actual rep\'s details' },
-  { name: 'Your Beer / Beverage Rep', company: '', phone: '', email: '', notes: 'Edit with your actual rep\'s details' },
-];
-
-export async function createOrgWithSettings(data: SetupInput) {
+export async function createOrgWithSettings(data: SetupInput): Promise<SetupResult> {
+  if (await isBotRequest()) return fail('rate_limited', BOT_BLOCKED_MESSAGE);
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+  if (!user) return fail('signed_out', 'Sign in to create your bar.');
 
+  const name = (data.name ?? '').trim().slice(0, 120);
+  if (!name) return fail('name', 'Enter your bar name.');
   // Checked on the server, not just in the form: this is the moment a business
   // relationship starts, and the record of it has to be trustworthy.
-  if (!data.accepted_terms) {
-    throw new Error('Please accept the Terms of Service to create your bar');
-  }
+  if (!data.accepted_terms) return fail('terms', 'Please accept the Terms of Service to create your bar.');
+
+  // The verified-email and one-bar checks are plain reads that fail closed
+  // (findOwnedBar throws). Only the IP limit below fails open, by design.
+  let ownedBarId: string | null;
+  try { ownedBarId = await findOwnedBar(user.id); }
+  catch { return fail('failed', 'We could not create your bar. Nothing was charged. Try again.'); }
+
+  const decision = decideCreate({ emailConfirmedAt: user.email_confirmed_at, ownedBarId });
+  if (decision.kind === 'unverified') return fail('unverified', 'Verify your email first. Open the link we sent you, then come back.');
+  if (decision.kind === 'existing') return { ok: true, orgId: decision.orgId, existing: true };
+
+  const limit = await checkRateLimit(RATE_LIMITS.createOrg, clientIp(await headers()));
+  if (!limit.allowed) return fail('rate_limited', 'Too many bars created from this connection today. Try again tomorrow, or contact us from the Rail website if you are stuck.');
 
   const admin = createAdminClient();
+  const settings = buildBarSettings(
+    { name, bar_type: data.bar_type || 'bar', bar_state: data.bar_state, bar_city: data.bar_city, timezone: data.timezone },
+    parsePrefill((user.user_metadata as Record<string, unknown> | undefined)?.prefill),
+  );
 
-  const slug = data.name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 60) + '-' + Math.random().toString(36).slice(2, 7);
-
-  // ── Create org ────────────────────────────────────────────────────────────
   const { data: org, error: orgErr } = await admin
     .from('organizations')
     .insert({
-      name:     data.name.trim(),
-      slug,
-      bar_type: data.bar_type ?? 'bar',
+      name,
+      slug: barSlug(name, Math.random().toString(36).slice(2, 7)),
+      bar_type: settings.bar_type ?? 'bar',
       bar_address: [data.bar_city, data.bar_state].filter(Boolean).join(', ') || null,
       pos_provider: null,
-      bar_settings: {
-        tip_split_percent:  data.tip_split_percent,
-        barback_tip_pct:    data.barback_tip_pct ?? 15,
-        default_hourly_rate: data.default_hourly_rate,
-        hourly_rates:       data.hourly_rates ?? {},
-        default_pour_oz:    data.default_pour_oz ?? 1.5,
-        bar_type:           data.bar_type ?? 'bar',
-        bar_state:          data.bar_state ?? '',
-        bar_city:           data.bar_city ?? '',
-        auto_reorder_enabled: false,
-        opener_bonus_type:  'none',
-        opener_bonus_value: 0,
-      },
+      bar_settings: settings,
     })
-    .select()
+    .select('id')
     .single();
+  if (orgErr || !org) return fail('failed', 'We could not create your bar. Nothing was charged. Try again.');
 
-  if (orgErr) throw new Error(orgErr.message);
-
-  // ── Create owner membership ───────────────────────────────────────────────
   const { error: memberErr } = await admin
     .from('memberships')
     .insert({ user_id: user.id, organization_id: org.id, role: 'owner' });
 
-  if (memberErr) throw new Error(memberErr.message);
+  if (memberErr) {
+    // admin-scope-ok: `org.id` is the row this very call just inserted; deleting
+    // it by primary key cannot reach another bar. Without this the org is orphaned.
+    await admin.from('organizations').delete().eq('id', org.id);
+    return fail('failed', 'We could not create your bar. Nothing was charged. Try again.');
+  }
 
-  // Recorded after the membership so the acceptance can name the bar it was
-  // made for. Before the seed steps, which are best-effort — a failed rep
-  // insert must not cost us the consent record.
+  // Two tabs can both pass the check above. The oldest bar wins; the loser undoes itself.
+  try {
+    const winner = await findOwnedBar(user.id);
+    if (winner && winner !== org.id) {
+      await admin.from('memberships').delete().eq('organization_id', org.id);
+      // admin-scope-ok: `org.id` was inserted by this call (see above).
+      await admin.from('organizations').delete().eq('id', org.id);
+      return { ok: true, orgId: winner, existing: true };
+    }
+  } catch { /* the bar exists and is ours; a failed re-check must not undo it */ }
+
+  // After the membership so the acceptance can name the bar; before the seed steps,
+  // which are best-effort, so a failed seed must not cost the consent record.
   await recordTermsAcceptance(org.id);
-
-  // ── Seed default categories (best-effort, non-blocking) ───────────────────
   await admin.from('inventory_categories').insert(
     DEFAULT_CATEGORIES.map((c) => ({ organization_id: org.id, ...c }))
   );
 
-  // ── Seed example reps (best-effort) ───────────────────────────────────────
-  await admin.from('reps').insert(
-    DEFAULT_REPS.map((r) => ({ ...r, organization_id: org.id }))
-  );
-
   revalidatePath('/app');
-  return org;
+  return { ok: true, orgId: org.id, existing: false };
+}
+
+/** Re-sends the confirmation link to the signed-in, still-unconfirmed address. */
+export async function resendConfirmation(): Promise<{ ok: boolean; message: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user?.email) return { ok: false, message: 'You are signed out. Sign in again to get a new link.' };
+  if (user.email_confirmed_at) return { ok: true, message: 'Your email is already confirmed. Reload this page.' };
+
+  const h = await headers();
+  const limit = await checkRateLimit(RATE_LIMITS.signupResend, `resend:${user.id}`);
+  if (!limit.allowed) return { ok: false, message: 'You have asked for a few links already. Check your spam folder, then try again in an hour.' };
+
+  const origin = h.get('origin') ?? `https://${h.get('host')}`;
+  const { error } = await supabase.auth.resend({
+    type: 'signup', email: user.email, options: { emailRedirectTo: `${origin}/auth/confirm?next=/setup` },
+  });
+  if (error) return { ok: false, message: 'We could not send the link. Try again in a minute.' };
+  return { ok: true, message: `Sent. Check ${user.email} and open the newest link.` };
 }

@@ -15,8 +15,12 @@ One org = one bar; users join orgs via a `memberships` table.
 npm run dev          # next dev
 npm run build        # next build
 npm run lint         # eslint
-npx tsc --noEmit     # typecheck
+npm run typecheck    # next typegen, then tsc --noEmit. A bare tsc reads .next/types,
+                     # which only a build or typegen refreshes, so it fails on pages
+                     # deleted since the last build.
 npm test             # vitest, unit tests for the pure money functions in lib/
+                     # Always via npm: a bare `npx vitest` from a lowercase `c:\` shell
+                     # (VS Code's default) fails every file. See scripts/dev/run-vitest.mjs.
 ```
 
 Sibling codebases have their own toolchains:
@@ -437,18 +441,79 @@ gets the sentence without a button rather than a control that would refuse it.
 Figures come off `run.snapshot`, never a recompute, or the banner would
 disagree with the screen it links to.
 
+**Toast is a pull source with a hard prerequisite, and its credentials never sit
+in `pos_config`.** A bar cannot connect until Toast has issued it API access:
+Toast sells and approves that separately from the POS, so the owner has to ask
+Toast for read-only credentials (client ID, client secret) that can read orders,
+labor, menus and restaurant details, plus the restaurant GUID. The connect screen
+says so up front. The login is verified against the restaurant before anything
+is saved, and the secret goes into `pos_credentials` encrypted. Reconnecting
+scrubs the plaintext `client_id`/`client_secret` an earlier build kept in
+`pos_config`. There is no refresh token: the cached login token is renewed by a
+fresh login under the same version compare-and-swap as Clover, and a 429 is
+reported, never retried in a loop.
+
+Toast's own `businessDate` is used as given; the time zone and closeout hour are
+read from the restaurant at connect and are only used for the hour of day. An
+order is a sale on its business date, a refund belongs to its
+`refundBusinessDate`, so the adapter also pulls orders *modified* since the
+window opened, because a refund on an old order lands on a later night. Only
+PAID or CLOSED checks count; voided, deleted and test-mode orders, voided checks
+and voided selections never reach Z or items. A check's net is split across its
+payments by share so the cash/card split always reconciles, and it is left NULL
+when any payment is not CASH or CREDIT. `declaredCashTips` from time entries is
+the only source of `cash_tips`, absent when the labor feed failed. Overtime is
+booked as plain hours so the pay run applies its weekly rule once.
+Unverified until a sandbox answers: dollars versus cents (`TOAST_AMOUNTS_IN_CENTS`
+flips it), whether `refundAmount` excludes tax, and the paging and scope list.
+
+**Clover and Toast are pulled, and "live" means daily plus on view.** Neither has
+an agent, so a run is `runProviderSync(orgId)` (`lib/pos/sync-run.ts`): take the
+lease on `pos_credentials.sync_lease_until`, let the adapter fetch and map, apply
+through the shared `applyNormalized`, then write `last_sync_at`,
+`last_sync_summary` and `last_sync_errors` through the `pos-config.ts` builders on
+a config read *after* the work. Four callers share it and it is idempotent, so
+overlap is safe: the daily cron (`runDailyProviderSync`, one try and one time
+limit per org, 40s budget, oldest `last_sync_at` first, 3-date lookback so a
+skipped bar catches up), "Sync now" (owner or manager, refused inside two
+minutes), a refresh after the response when a connected bar opens the app and the
+last sync is over 30 minutes old (`isStaleOnView`, in the app layout), and the
+optional Clover webhook. The webhook carries ids only and is a hint; it is
+inert without `CLOVER_WEBHOOK_KEY` and its org lookup is the one cross-org read.
+
+`assessSyncHealth` is provider aware: API bars go stale at 36 hours and down at
+72, because a daily cron is silent for hours by design, and 2Touch thresholds are
+unchanged. A rejected login sets `pos_config.needs_reauth` and the status
+`needs-reauth` outranks everything; the cron skips such a bar until someone
+reconnects. A sync that brought nothing back is still `no-data`, and an absent
+summary still means "cannot say". Panels hide through `sales-capabilities` on
+row counts, with no provider branch; only the help copy differs.
+
+Clover and Toast are built and tested against fixtures only. Neither has run
+against a real or sandbox account, and neither belongs on the public front page
+until one has (`docs/go-to-market/claims-register.md`, A20 to A22). Owner steps:
+`docs/integrations/clover.md` and `docs/integrations/toast.md`.
+
 ## Env vars (`.env.local`)
 
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
 `GROQ_API_KEY`, `DD_ENCRYPTION_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
 `TWILIO_FROM_NUMBER`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `TWOTOUCH_INGEST_SECRET`,
-`CLOVER_CLIENT_ID`, `CLOVER_REDIRECT_URI`, `CLOVER_SANDBOX`. Plus `CRON_SECRET` on Vercel.
+`CLOVER_CLIENT_ID`, `CLOVER_CLIENT_SECRET`, `CLOVER_REDIRECT_URI`, `OAUTH_STATE_SECRET`,
+`CLOVER_SANDBOX`. Plus `CRON_SECRET` on Vercel. Optional for Clover: `CLOVER_API_REGION`,
+`CLOVER_WEBHOOK_KEY`.
+Optional for Toast: `TOAST_API_HOST` (the host Toast issues; defaults to production),
+`TOAST_AMOUNTS_IN_CENTS=true` (only if a sandbox shows cents, not dollars).
 
 Web Push (all three, or push silently no-ops and only the in-app bell works):
 `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (a
 `mailto:` or https URL). Generate a pair with `npx web-push generate-vapid-keys`.
 Rotating them invalidates every stored `push_subscriptions` row — devices must
 re-enable.
+
+Billing (all optional; with no `STRIPE_SECRET_KEY` billing is a no-op, see `docs/billing/README.md`):
+`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_CLOSE`, `STRIPE_PRICE_WHOLE_BAR`,
+`NEXT_PUBLIC_PRICE_LABEL_CLOSE`, `NEXT_PUBLIC_PRICE_LABEL_WHOLE_BAR`, `BILLING_ENFORCE` (`true` blocks unpaid bars; default off).
 
 Agent release manifest (`GET /api/agent/manifest`, Vercel only — the route returns
 `204` until all three are set, which every agent reads as "you are current"):

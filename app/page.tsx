@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { SIGNUP_OPEN } from '@/lib/auth/signup-open';
 import {
   ArrowRight, Package, CircleDollarSign, BarChart2,
   TrendingUp, FileText, ShoppingCart,
@@ -24,9 +25,9 @@ export const metadata: Metadata = {
 };
 
 const FEATURES = [
-  { icon: Package,          title: 'Real-Time Inventory',       desc: 'Track every bottle, keg, and ingredient with live stock levels and instant low-stock alerts.' },
-  { icon: CircleDollarSign, title: 'Payroll & Tip Splits',      desc: 'Automated payroll, pooled tip distribution, barback allocations, and opener bonuses in seconds.' },
-  { icon: BarChart2,        title: 'Nightly Z-Report Analytics',desc: 'Import Z reports and instantly see sales trends, tip percentages, and per-server performance.' },
+  { icon: Package,          title: 'Real-Time Inventory',       desc: 'Track stock by the bottle and keg, with par levels and a low-stock alert each day.' },
+  { icon: CircleDollarSign, title: 'Payroll & Tip Splits',      desc: 'Pooled, individual or percentage tip splits, barback cuts and opener bonuses, worked out for you.' },
+  { icon: BarChart2,        title: 'Nightly Z-Report Analytics',desc: 'See sales trends, tip percentages and per-server sales from your Z reports.' },
   { icon: ShoppingCart,     title: 'Rep & Supplier Orders',     desc: 'Manage distributors, send purchase orders by email or SMS, and keep a full order history.' },
   { icon: TrendingUp,       title: 'Smart Auto-Reorder',        desc: 'When stock drops below par, Rail flags it and lets you place an order in one click.' },
   { icon: FileText,         title: 'Tax & W-2 Reports',         desc: 'Generate W-2 drafts, 1099-NECs, and comprehensive tax summaries for your accountant.' },
@@ -34,15 +35,15 @@ const FEATURES = [
 
 // The "problem" beat the design system's pattern calls for before the solution.
 const PROBLEMS = [
-  { icon: ClipboardX,    title: 'Inventory lives on a clipboard', desc: 'Counts get copied into a spreadsheet days later, by which point the number is already wrong.' },
+  { icon: ClipboardX,    title: 'Still counting on a clipboard?', desc: 'Counts get copied into a spreadsheet days later, by which point the number is already wrong.' },
   { icon: Calculator,    title: 'Tip math happens at 3 a.m.',     desc: 'Pooled tips, barback cuts, and opener bonuses get worked out by hand — and get disputed the next shift.' },
   { icon: AlertTriangle, title: 'Shrinkage shows up too late',    desc: 'Over-pours and waste only surface at the end of the month, long after you could have acted on them.' },
 ];
 
 const STEPS = [
-  { n: '01', title: 'Connect your POS',   desc: 'Link Clover, Toast, or 2TouchPOS — or simply import CSV exports from any system.' },
-  { n: '02', title: 'Track in real time', desc: 'Rail syncs inventory, imports Z reports, and calculates payroll automatically every night.' },
-  { n: '03', title: 'Run your operation', desc: 'Catch problems early, pay staff correctly, and reorder supplies before you ever run out.' },
+  { n: '01', title: 'Connect your POS',   desc: 'Link the 2Touch POS you already run with a small agent on the POS computer, or import the exports your POS produces.' },
+  { n: '02', title: 'Track in real time', desc: 'Rail syncs sales and Z reports, and works out tip splits and payroll for you to review.' },
+  { n: '03', title: 'Run your operation', desc: 'Catch problems early, review pay before you approve it, and reorder supplies before you run out.' },
 ];
 
 // SVG icons, not emoji — MASTER.md forbids emoji-as-icon.
@@ -67,15 +68,15 @@ const BAR_TYPES = [
 const FAQS: { q: string; a: string }[] = [
   {
     q: 'Do I have to switch POS systems?',
-    a: 'No. Rail reads from the POS you already run. There is a direct integration for Clover, Toast and 2TouchPOS, and for anything else you can import the CSV or text exports your system already produces.',
+    a: 'No. If you run 2Touch, a small program on the POS computer sends Rail your sales. Otherwise you can import the exports your POS already produces.',
   },
   {
     q: 'How does Rail get my sales data?',
-    a: 'Three ways, depending on your setup. A small agent installed on the POS machine syncs automatically every few minutes; a nightly email report can be ingested for you; or you upload the export by hand whenever you want.',
+    a: 'Three ways, depending on your setup. A small agent installed on the Windows POS machine syncs automatically every few minutes; a nightly email report can be ingested for you; or you upload the export by hand whenever you want.',
   },
   {
     q: 'How long does setup take?',
-    a: 'Connecting a POS and importing your existing inventory usually takes under an hour. You can try the demo immediately without setting anything up.',
+    a: 'Try the demo now. Setup is done with you; ask us how long your bar\u2019s would take.',
   },
   {
     q: 'Can I move my existing inventory across?',
@@ -95,15 +96,8 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'What happens to my data if I stop using Rail?',
-    a: 'You can export it at any time, and we delete your account data within 30 days of closure except where tax rules require us to retain records.',
+    a: 'We can export your payroll and sales records on request. Account closure is handled by email, and we will tell you what we must keep.',
   },
-];
-
-const STATS = [
-  { value: '28+',   label: 'Inventory items tracked'   },
-  { value: '5 hrs', label: 'Saved per week on average' },
-  { value: '100%',  label: 'Automated tip calculations'},
-  { value: '$0',    label: 'Extra for payroll reports' },
 ];
 
 // ── Page ────────────────────────────────────────────────────────────────────
@@ -241,16 +235,24 @@ export default function HomePage() {
             ))}
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
-            <ThemeToggle />
+            <ThemeToggle className="h-11 w-11 sm:h-9 sm:w-9" />
             <Link
               href="/login"
               className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors duration-200 hidden sm:inline-flex items-center"
             >
               Sign in
             </Link>
+            {SIGNUP_OPEN && (
+              <Link
+                href="/signup"
+                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors duration-200 hidden lg:inline-flex items-center"
+              >
+                Create an account
+              </Link>
+            )}
             <a
               href="#contact"
-              className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-cta text-cta-foreground font-semibold text-sm hover:brightness-95 transition-[filter] duration-200"
+              className="inline-flex items-center gap-2 h-11 sm:h-9 px-4 rounded-lg bg-cta text-cta-foreground font-semibold text-sm hover:brightness-95 transition-[filter] duration-200"
             >
               Request a demo
             </a>
@@ -352,17 +354,6 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Stat bar */}
-          <div className="relative z-10 border-t border-sidebar-border">
-            <div className="max-w-7xl mx-auto px-6 py-6 grid grid-cols-2 sm:grid-cols-4 gap-6 sm:divide-x divide-sidebar-border">
-              {STATS.map(({ value, label }) => (
-                <div key={label} className="sm:px-8 sm:first:pl-0">
-                  <p className="font-heading text-2xl font-bold text-sidebar-primary tabular-nums">{value}</p>
-                  <p className="text-xs text-sidebar-foreground/60 mt-1 leading-snug">{label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
         </section>
 
         {/* ── Demo disclaimer ────────────────────────────────────────────── */}
@@ -382,7 +373,7 @@ export default function HomePage() {
             <div className="max-w-2xl mb-12">
               <span className="eyebrow">The status quo</span>
               <h2 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mt-3">
-                Most bars run on memory and guesswork.
+                Still running on memory and guesswork?
               </h2>
             </div>
             <div className="grid gap-5 md:grid-cols-3">
@@ -435,7 +426,7 @@ export default function HomePage() {
             <div className="max-w-2xl mb-12">
               <span className="eyebrow">Simple setup</span>
               <h2 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mt-3">
-                Up and running in minutes
+                We set it up with you
               </h2>
             </div>
             <ol className="grid gap-8 md:grid-cols-3">
@@ -508,7 +499,7 @@ export default function HomePage() {
               />
               <a
                 href="#contact"
-                className="inline-flex items-center gap-1.5 text-primary-foreground/85 hover:text-primary-foreground font-medium transition-colors duration-200"
+                className="inline-flex items-center gap-1.5 min-h-11 text-primary-foreground/85 hover:text-primary-foreground font-medium transition-colors duration-200"
               >
                 Or schedule a guided demo <ChevronRight className="h-4 w-4" aria-hidden />
               </a>
@@ -557,11 +548,11 @@ export default function HomePage() {
                       The acceptance is recorded server-side in /api/demo. */}
                   <p className="text-muted-foreground text-[0.6875rem] leading-relaxed pt-1">
                     Starting a demo means you accept our{' '}
-                    <Link href="/terms" className="underline underline-offset-2 hover:text-foreground">
+                    <Link href="/terms" className="inline-block min-h-6 underline underline-offset-2 hover:text-foreground">
                       Terms
                     </Link>{' '}
                     and{' '}
-                    <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
+                    <Link href="/privacy" className="inline-block min-h-6 underline underline-offset-2 hover:text-foreground">
                       Privacy Policy
                     </Link>
                     .
@@ -591,12 +582,15 @@ export default function HomePage() {
               <p className="font-heading font-bold text-lg tracking-[0.3em] uppercase">Rail</p>
               <p className="text-sidebar-foreground/60 text-sm mt-1">Bar Management Platform</p>
             </div>
-            <nav aria-label="Footer" className="flex flex-wrap gap-x-8 gap-y-2 text-sm text-sidebar-foreground/70">
+            <nav aria-label="Footer" className="flex flex-wrap gap-x-8 text-sm [&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center text-sidebar-foreground/70">
               {NAV_LINKS.map(([label, href]) => (
                 <a key={href} href={href} className="hover:text-sidebar-foreground transition-colors duration-200">
                   {label}
                 </a>
               ))}
+              <Link href="/pricing" className="hover:text-sidebar-foreground transition-colors duration-200">
+                Pricing
+              </Link>
               <Link href="/privacy" className="hover:text-sidebar-foreground transition-colors duration-200">
                 Privacy
               </Link>

@@ -121,4 +121,6 @@ export const LEGACY_TAB_ROUTES: Record<string, string> = {
   // The day view of the pay period screen, not a route of its own any more.
   split: '/app/payroll?view=day',
   'direct-deposit': '/app/payroll/direct-deposit',
+  // Import moved to Settings; dashboards and stored links still say ?tab=import.
+  import: '/app/settings?tab=import-data',
 };

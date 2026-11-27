@@ -29,6 +29,7 @@ export default async function MyPayPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-4">
+      <h1 className="text-lg font-semibold">My hours and pay</h1>
       {nothingYet && (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">

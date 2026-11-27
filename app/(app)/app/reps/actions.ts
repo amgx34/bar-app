@@ -8,6 +8,7 @@ import { canManageReps } from '@/lib/permissions';
 import { repSchema, orderSchema, type RepInput, type OrderInput } from '@/lib/schemas/reps';
 import { sendEmail, buildOrderEmail, buildConfirmationEmail } from '@/lib/reps/email';
 import { sendOrderSms } from '@/lib/reps/sms';
+import { orderOutcome, type Channel } from '@/lib/reps/order-status';
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -102,7 +103,7 @@ export async function deleteRep(repId: string): Promise<void> {
 
 // ── Orders ────────────────────────────────────────────────────────────────────
 
-export async function sendRepOrder(repId: string, raw: unknown): Promise<{ orderId: string; emailWarning?: string }> {
+export async function sendRepOrder(repId: string, raw: unknown): Promise<{ orderId: string; status: 'sent' | 'draft'; failed: Channel[] }> {
   const { org, role } = await getCurrentOrg();
   if (!canManageReps(role)) throw new Error('Not authorized');
 
@@ -141,10 +142,11 @@ export async function sendRepOrder(repId: string, raw: unknown): Promise<{ order
     })
     .select('id')
     .single();
-  if (orderErr || !order) throw new Error(orderErr?.message ?? 'Failed to record order');
+  if (orderErr || !order) { console.error('[sendRepOrder] save failed:', orderErr?.message); throw new Error('Failed to record order'); }
 
   // ── 2. Send notifications (best-effort — never block or lose the order) ──────
-  const emailErrors: string[] = [];
+  let emailFailed = false;
+  let smsFailed = false;
 
   if (input.send_email && rep.email) {
     const html = buildOrderEmail({
@@ -160,7 +162,7 @@ export async function sendRepOrder(repId: string, raw: unknown): Promise<{ order
       await sendEmail(rep.email, `Order from ${org.name} — PO ${poNumber}`, html);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      emailErrors.push(`Email to rep failed: ${msg}`);
+      emailFailed = true;
       console.error('[sendRepOrder] email to rep failed:', msg);
     }
   }
@@ -171,14 +173,20 @@ export async function sendRepOrder(repId: string, raw: unknown): Promise<{ order
     try {
       await sendOrderSms(rep.phone, msg);
     } catch (err) {
+      smsFailed = true;
       console.error('[sendRepOrder] SMS to rep failed:', err);
     }
+  }
+
+  const { status, failed } = orderOutcome({ wantEmail: input.send_email, wantSms: input.send_sms, emailFailed, smsFailed });
+  if (status !== 'sent') {
+    await admin.from('rep_orders').update({ status }).eq('id', order.id).eq('organization_id', org.id);
   }
 
   // Confirmation email to org owner (always best-effort)
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (user?.email) {
+  if (user?.email && status === 'sent') {
     const html = buildConfirmationEmail({
       orgName:    org.name,
       repName:    rep.name,
@@ -191,11 +199,7 @@ export async function sendRepOrder(repId: string, raw: unknown): Promise<{ order
 
   revalidatePath('/app/reps');
 
-  // Return the order ID plus any non-fatal email warnings so the UI can surface them
-  return {
-    orderId:      order.id,
-    emailWarning: emailErrors.length > 0 ? emailErrors[0] : undefined,
-  };
+  return { orderId: order.id, status, failed };
 }
 
 export async function getRepOrders(repId: string): Promise<RepOrder[]> {

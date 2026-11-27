@@ -16,11 +16,16 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { seedDemoOrg } from '@/lib/demo/seed';
+import { DEMO_PROFILES, profileSlug } from '@/lib/demo/profiles';
 import { DEMO_EMAIL_SUFFIX, DEMO_SLUG_PREFIX } from '@/lib/demo/constants';
 import { recordTermsAcceptanceForUser } from '@/lib/terms';
 import { checkRateLimit, clientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { BOT_BLOCKED_MESSAGE, isBotRequest } from '@/lib/auth/bot-check';
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
+
+// Seeds three orgs serially (createUser + 3x seedDemoOrg + sign-in); the platform default is too tight for a cold start.
+export const maxDuration = 60;
 
 export const DEMO_TTL_HOURS = 24;
 export { DEMO_EMAIL_SUFFIX, DEMO_SLUG_PREFIX } from '@/lib/demo/constants';
@@ -30,13 +35,17 @@ export { DEMO_EMAIL_SUFFIX, DEMO_SLUG_PREFIX } from '@/lib/demo/constants';
  * total cost — a botnet spreads across addresses — so this caps the blast
  * radius on the database regardless of where requests come from.
  */
-const MAX_LIVE_DEMO_ORGS = 250;
+const MAX_LIVE_DEMO_ORGS = 750; // 250 visitors x 3 bars each; was 250 when a visitor got one org
 
 function fail(reason: string, status: number) {
   return NextResponse.json({ error: reason }, { status });
 }
 
 export async function POST(req: NextRequest) {
+  if (await isBotRequest()) {
+    return NextResponse.json({ error: BOT_BLOCKED_MESSAGE }, { status: 429 });
+  }
+
   // ── 0. Bound the abuse ────────────────────────────────────────────────────
   const ip = clientIp(req.headers);
   const limit = await checkRateLimit(RATE_LIMITS.demoCreate, ip);
@@ -77,7 +86,7 @@ export async function POST(req: NextRequest) {
       .select('id', { count: 'exact', head: true })
       .like('slug', `${DEMO_SLUG_PREFIX}%`);
 
-    if (!countErr && (count ?? 0) >= MAX_LIVE_DEMO_ORGS) {
+    if (!countErr && (count ?? 0) + DEMO_PROFILES.length > MAX_LIVE_DEMO_ORGS) {
       console.warn(`[demo] refused: ${count} live demo orgs >= cap ${MAX_LIVE_DEMO_ORGS}`);
       return fail('Demo capacity is full right now. Please try again shortly.', 503);
     }
@@ -99,7 +108,25 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 2. Seed demo org + data ──────────────────────────────────────────────
-    const demoOrgId = await seedDemoOrg(admin, user.id);
+    // Three bars per visitor. Slugs are fixed up front so a failure part way can
+    // delete exactly what was attempted, including an org whose seed threw
+    // before returning its id. Orgs cascade their children and memberships.
+    const stamp = Date.now().toString(36);
+    const slugs = DEMO_PROFILES.map((p) => profileSlug(p, stamp));
+    let demoOrgId: string;
+    try {
+      const ids: string[] = [];
+      for (let i = 0; i < DEMO_PROFILES.length; i++) {
+        ids.push(await seedDemoOrg(admin, user.id, slugs[i], DEMO_PROFILES[i]));
+      }
+      demoOrgId = ids[0];
+    } catch (seedErr) {
+      // admin-scope-ok: these are the demo orgs this very request just created,
+      // identified by the unique slugs minted above; not tenant data.
+      await admin.from('organizations').delete().in('slug', slugs);
+      await admin.auth.admin.deleteUser(user.id);
+      throw seedErr;
+    }
 
     // Recorded here rather than left to the /app consent gate, which would put
     // a wall in front of the demo the moment someone clicked "try it". The demo

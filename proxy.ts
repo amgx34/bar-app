@@ -1,8 +1,13 @@
 import { createServerClient } from '@supabase/ssr';
+import { DEMO_COOKIE } from '@/lib/demo/constants';
+import { isGatedPath } from '@/lib/auth/gated-path';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  // Lets the app layout tell which page a blocked bar is asking for (see lib/billing/paywall.ts).
+  const forwarded = new Headers(request.headers);
+  forwarded.set('x-path-query', request.nextUrl.pathname + request.nextUrl.search);
+  let response = NextResponse.next({ request: { headers: forwarded } });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,7 +17,7 @@ export async function proxy(request: NextRequest) {
         getAll: () => request.cookies.getAll(),
         setAll: (cookiesToSet) => {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
+          response = NextResponse.next({ request: { headers: forwarded } });
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );
@@ -23,19 +28,13 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Boundary-aware: a bare startsWith('/app') also matches /apple-icon, and
-  // would match /apply or /appointments if those ever existed — sending public
-  // routes to the login page purely because of a shared prefix.
-  const { pathname } = request.nextUrl;
-  const isAppRoute = pathname === '/app' || pathname.startsWith('/app/');
-  // The staff portal needs the same gate and the same boundary care: a bare
-  // startsWith('/me') would also catch /menu or /members.
-  const isStaffRoute = pathname === '/me' || pathname.startsWith('/me/');
-
-  if (!user && (isAppRoute || isStaffRoute)) {
+  // Boundary rules live in isGatedPath: /app, /me and /setup, not /apple-icon or /setup-guide.
+  if (!user && isGatedPath(request.nextUrl.pathname)) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
     loginUrl.searchParams.set('next', request.nextUrl.pathname);
+    // A demo user is deleted after 24 hours; this browser remembers it had one.
+    if (request.cookies.has(DEMO_COOKIE)) loginUrl.searchParams.set('demo', 'expired');
     return NextResponse.redirect(loginUrl);
   }
 

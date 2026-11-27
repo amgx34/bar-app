@@ -10,6 +10,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { NotificationBell } from './notification-bell';
+import { OrgSwitcher } from './org-switcher';
+import type { CurrentOrgResult } from '@/lib/org';
 
 const POS_LABELS: Record<string, string> = {
   clover:  'Clover',
@@ -22,13 +24,15 @@ type Props = {
   posProvider?: string | null;
   orgName?:    string;
   orgSlug:     string;
+  org:         CurrentOrgResult['org'];
+  memberships: CurrentOrgResult['allMemberships'];
 };
 
-export function AppHeader({ email, posProvider, orgName, orgSlug }: Props) {
+export function AppHeader({ email, posProvider, orgName, orgSlug, org, memberships }: Props) {
   const hasPOS = !!posProvider;
 
   return (
-    <header className="sticky top-0 z-nav flex h-14 items-center border-b border-border/60 bg-card/95 backdrop-blur-sm px-3 sm:px-6 gap-3">
+    <header className="sticky top-0 z-nav flex h-14 items-center border-b border-border/60 bg-card/95 backdrop-blur-sm px-3 sm:px-6 gap-1.5 sm:gap-3">
       <SidebarTrigger className="shrink-0" />
 
       <span className="font-bold text-base sm:text-lg tracking-[0.2em] text-primary uppercase select-none">
@@ -38,11 +42,13 @@ export function AppHeader({ email, posProvider, orgName, orgSlug }: Props) {
       {/* Which bar you are editing. Rail is multi-tenant, so this must be
           visible on phones too — it previously hid behind an `xs:` breakpoint
           that Tailwind v4 does not define here, so it never rendered at all. */}
-      {orgName && (
+      {orgName && (memberships.length > 1 ? (
+        <OrgSwitcher currentOrg={org} allMemberships={memberships} />
+      ) : (
         <span className="text-sm text-muted-foreground truncate max-w-[8rem] sm:max-w-[14rem]">
           {orgName}
         </span>
-      )}
+      ))}
 
       <div className="flex-1" />
 

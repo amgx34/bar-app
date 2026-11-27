@@ -1,0 +1,494 @@
+{
+ "schemaVersion": 2,
+ "generatedAt": "2026-11-25T04:05:35.961848+00:00",
+ "title": "Design System: Rail",
+ "extensions": {
+  "colorMeta": {
+   "primary": {
+    "role": "primary",
+    "displayName": "Data Navy",
+    "canonical": "#1E40AF",
+    "tonalRamp": [
+     "#02054D",
+     "#0F277A",
+     "#2748AB",
+     "#416BDC",
+     "#6993FA",
+     "#93BBFF",
+     "#B7DCFF",
+     "#CDF1FF"
+    ]
+   },
+   "primary-on-dark": {
+    "role": "primary",
+    "displayName": "Lit Periwinkle",
+    "canonical": "#7EA6FF",
+    "tonalRamp": [
+     "#030F3F",
+     "#162E69",
+     "#304E96",
+     "#4C70C4",
+     "#7396E3",
+     "#9CBDFF",
+     "#C0DEFF",
+     "#D5F2FF"
+    ]
+   },
+   "cta-amber": {
+    "role": "secondary",
+    "displayName": "Signal Amber",
+    "canonical": "#D97706",
+    "tonalRamp": [
+     "#350000",
+     "#5E1800",
+     "#893700",
+     "#B55700",
+     "#D78033",
+     "#F8A96B",
+     "#FFCD96",
+     "#FFE2AF"
+    ]
+   },
+   "cta-amber-ink": {
+    "role": "secondary",
+    "displayName": "Amber Ink",
+    "canonical": "#1A1206",
+    "tonalRamp": [
+     "#1B150D",
+     "#393227",
+     "#5A5144",
+     "#7D7364",
+     "#A09789",
+     "#C5BCB0",
+     "#E5DDD1",
+     "#F8F1E6"
+    ]
+   },
+   "amber-text": {
+    "role": "secondary",
+    "displayName": "Amber Text",
+    "canonical": "#92400E",
+    "tonalRamp": [
+     "#320200",
+     "#591D00",
+     "#833A10",
+     "#AE5A2E",
+     "#D0825C",
+     "#F2AA89",
+     "#FFCDAE",
+     "#FFE2C6"
+    ]
+   },
+   "brand-blue": {
+    "role": "secondary",
+    "displayName": "Signal Blue",
+    "canonical": "#3B82F6",
+    "tonalRamp": [
+     "#00074E",
+     "#00297C",
+     "#084BAD",
+     "#286EDF",
+     "#5796FD",
+     "#85BEFF",
+     "#ABDFFF",
+     "#C3F4FF"
+    ]
+   },
+   "canvas": {
+    "role": "neutral",
+    "displayName": "Cool Canvas",
+    "canonical": "#F8FAFC",
+    "tonalRamp": [
+     "#151618",
+     "#313334",
+     "#515354",
+     "#737576",
+     "#97989A",
+     "#BCBEC0",
+     "#DCDEE0",
+     "#F0F2F4"
+    ]
+   },
+   "card": {
+    "role": "neutral",
+    "displayName": "Card White",
+    "canonical": "#FFFFFF",
+    "tonalRamp": [
+     "#161616",
+     "#333333",
+     "#525252",
+     "#747474",
+     "#989898",
+     "#BEBEBE",
+     "#DEDEDE",
+     "#F2F2F2"
+    ]
+   },
+   "ink-navy": {
+    "role": "neutral",
+    "displayName": "Ink Navy",
+    "canonical": "#1E3A8A",
+    "tonalRamp": [
+     "#030F40",
+     "#172D6A",
+     "#314D96",
+     "#4D70C4",
+     "#7496E4",
+     "#9DBCFF",
+     "#C0DDFF",
+     "#D6F2FF"
+    ]
+   },
+   "mist": {
+    "role": "neutral",
+    "displayName": "Mist",
+    "canonical": "#E9EEF6",
+    "tonalRamp": [
+     "#13161C",
+     "#2F3339",
+     "#4F5359",
+     "#70757C",
+     "#9499A0",
+     "#B9BEC6",
+     "#D9DEE6",
+     "#EDF2FA"
+    ]
+   },
+   "slate-text": {
+    "role": "neutral",
+    "displayName": "Slate Text",
+    "canonical": "#475569",
+    "tonalRamp": [
+     "#0F1622",
+     "#293342",
+     "#475365",
+     "#67768B",
+     "#8C99AD",
+     "#B2BFD1",
+     "#D4DFEF",
+     "#E8F3FF"
+    ]
+   },
+   "hairline": {
+    "role": "neutral",
+    "displayName": "Hairline",
+    "canonical": "#DBEAFE",
+    "tonalRamp": [
+     "#0F1620",
+     "#2A3440",
+     "#485362",
+     "#697687",
+     "#8D99AA",
+     "#B4BFCE",
+     "#D5DFED",
+     "#E9F3FF"
+    ]
+   },
+   "control-edge": {
+    "role": "neutral",
+    "displayName": "Control Edge",
+    "canonical": "#7C93B5",
+    "tonalRamp": [
+     "#0A1628",
+     "#24334A",
+     "#41536F",
+     "#607696",
+     "#859AB8",
+     "#ACBFDB",
+     "#CEDFF9",
+     "#E3F3FF"
+    ]
+   },
+   "destructive": {
+    "role": "neutral",
+    "displayName": "Destructive Red",
+    "canonical": "#DC2626",
+    "tonalRamp": [
+     "#440000",
+     "#720000",
+     "#A30000",
+     "#D51F21",
+     "#F75E53",
+     "#FF8F81",
+     "#FFB6A8",
+     "#FFCEC0"
+    ]
+   },
+   "sidebar-navy": {
+    "role": "neutral",
+    "displayName": "Shell Navy",
+    "canonical": "#0E1729",
+    "tonalRamp": [
+     "#101622",
+     "#2B3343",
+     "#495366",
+     "#69758B",
+     "#8D99AE",
+     "#B4BED2",
+     "#D5DEF0",
+     "#E9F2FF"
+    ]
+   },
+   "sidebar-text": {
+    "role": "neutral",
+    "displayName": "Shell Text",
+    "canonical": "#DCE5F5",
+    "tonalRamp": [
+     "#12161E",
+     "#2E333D",
+     "#4C535F",
+     "#6D7583",
+     "#9199A6",
+     "#B7BECA",
+     "#D8DEE9",
+     "#ECF2FC"
+    ]
+   },
+   "sidebar-active": {
+    "role": "neutral",
+    "displayName": "Shell Active",
+    "canonical": "#1B2A45",
+    "tonalRamp": [
+     "#0C1627",
+     "#273349",
+     "#44536E",
+     "#637594",
+     "#8899B6",
+     "#AFBFD9",
+     "#D1DFF7",
+     "#E5F3FF"
+    ]
+   },
+   "dark-canvas": {
+    "role": "neutral",
+    "displayName": "Dark Canvas",
+    "canonical": "#0B1220",
+    "tonalRamp": [
+     "#111620",
+     "#2C3340",
+     "#4B5362",
+     "#6B7587",
+     "#9099AA",
+     "#B6BECE",
+     "#D7DEED",
+     "#EBF2FF"
+    ]
+   },
+   "dark-card": {
+    "role": "neutral",
+    "displayName": "Dark Card",
+    "canonical": "#131C2E",
+    "tonalRamp": [
+     "#101622",
+     "#2B3342",
+     "#495366",
+     "#69758B",
+     "#8E99AD",
+     "#B4BED1",
+     "#D5DEF0",
+     "#EAF2FF"
+    ]
+   },
+   "dark-ink": {
+    "role": "neutral",
+    "displayName": "Dark Ink",
+    "canonical": "#E8EDF7",
+    "tonalRamp": [
+     "#13161D",
+     "#2F333A",
+     "#4E535B",
+     "#70757D",
+     "#9498A2",
+     "#B9BEC7",
+     "#D9DEE8",
+     "#EDF2FC"
+    ]
+   }
+  },
+  "typographyMeta": {
+   "display": {
+    "displayName": "Display",
+    "purpose": "Page titles and the dashboard greeting."
+   },
+   "headline": {
+    "displayName": "Headline",
+    "purpose": "Page headings and large stat figures."
+   },
+   "title": {
+    "displayName": "Title",
+    "purpose": "Card titles."
+   },
+   "body": {
+    "displayName": "Body",
+    "purpose": "All UI copy."
+   },
+   "label": {
+    "displayName": "Eyebrow",
+    "purpose": "Uppercase section kickers in amber text."
+   }
+  },
+  "shadows": [
+   {
+    "name": "subtle-lift",
+    "value": "0 1px 2px rgb(15 23 42 / 0.05)",
+    "purpose": "Resting emphasis on a card."
+   },
+   {
+    "name": "card",
+    "value": "0 4px 6px -1px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.05)",
+    "purpose": "Raised cards and buttons."
+   },
+   {
+    "name": "overlay",
+    "value": "0 10px 15px -3px rgb(15 23 42 / 0.10), 0 4px 6px -4px rgb(15 23 42 / 0.06)",
+    "purpose": "Hover lift, dropdowns, dialogs."
+   },
+   {
+    "name": "feature",
+    "value": "0 20px 25px -5px rgb(15 23 42 / 0.14), 0 8px 10px -6px rgb(15 23 42 / 0.08)",
+    "purpose": "Reserved; rarely used."
+   }
+  ],
+  "motion": [
+   {
+    "name": "lift",
+    "value": "box-shadow 200ms ease, border-color 200ms ease",
+    "purpose": "Card hover; shadow and border only."
+   },
+   {
+    "name": "control",
+    "value": "all 150ms (transition-all)",
+    "purpose": "Buttons, inputs, badges."
+   }
+  ],
+  "breakpoints": [
+   {
+    "name": "mobile",
+    "value": "768px"
+   },
+   {
+    "name": "sm",
+    "value": "640px"
+   }
+  ]
+ },
+ "components": [
+  {
+   "name": "Primary Button",
+   "kind": "button",
+   "refersTo": "button-primary",
+   "description": "Default action; navy fill, white text.",
+   "html": "<button class=\"ds-btn-primary\">Save changes</button>",
+   "css": ".ds-btn-primary{display:inline-flex;align-items:center;height:32px;padding:0 10px;border:1px solid transparent;border-radius:8px;background:#1E40AF;color:#fff;font:500 14px 'Fira Sans',system-ui,sans-serif;cursor:pointer;transition:background .15s}.ds-btn-primary:hover{background:rgb(30 64 175 / .8)}.ds-btn-primary:focus-visible{outline:2px solid #1E40AF;outline-offset:2px}.ds-btn-primary:active{transform:translateY(1px)}"
+  },
+  {
+   "name": "Outline Button",
+   "kind": "button",
+   "refersTo": "button-outline",
+   "description": "Secondary action on a light surface.",
+   "html": "<button class=\"ds-btn-outline\">Cancel</button>",
+   "css": ".ds-btn-outline{display:inline-flex;align-items:center;height:32px;padding:0 10px;border:1px solid #DBEAFE;border-radius:8px;background:#F8FAFC;color:#1E3A8A;font:500 14px 'Fira Sans',system-ui,sans-serif;cursor:pointer}.ds-btn-outline:hover{background:#E9EEF6}.ds-btn-outline:focus-visible{outline:2px solid #1E40AF;outline-offset:2px}"
+  },
+  {
+   "name": "Destructive Button",
+   "kind": "button",
+   "refersTo": "button-destructive",
+   "description": "Destructive action as a red tint, not a solid block.",
+   "html": "<button class=\"ds-btn-destructive\">Void shipment</button>",
+   "css": ".ds-btn-destructive{display:inline-flex;align-items:center;height:32px;padding:0 10px;border:1px solid transparent;border-radius:8px;background:rgb(220 38 38 / .1);color:#DC2626;font:500 14px 'Fira Sans',system-ui,sans-serif;cursor:pointer}.ds-btn-destructive:hover{background:rgb(220 38 38 / .2)}.ds-btn-destructive:focus-visible{outline:2px solid #1E40AF;outline-offset:2px}"
+  },
+  {
+   "name": "Text Field",
+   "kind": "input",
+   "refersTo": "input",
+   "description": "Labelled single-line input with a 3:1 control edge.",
+   "html": "<label class=\"ds-label\" for=\"ds-f\">Phone</label><input class=\"ds-input\" id=\"ds-f\" value=\"+1 (555) 000-0000\">",
+   "css": ".ds-label{display:block;margin-bottom:6px;font:500 14px 'Fira Sans',system-ui,sans-serif;color:#1E3A8A}.ds-input{box-sizing:border-box;width:240px;height:32px;padding:4px 10px;border:1px solid #7C93B5;border-radius:8px;background:transparent;color:#1E3A8A;font:400 14px 'Fira Sans',system-ui,sans-serif}.ds-input:focus-visible{outline:none;border-color:#1E40AF;box-shadow:0 0 0 3px rgb(30 64 175 / .5)}"
+  },
+  {
+   "name": "Stat Card",
+   "kind": "card",
+   "refersTo": "card",
+   "description": "Signature dashboard tile: tinted icon chip, large mono figure, label, sub-line.",
+   "html": "<div class=\"ds-stat\"><span class=\"ds-chip\"></span><div class=\"ds-fig\">$2.6k</div><div class=\"ds-lbl\">Inventory Value</div><div class=\"ds-sub\">28 items tracked</div></div>",
+   "css": ".ds-stat{width:200px;padding:20px;border-radius:11px;background:#fff;box-shadow:0 0 0 1px rgb(30 58 138 / .1);font-family:'Fira Sans',system-ui,sans-serif;color:#1E3A8A}.ds-chip{display:block;width:32px;height:32px;margin-bottom:12px;border-radius:8px;background:#E0E7FF}.ds-fig{font:700 28px 'Fira Code',ui-monospace,monospace;letter-spacing:-.025em;color:#1E3A8A}.ds-lbl{margin-top:4px;font-size:12px;font-weight:600}.ds-sub{font-size:12px;color:#475569}"
+  },
+  {
+   "name": "Eyebrow Label",
+   "kind": "chip",
+   "refersTo": "label",
+   "description": "Section kicker in amber text.",
+   "html": "<span class=\"ds-eyebrow\">Quick actions</span>",
+   "css": ".ds-eyebrow{font:600 11px 'Fira Code',ui-monospace,monospace;letter-spacing:.18em;text-transform:uppercase;color:#92400E}"
+  },
+  {
+   "name": "Sidebar Item",
+   "kind": "nav",
+   "refersTo": "sidebar",
+   "description": "Navigation row on the navy shell; active item on Shell Active.",
+   "html": "<nav class=\"ds-side\"><a class=\"ds-side-a ds-on\" href=\"#\">Dashboard</a><a class=\"ds-side-a\" href=\"#\">Inventory</a></nav>",
+   "css": ".ds-side{width:220px;padding:8px;background:#0E1729;border-radius:8px}.ds-side-a{display:block;padding:8px 12px;border-radius:8px;color:#DCE5F5;font:500 14px 'Fira Sans',system-ui,sans-serif;text-decoration:none}.ds-side-a:hover{background:#162034}.ds-on{background:#1B2A45}.ds-side-a:focus-visible{outline:2px solid #7EA6FF;outline-offset:2px}"
+  }
+ ],
+ "narrative": {
+  "northStar": "The Night Manager's Clipboard",
+  "overview": "Rail is a working tool for someone standing behind a bar at the end of a long night. Built to be read quickly, with one hand, on a phone, in dim light: large tabular figures, short plain-English labels, clearly bounded cards. Confident and approachable rather than austere.",
+  "keyCharacteristics": [
+   "Navy shell, light cool canvas, white hairline-ringed cards; a full dark theme.",
+   "Monospace headings and tabular numerals: numbers are the product.",
+   "One amber accent, used as a signal, never as decoration.",
+   "Contrast is verified: 4.5:1 text, 3:1 control boundaries.",
+   "Dense on desktop, 44px touch targets and 16px inputs on mobile.",
+   "Prints cleanly: Z reports and pay runs in black on white."
+  ],
+  "rules": [
+   {
+    "name": "The One Signal Rule",
+    "body": "Amber is the only warm hue. It marks the one action or label that deserves attention on a screen; never a hover color or decoration.",
+    "section": "colors"
+   },
+   {
+    "name": "The Two-Tier Border Rule",
+    "body": "Decorative dividers use Hairline. Anything whose edge matters to a user uses Control Edge.",
+    "section": "colors"
+   },
+   {
+    "name": "The Navy Text Rule",
+    "body": "Body and heading text is navy. Pure black text appears only in print.",
+    "section": "colors"
+   },
+   {
+    "name": "The Tabular Rule",
+    "body": "Tables and anything marked .tabular use tabular figures so columns align.",
+    "section": "typography"
+   },
+   {
+    "name": "The Headings-Are-Mono Rule",
+    "body": "h1 through h6 are Fira Code; body copy is never set in the mono face.",
+    "section": "typography"
+   },
+   {
+    "name": "The No-Shift Hover Rule",
+    "body": "Hover states change shadow and border only; no hover moves, scales or resizes a layout.",
+    "section": "elevation"
+   }
+  ],
+  "dos": [
+   "**Do** pair Signal Amber with near-black ink (#1A1206); never put white text on amber.",
+   "**Do** use Amber Text (#92400E) for amber on light surfaces and #FBBF24 in dark mode.",
+   "**Do** keep control boundaries at Control Edge (3:1) and decorative dividers at Hairline.",
+   "**Do** set numbers in tabular figures and headings in Fira Code with ligatures off.",
+   "**Do** keep hover effects to shadow and border changes; keep touch targets at 44px on mobile and inputs at 16px.",
+   "**Do** reserve 9rem plus the safe-area inset at the bottom of mobile pages so the floating button never covers content.",
+   "**Do** say what is missing: an empty state names what to connect rather than showing a zero."
+  ],
+  "donts": [
+   "**Don't** use amber for hover states or purely decorative fills; it is the one signal color.",
+   "**Don't** use the hairline color for an input or control edge.",
+   "**Don't** let a hover transform shift layout.",
+   "**Don't** hard-code colors; use the semantic tokens so the dark theme and print styles keep working.",
+   "**Don't** set body copy in the mono face, or headings in Fira Sans.",
+   "**Don't** nest a second `<main>` inside the app layout."
+  ]
+ }
+}

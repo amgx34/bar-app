@@ -178,7 +178,7 @@ export function StockAdjustDialog({ open, onOpenChange, item, onOptimisticStock 
           <div className="space-y-1">
             <Label>Reason</Label>
             <Select defaultValue="delivery" onValueChange={(v) => setValue('reason', v as StockAdjustmentInput['reason'])}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger><SelectValue>{(v: string) => REASONS.find((r) => r.value === v)?.label ?? v}</SelectValue></SelectTrigger>
               <SelectContent>
                 {REASONS.map((r) => (
                   <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>

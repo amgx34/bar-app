@@ -130,9 +130,9 @@ export default function Form1099({ availableYears, employees, orgName }: Props) 
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border bg-amber-500/5 border-amber-500/20 p-4 text-sm text-amber-300 space-y-1">
+      <div className="rounded-xl border bg-amber-500/5 border-amber-500/20 p-4 text-sm text-accent-text space-y-1">
         <p className="font-semibold">Before generating 1099-NECs:</p>
-        <p className="text-amber-300/70 text-xs leading-relaxed">
+        <p className="text-accent-text text-xs leading-relaxed">
           1099-NEC forms are for <strong>independent contractors</strong> (non-employees) paid $600 or more.
           Regular bar staff on the payroll receive W-2s, not 1099s. Misclassifying employees as contractors carries serious IRS penalties.
           Have a tax professional confirm worker classification before filing.
@@ -145,7 +145,7 @@ export default function Form1099({ availableYears, employees, orgName }: Props) 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Tax Year</Label>
-            <Select value={String(year)} onValueChange={(v) => { setYear(Number(v)); setEntries(null); }}>
+            <Select label="Tax year" value={String(year)} onValueChange={(v) => { setYear(Number(v)); setEntries(null); }}>
               <SelectTrigger className="h-9">{year}</SelectTrigger>
               <SelectContent>{availableYears.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
             </Select>
@@ -164,7 +164,7 @@ export default function Form1099({ availableYears, employees, orgName }: Props) 
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">State</Label>
-            <Select value={state} onValueChange={(v) => setState(v ?? '')}>
+            <Select label="State" value={state} onValueChange={(v) => setState(v ?? '')}>
               <SelectTrigger className="h-9">
                 <span className="truncate text-sm">{state ? US_STATES.find(s => s.code === state)?.name : 'Select state'}</span>
               </SelectTrigger>

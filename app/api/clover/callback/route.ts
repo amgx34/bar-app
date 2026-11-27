@@ -1,135 +1,114 @@
+/**
+ * GET /api/clover/callback — the end of Clover's OAuth v2 redirect.
+ *
+ * The `state` is HMAC-signed (OAUTH_STATE_SECRET) and paired with a nonce
+ * cookie, so a forged link cannot attach someone else's Clover account to a
+ * bar. It also carries the region, cutoff hour and time zone chosen on the
+ * setup page, which means nothing is written to the org until Clover has
+ * answered and the whole connection is valid.
+ *
+ * The token pair goes to the encrypted credentials store, never to pos_config.
+ */
+
+import { after, NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
-import { NextRequest, NextResponse } from 'next/server';
+import { saveCredentials } from '@/lib/pos/credentials';
+import { applyProviderSettings, type PosConfig } from '@/lib/pos/pos-config';
+import { isValidTimeZone } from '@/lib/pos/business-date';
+import { runProviderSync } from '@/lib/pos/sync-run';
+import { cloverHosts, effectiveRegion, exchangeCode, verifyState } from '@/lib/pos/providers/clover/auth';
 
-const CLOVER_BASE =
-  process.env.CLOVER_SANDBOX === 'true'
-    ? 'https://sandbox.dev.clover.com'
-    : 'https://www.clover.com';
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-const CLOVER_API =
-  process.env.CLOVER_SANDBOX === 'true'
-    ? 'https://apisandbox.dev.clover.com'
-    : 'https://api.clover.com';
+const NONCE_COOKIE = 'clover_oauth_nonce';
 
 export async function GET(req: NextRequest) {
   const { searchParams, origin } = new URL(req.url);
-  const code       = searchParams.get('code');
-  const merchantId = searchParams.get('merchant_id'); // Clover includes this directly
-  const state      = searchParams.get('state'); // org_id we passed when initiating
+  const back = (q: string) => NextResponse.redirect(`${origin}/app/settings?tab=pos&${q}`);
 
-  if (!code || !state) {
-    return NextResponse.redirect(`${origin}/app/settings?tab=pos&error=clover_missing_params`);
-  }
+  const code = searchParams.get('code');
+  const merchantId = searchParams.get('merchant_id');
+  const secret = process.env.OAUTH_STATE_SECRET;
+  const state = secret ? verifyState(searchParams.get('state'), secret) : null;
+  if (!code || !merchantId || !state) return back('error=clover_missing_params');
 
-  // Verify the requesting user is an owner/manager of that org
+  const jar = await cookies();
+  const nonce = jar.get(NONCE_COOKIE)?.value;
+  jar.delete({ name: NONCE_COOKIE, path: '/api/clover' });
+  if (!nonce || nonce !== state.n) return back('error=clover_missing_params');
+
+  // The person finishing the flow must still own or manage the org in the state.
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.redirect(`${origin}/login`);
-
   const { data: membership } = await supabase
     .from('memberships')
     .select('role')
-    .eq('organization_id', state)
+    .eq('organization_id', state.o)
     .eq('user_id', user.id)
     .single();
+  if (!membership || !['owner', 'manager'].includes(membership.role)) return back('error=clover_unauthorized');
 
-  if (!membership || !['owner', 'manager'].includes(membership.role)) {
-    return NextResponse.redirect(`${origin}/app/settings?tab=pos&error=clover_unauthorized`);
+  const region = effectiveRegion(state.r);
+  let secrets;
+  try {
+    secrets = await exchangeCode(region, code);
+  } catch (e) {
+    console.error('[clover] token exchange failed:', e instanceof Error ? e.message : e);
+    return back('error=clover_token_failed');
   }
 
-  // ── Token exchange ────────────────────────────────────────────────────────
-  // Prefer OAuth v2 (requires client_secret). Fall back to v1 (App ID only)
-  // when CLOVER_CLIENT_SECRET is not configured.
-
-  let accessToken: string | null = null;
-  let resolvedMerchantId: string | null = merchantId;
-
-  const clientId     = process.env.CLOVER_CLIENT_ID!;
-  const clientSecret = process.env.CLOVER_CLIENT_SECRET;
-  const redirectUri  = process.env.CLOVER_REDIRECT_URI!;
-
-  if (clientSecret) {
-    // v2 OAuth (recommended for production)
-    const tokenRes = await fetch(`${CLOVER_API}/oauth/v2/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type:    'authorization_code',
-        client_id:     clientId,
-        client_secret: clientSecret,
-        code,
-        redirect_uri:  redirectUri,
-      }),
+  // Read the merchant's time zone. Clover has no business day, so a wrong zone
+  // would shift every night; without one the connection is saved but not usable.
+  let timezone: string | null = null;
+  try {
+    const res = await fetch(`${cloverHosts(region).api}/v3/merchants/${encodeURIComponent(merchantId)}`, {
+      headers: { Authorization: `Bearer ${secrets.access_token as string}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(15000),
     });
-
-    if (!tokenRes.ok) {
-      console.error('Clover v2 token exchange failed:', await tokenRes.text());
-      return NextResponse.redirect(`${origin}/app/settings?tab=pos&error=clover_token_failed`);
+    if (res.ok) {
+      const m = (await res.json()) as { timezone?: unknown; timeZone?: unknown };
+      const tz = m.timezone ?? m.timeZone;
+      if (isValidTimeZone(tz)) timezone = tz;
     }
+  } catch { /* falls through to the zone chosen at setup */ }
+  timezone ??= isValidTimeZone(state.tz) ? state.tz : null;
 
-    const json = await tokenRes.json() as {
-      access_token: string;
-      refresh_token?: string;
-      expires_in?: number;
-      merchant_id?: string;
-    };
-    accessToken         = json.access_token ?? null;
-    resolvedMerchantId  = json.merchant_id ?? merchantId;
-  } else {
-    // v1 OAuth fallback — App ID + code only (no secret needed)
-    const tokenRes = await fetch(
-      `${CLOVER_BASE}/oauth/token?client_id=${clientId}&code=${code}`,
-    );
-
-    if (!tokenRes.ok) {
-      console.error('Clover v1 token exchange failed:', await tokenRes.text());
-      return NextResponse.redirect(`${origin}/app/settings?tab=pos&error=clover_token_failed`);
-    }
-
-    const json = await tokenRes.json() as { access_token?: string; merchant_id?: string };
-    accessToken        = json.access_token ?? null;
-    resolvedMerchantId = json.merchant_id ?? merchantId;
-  }
-
-  if (!accessToken) {
-    return NextResponse.redirect(`${origin}/app/settings?tab=pos&error=clover_invalid_token`);
-  }
-
-  // Resolve merchant ID from Clover API if still unknown
-  if (!resolvedMerchantId) {
-    try {
-      const meRes = await fetch(`${CLOVER_API}/v3/merchant`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (meRes.ok) {
-        const me = await meRes.json() as { id?: string };
-        resolvedMerchantId = me.id ?? null;
-      }
-    } catch { /* best-effort */ }
-  }
-
-  if (!resolvedMerchantId) {
-    return NextResponse.redirect(`${origin}/app/settings?tab=pos&error=clover_invalid_token`);
-  }
-
-  // ── Persist connection ────────────────────────────────────────────────────
   const admin = createAdminClient();
-  const { error } = await admin
-    .from('organizations')
-    .update({
-      pos_provider: 'clover',
-      pos_config: {
-        merchant_id:   resolvedMerchantId,
-        access_token:  accessToken,
-      },
-    })
-    .eq('id', state);
+  try {
+    await saveCredentials(admin, state.o, { provider: 'clover', externalId: merchantId, secrets });
 
-  if (error) {
-    console.error('Failed to store Clover config:', error.message);
-    return NextResponse.redirect(`${origin}/app/settings?tab=pos&error=clover_save_failed`);
+    // admin-scope-ok: `organizations` is keyed by id, and state.o was signed by
+    // this server and checked against the caller's membership above.
+    const { data: org } = await admin.from('organizations').select('pos_provider, pos_config').eq('id', state.o).single();
+    const latest = (org?.pos_config ?? {}) as PosConfig;
+    // Switching provider restarts the config. Sales history and stock ledgers are other tables.
+    const base: PosConfig = org?.pos_provider === 'clover'
+      ? { ...latest }
+      : latest.credentials_enc ? { credentials_enc: latest.credentials_enc } : {};
+    delete base.access_token; // the plaintext key older connections kept
+    delete base.expires_at;
+    const next = applyProviderSettings(base, {
+      merchant_id: merchantId,
+      clover_region: region,
+      cutoff_hour: state.c,
+      ...(timezone ? { timezone } : {}),
+      needs_reauth: false,
+    });
+    // admin-scope-ok: same as above, a row keyed by the verified org id.
+    const { error } = await admin.from('organizations').update({ pos_provider: 'clover', pos_config: next }).eq('id', state.o);
+    if (error) throw new Error(error.message);
+  } catch (e) {
+    console.error('[clover] could not store connection:', e instanceof Error ? e.message : e);
+    return back('error=clover_save_failed');
   }
 
-  return NextResponse.redirect(`${origin}/app/settings?tab=pos&connected=clover`);
+  if (!timezone) return back('error=clover_timezone');
+
+  // First pull right away so the bar is not looking at an empty dashboard until the nightly cron.
+  after(() => runProviderSync(state.o).catch((e) => console.error('[clover] first sync failed:', e)));
+  return back('connected=clover');
 }

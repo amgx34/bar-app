@@ -64,7 +64,7 @@ export default function FlagsTab({ serverStats, populationMean, populationStdDev
           <p className="tabular-nums">
             Bar mean: <span className="text-foreground font-medium">{pct(populationMean)}</span>
             {' '}· Std dev: <span className="text-foreground font-medium">{pct(populationStdDev)}</span>
-            {' '}· Flag threshold: <span className="text-yellow-400 font-medium">{pct(threshold)}</span>
+            {' '}· Flag threshold: <span className="text-accent-text font-medium">{pct(threshold)}</span>
           </p>
         </CardContent>
       </Card>
@@ -73,7 +73,7 @@ export default function FlagsTab({ serverStats, populationMean, populationStdDev
       {flagged.length > 0 ? (
         <div className="flex items-center gap-3 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-4">
           <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0" />
-          <p className="text-sm font-medium text-yellow-400">
+          <p className="text-sm font-medium text-accent-text">
             {flagged.length} bartender{flagged.length > 1 ? 's' : ''} flagged:{' '}
             {flagged.map((s) => s.name).join(', ')}
           </p>
@@ -120,7 +120,7 @@ export default function FlagsTab({ serverStats, populationMean, populationStdDev
                 <td className="px-4 py-3 text-right tabular-nums text-cyan-700 dark:text-cyan-300">
                   ${s.totalTips.toFixed(2)}
                 </td>
-                <td className={`px-4 py-3 text-right tabular-nums font-semibold ${s.flagged ? 'text-yellow-400' : ''}`}>
+                <td className={`px-4 py-3 text-right tabular-nums font-semibold ${s.flagged ? 'text-accent-text' : ''}`}>
                   {pct(s.avgTipPct)}
                 </td>
                 <td className={`px-4 py-3 text-right tabular-nums text-xs ${
@@ -130,7 +130,7 @@ export default function FlagsTab({ serverStats, populationMean, populationStdDev
                 </td>
                 <td className="px-4 py-3 text-center">
                   {s.flagged ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-yellow-500/15 px-2.5 py-0.5 text-xs font-medium text-yellow-400">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-yellow-500/15 px-2.5 py-0.5 text-xs font-medium text-accent-text">
                       <AlertTriangle className="h-3 w-3" />
                       Flagged
                     </span>

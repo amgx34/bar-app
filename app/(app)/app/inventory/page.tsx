@@ -25,6 +25,7 @@ type SearchParams = Promise<{
   q?: string;
   category?: string;
   include_inactive?: string;
+  stock?: string;
 }>;
 
 export const metadata: Metadata = { title: 'Inventory' };
@@ -35,7 +36,7 @@ export default async function InventoryPage({
   searchParams: SearchParams;
 }) {
   const { org, role } = await getCurrentOrg();
-  const { q, category, include_inactive } = await searchParams;
+  const { q, category, include_inactive, stock } = await searchParams;
   const supabase = createAdminClient();
 
   // Build query
@@ -55,8 +56,15 @@ export default async function InventoryPage({
   if (q) query = query.ilike('name', `%${q}%`);
   if (category && category !== 'all') query = query.eq('category_id', category);
 
-  const [{ data: items, error }, { data: categories }, { data: reps }, { data: usageLogs }, shipments] = await Promise.all([
+  const [{ data: allItems, error }, { data: dashItems }, { data: categories }, { data: reps }, { data: usageLogs }, shipments] = await Promise.all([
     query,
+    // The dashboard totals describe the whole bar, not the current search, so
+    // they read every active item rather than the filtered list.
+    supabase
+      .from('inventory_items')
+      .select('current_stock, cost_price')
+      .eq('organization_id', org.id)
+      .eq('is_active', true),
     supabase.from('inventory_categories').select('id, name, cost_type, default_pour_oz').eq('organization_id', org.id).order('name'),
     supabase.from('reps').select('id, name').eq('organization_id', org.id).eq('is_active', true).order('name'),
     supabase
@@ -75,19 +83,32 @@ export default async function InventoryPage({
   ]);
 
   if (error) {
-    return <main className="p-6 text-destructive">{error.message}</main>;
+    return <div className="p-6 text-destructive">{error.message}</div>;
   }
 
+  // Stock status compares two columns, which PostgREST cannot filter on, so it
+  // is applied here. Low = below par (items with no par are never low).
+  const items =
+    stock === 'low_stock'
+      ? (allItems ?? []).filter((i) => i.par_level !== null && i.current_stock < i.par_level)
+      : stock === 'in_stock'
+        ? (allItems ?? []).filter((i) => i.current_stock > 0)
+        : (allItems ?? []);
+  const isFiltered = Boolean(q) || (!!category && category !== 'all') || stock === 'low_stock' || stock === 'in_stock';
+
   return (
-    <main className="p-6 space-y-4">
+    <div className="flex flex-col gap-4 p-6">
       {/* This page leads with a dashboard rather than a title bar, so the
           heading is visually hidden — but the document still needs one h1. */}
       <h1 className="sr-only">Inventory</h1>
-      <InventoryDashboard
-        usageLogs={(usageLogs ?? []) as unknown as DashboardUsageLog[]}
-        items={(items ?? []) as unknown as DashboardItem[]}
-        shipments={shipments}
-      />
+      {/* On a phone the list is the job, so the analytics follow it. */}
+      <div className="order-last sm:order-first">
+        <InventoryDashboard
+          usageLogs={(usageLogs ?? []) as unknown as DashboardUsageLog[]}
+          items={(dashItems ?? []) as unknown as DashboardItem[]}
+          shipments={shipments}
+        />
+      </div>
       <InventoryHeader
         role={role}
         categories={categories ?? []}
@@ -95,17 +116,20 @@ export default async function InventoryPage({
         currentQ={q ?? ''}
         currentCategory={category ?? 'all'}
         includeInactive={include_inactive === '1'}
+        currentStock={stock ?? 'all'}
         defaultPourOz={org.bar_settings?.default_pour_oz ?? 1.5}
         bottleSizesMl={org.bar_settings?.bottle_sizes_ml ?? [375, 750, 1000, 1750]}
       />
       <InventoryTable
-        items={(items ?? []) as unknown as ItemRow[]}
+        items={items as unknown as ItemRow[]}
+        isFiltered={isFiltered}
+        searchTerm={q ?? ''}
         categories={categories ?? []}
         reps={reps ?? []}
         role={role}
         defaultPourOz={org.bar_settings?.default_pour_oz ?? 1.5}
         bottleSizesMl={org.bar_settings?.bottle_sizes_ml ?? [375, 750, 1000, 1750]}
       />
-    </main>
+    </div>
   );
 }

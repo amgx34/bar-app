@@ -37,6 +37,8 @@ export type SyncStatus =
   | 'stale'
   /** Silent long enough that data is certainly missing. */
   | 'down'
+  /** Clover or Toast no longer accepts the saved login. A person must reconnect. */
+  | 'needs-reauth'
   /** No agent configured for this bar. Not a fault. */
   | 'not-configured';
 
@@ -50,6 +52,18 @@ export type SyncStatus =
  */
 const STALE_AFTER_MINUTES = 60;
 const DOWN_AFTER_MINUTES = 12 * 60;
+
+/**
+ * Clover and Toast are pulled, not pushed: the daily cron plus a refresh when
+ * someone opens the dashboard. Silence for an hour is ordinary there, so the
+ * agent's five-minute-cadence bands would cry wolf every night.
+ */
+const API_STALE_AFTER_MINUTES = 36 * 60;
+const API_DOWN_AFTER_MINUTES = 72 * 60;
+
+const API_NAMES = { clover: 'Clover', toast: 'Toast' } as const;
+type ApiProvider = keyof typeof API_NAMES;
+const isApiProvider = (p: string | null | undefined): p is ApiProvider => p === 'clover' || p === 'toast';
 
 export type SyncSummary = {
   zReports?: number;
@@ -70,7 +84,18 @@ export type PosConfigShape = {
   last_sync_errors?: unknown;
   last_sync_summary?: SyncSummary | null;
   agent_version?: string | null;
+  merchant_id?: unknown;
+  restaurant_guid?: unknown;
+  needs_reauth?: unknown;
 };
+
+/** A provider with a login on file. 2Touch needs its agent token; Clover and Toast need their account id. */
+export function isConnected(provider: string | null | undefined, cfg: PosConfigShape): boolean {
+  if (provider === '2touch') return !!cfg.agent_token;
+  if (provider === 'clover') return !!cfg.merchant_id;
+  if (provider === 'toast') return !!cfg.restaurant_guid;
+  return false;
+}
 
 export type SyncHealth = {
   status: SyncStatus;
@@ -152,7 +177,7 @@ export function assessSyncHealth(
 
   // A bar with no agent is not broken. Reporting "never synced" for every
   // Clover or manual-upload bar would train everyone to ignore this strip.
-  if (posProvider !== '2touch' || !cfg.agent_token) {
+  if (!isConnected(posProvider, cfg)) {
     return {
       ...base,
       status: 'not-configured',
@@ -163,6 +188,31 @@ export function assessSyncHealth(
   }
 
   const lastSyncAt = typeof cfg.last_sync_at === 'string' ? cfg.last_sync_at : null;
+  const api = isApiProvider(posProvider);
+  const name = api ? API_NAMES[posProvider] : 'The POS agent';
+
+  // Nothing else matters until the login works: every later sync will fail the same way.
+  if (api && cfg.needs_reauth) {
+    return {
+      ...base,
+      status: 'needs-reauth',
+      minutesAgo: lastSyncAt ? minutesBetween(lastSyncAt, now) : null,
+      lastSyncAt,
+      message: `${name} no longer accepts the saved login, so nothing new is coming in. Reconnect ${name} in Settings.`,
+    };
+  }
+
+  if (!lastSyncAt && api) {
+    // Connected but the first pull has not run: waiting, not an agent that failed to install.
+    return {
+      ...base,
+      status: 'stale',
+      minutesAgo: null,
+      lastSyncAt: null,
+      message: `${name} is connected but has not synced yet. Use Sync now in Settings, or wait for tonight's run.`,
+    };
+  }
+
   if (!lastSyncAt) {
     return {
       ...base,
@@ -187,7 +237,10 @@ export function assessSyncHealth(
     };
   }
 
-  if (minutesAgo === null || minutesAgo >= DOWN_AFTER_MINUTES) {
+  const downAfter = api ? API_DOWN_AFTER_MINUTES : DOWN_AFTER_MINUTES;
+  const staleAfter = api ? API_STALE_AFTER_MINUTES : STALE_AFTER_MINUTES;
+
+  if (minutesAgo === null || minutesAgo >= downAfter) {
     return {
       ...base,
       status: 'down',
@@ -197,13 +250,15 @@ export function assessSyncHealth(
     };
   }
 
-  if (minutesAgo >= STALE_AFTER_MINUTES) {
+  if (minutesAgo >= staleAfter) {
     return {
       ...base,
       status: 'stale',
       minutesAgo,
       lastSyncAt,
-      message: `Nothing heard for ${describeDuration(minutesAgo)}. Normal if the POS is switched off, otherwise check the agent.`,
+      message: api
+        ? `${name} has not synced for ${describeDuration(minutesAgo)}. Use Sync now in Settings; if it keeps failing, reconnect ${name}.`
+        : `Nothing heard for ${describeDuration(minutesAgo)}. Normal if the POS is switched off, otherwise check the agent.`,
     };
   }
 
@@ -222,9 +277,10 @@ export function assessSyncHealth(
       status: 'no-data',
       minutesAgo,
       lastSyncAt,
-      message:
-        'The POS agent is checking in but has reported no sales, hours or items. '
-        + 'Normal if the bar has been closed, otherwise a feed has stopped returning data.',
+      message: api
+        ? `${name} synced but returned no sales, hours or items. Normal if the bar has been closed, otherwise check the permissions on the ${name} connection.`
+        : 'The POS agent is checking in but has reported no sales, hours or items. '
+          + 'Normal if the bar has been closed, otherwise a feed has stopped returning data.',
     };
   }
 
@@ -233,6 +289,8 @@ export function assessSyncHealth(
     status: 'healthy',
     minutesAgo,
     lastSyncAt,
-    message: `Syncing normally — last checked in ${describeAge(minutesAgo)}.`,
+    message: api
+      ? `${name} is syncing normally. Last synced ${describeAge(minutesAgo)}.`
+      : `Syncing normally — last checked in ${describeAge(minutesAgo)}.`,
   };
 }

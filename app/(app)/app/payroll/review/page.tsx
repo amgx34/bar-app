@@ -1,13 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowLeft, ChevronLeft, ChevronRight, Clock, DollarSign, Users, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Clock, DollarSign, AlertTriangle } from 'lucide-react';
 import { computePayroll } from '../actions';
 import { getCurrentOrg } from '@/lib/org';
 import { defaultWeek } from '../_shared';
 import { addDays, payRunHref, resolvePayPeriod } from '@/lib/date-range';
 import { PayrollReviewClient } from './_components/payroll-review-client';
 import { ApprovalPanel } from './_components/approval-panel';
-import { getPayrollRun, getPayrollRunDiff } from '../approval-actions';
+import { getPayrollRun, getPayrollRunDiff, getApproverName } from '../approval-actions';
+import { approvedTotal, snapshotToEntries } from '@/lib/payroll/approved-view';
+import { diffPayrollRun } from '@/lib/payroll/run-diff';
 import { canSubmitPayroll, canApprovePayroll } from '@/lib/permissions';
 import { computeRunWithholding } from '../run-withholding';
 import type { Withholding } from '@/lib/payroll/tax/types';
@@ -40,19 +42,46 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
     defaultWeek(),
   );
 
-  const entries = await computePayroll(startDate, endDate);
-  const withholding = await computeRunWithholding(
-    (org.bar_settings ?? {}) as Record<string, unknown>,
-    startDate, endDate, entries,
-  );
-
-  // The diff is only meaningful once something has been submitted, and only
-  // an approver can act on it — so it costs a second computePayroll() run
-  // exclusively for the person who needs it.
+  const liveEntries = await computePayroll(startDate, endDate);
   const approvalRun = await getPayrollRun(startDate, endDate);
+  const isApproved = approvalRun?.status === 'approved';
+
+  // An approved run shows what was signed off, never a recompute: the live
+  // figures can drift after approval (a late shift, a tip correction) and a
+  // green "Approved" badge over moved numbers is a lie.
+  const frozen = isApproved ? snapshotToEntries(approvalRun.snapshot ?? []) : null;
+  const entries = frozen ?? liveEntries;
+
+  // Skipped for an approved run: its withholding is the one frozen with it.
+  const liveWithholding = isApproved
+    ? ({ kind: 'off' } as const)
+    : await computeRunWithholding(
+        (org.bar_settings ?? {}) as Record<string, unknown>,
+        startDate, endDate, liveEntries,
+      );
+  const withholding: Awaited<ReturnType<typeof computeRunWithholding>> = isApproved
+    ? { kind: 'ok', byEmployee: new Map(
+        (approvalRun.snapshot ?? []).flatMap((e) => (e.withholding ? [[e.employeeId, e.withholding] as const] : [])),
+      ) }
+    : liveWithholding;
+  const hasFrozenWithholding = withholding.kind === 'ok' && withholding.byEmployee.size > 0;
+
+  // Pending: only an approver can act on the diff. Approved: anyone who can see
+  // the page should be told when today's records no longer match the approval.
+  // Diffed from the recompute above, so it costs no second computePayroll().
   const approvalDiff = approvalRun?.status === 'pending_approval' && canApprovePayroll(role)
     ? await getPayrollRunDiff(startDate, endDate)
-    : null;
+    : isApproved
+      ? diffPayrollRun(
+          approvalRun.snapshot ?? [],
+          liveEntries.map((e) => ({
+            employeeId: e.employeeId, employeeName: e.employeeName,
+            totalHours: e.totalHours, totalCompensation: e.totalCompensation,
+          })),
+        )
+      : null;
+  const approverName = isApproved ? await getApproverName(approvalRun.reviewed_by) : null;
+  const noDetail = frozen?.some((e) => !e.hasDetail) ?? false;
 
   const totals = entries.reduce(
     (acc, e) => ({
@@ -65,7 +94,7 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
     { totalHours: 0, regularPay: 0, overtimePay: 0, tips: 0, totalCompensation: 0 },
   );
 
-  const unconfigured = entries.filter(e => !e.role || e.hourlyRate == null);
+  const unconfigured = (isApproved ? [] : entries).filter(e => !e.role || e.hourlyRate == null);
   const periodLabel  = fmtDateRange(startDate, endDate);
 
   return (
@@ -80,15 +109,10 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
           <div className="flex min-w-0 items-center gap-3">
             <Link
               href={`/app/payroll?tab=payroll&startDate=${startDate}&endDate=${endDate}`}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="h-4 w-4" /> Back
             </Link>
-            <div className="h-4 w-px bg-border" />
-            <div>
-              <span className="text-sm font-semibold">Payroll Review</span>
-              <span className="text-xs text-muted-foreground ml-2">{periodLabel}</span>
-            </div>
           </div>
 
           {/* Export button — client handles CSV download */}
@@ -98,6 +122,7 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
             endDate={endDate}
             periodLabel={periodLabel}
             orgName={org.name}
+            approved={isApproved}
             exportOnly
           />
         </div>
@@ -112,25 +137,17 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
           endDate={endDate}
           canSubmit={canSubmitPayroll(role)}
           canApprove={canApprovePayroll(role)}
+          approvedBy={approverName}
+          approvedTotal={isApproved ? approvedTotal(approvalRun.snapshot ?? []) : null}
+          staleSinceApproval={isApproved ? approvalDiff : null}
         />
 
         {/* ── Period + totals summary ─────────────────────────────────────────── */}
         <div className="space-y-1">
-          {/* Positional cue for a three-level route — without it this page gives
-              no on-screen indication that it sits under Payroll. */}
-          <nav aria-label="Breadcrumb">
-            <Link
-              href="/app/payroll"
-              className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors duration-200"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-              Payroll
-            </Link>
-          </nav>
           {/* h2, not h1: the Payroll layout already supplies the page's h1, and
               two h1s leave a screen reader with no single page title. */}
           <h2 className="text-2xl font-bold">Pay Period Review</h2>
-          <p className="text-muted-foreground">{periodLabel} · {org.name}</p>
+          <p className="text-muted-foreground">{periodLabel} · {org.name}{isApproved ? ' · showing the approved figures' : ''}</p>
 
           {/* Moving a week from here rather than only from the Pay Run: this is
               the screen you are on when you notice you are running the wrong
@@ -162,33 +179,33 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
         {/* KPI strip */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <SummaryKpi
-            icon={<Users className="h-4 w-4" />}
-            label="Employees"
-            value={String(entries.length)}
-            color="text-primary"
-          />
-          <SummaryKpi
             icon={<Clock className="h-4 w-4" />}
-            label="Total Hours"
+            label={`Total hours · ${entries.length} ${entries.length === 1 ? 'employee' : 'employees'}`}
             value={totals.totalHours.toFixed(1)}
             color="text-sky-600"
           />
           <SummaryKpi
             icon={<DollarSign className="h-4 w-4" />}
-            label="Wages"
-            value={fmtMoney(totals.regularPay + totals.overtimePay)}
+            label="Wages incl. overtime"
+            value={noDetail ? '—' : fmtMoney(totals.regularPay + totals.overtimePay)}
             color="text-amber-600"
           />
           <SummaryKpi
             icon={<DollarSign className="h-4 w-4" />}
-            label="Total Payroll"
+            label="Tips"
+            value={noDetail ? '—' : fmtMoney(totals.tips)}
+            color="text-amber-600"
+          />
+          <SummaryKpi
+            icon={<DollarSign className="h-4 w-4" />}
+            label={isApproved ? 'Approved total (gross)' : 'Total payroll (gross)'}
             value={fmtMoney(totals.totalCompensation)}
             color="text-emerald-600"
             highlight
           />
         </div>
 
-        <WithholdingNotice state={withholding} />
+        {(!isApproved || hasFrozenWithholding) && <WithholdingNotice state={withholding} />}
 
         {/* Unconfigured employees warning */}
         {unconfigured.length > 0 && (
@@ -228,7 +245,8 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
 
             {entries.map((entry) => {
               const wages = entry.regularPay + entry.overtimePay;
-              const isConfigured = entry.role && entry.hourlyRate != null;
+              const hasDetail = !('hasDetail' in entry) || entry.hasDetail;
+              const isConfigured = isApproved || (entry.role && entry.hourlyRate != null);
 
               return (
                 <div
@@ -244,17 +262,22 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
                       <div>
                         <p className="font-semibold text-sm">{entry.employeeName}</p>
                         <p className="text-xs text-muted-foreground capitalize">
-                          {entry.role ?? '—'}{entry.hourlyRate != null ? ` · $${entry.hourlyRate.toFixed(2)}/hr` : ''}
+                          {entry.role ?? '—'}{hasDetail && entry.hourlyRate != null ? ` · $${entry.hourlyRate.toFixed(2)}/hr` : ''}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold tabular-nums">{fmtMoney(entry.totalCompensation)}</p>
-                      <p className="text-[10px] text-muted-foreground">total</p>
+                      <p className="text-xs text-muted-foreground">gross</p>
                     </div>
                   </div>
 
                   {/* Breakdown columns */}
+                  {!hasDetail ? (
+                    <p className="px-5 py-3 text-xs text-muted-foreground">
+                      Approved before pay breakdowns were saved, so only the total was kept.
+                    </p>
+                  ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0">
                     <PayCell
                       label="Regular"
@@ -274,12 +297,13 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
                       dim={entry.tipAmount === 0}
                     />
                     <PayCell
-                      label="Wages"
+                      label="Wages incl. OT"
                       sub={`${entry.totalHours.toFixed(1)} total hrs`}
                       value={fmtMoney(wages)}
                       highlight
                     />
                   </div>
+                  )}
 
                   {withholding.kind === 'ok' && (
                     <WithholdingRow w={withholding.byEmployee.get(entry.employeeId)} />
@@ -307,6 +331,7 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
             endDate={endDate}
             periodLabel={periodLabel}
             orgName={org.name}
+            approved={isApproved}
           />
         )}
 
@@ -382,11 +407,11 @@ function PayCell({
 }) {
   return (
     <div className={`px-4 py-3 space-y-0.5 ${highlight ? 'bg-muted/30' : ''}`}>
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+      <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
       <p className={`text-sm font-semibold tabular-nums ${dim ? 'text-muted-foreground' : ''} ${highlight ? 'text-primary' : ''}`}>
         {value}
       </p>
-      <p className="text-[10px] text-muted-foreground">{sub}</p>
+      <p className="text-xs text-muted-foreground">{sub}</p>
     </div>
   );
 }

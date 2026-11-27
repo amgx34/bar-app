@@ -5,7 +5,7 @@
  *   usage logs (deliveries, spillage, comps, staff drinks, recounts)
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { DEMO_SLUG_PREFIX } from './constants';
+import { DEMO_PROFILES, shapeNights, type DemoProfile } from './profiles';
 
 // ── Static seed tables ─────────────────────────────────────────────────────
 
@@ -204,16 +204,25 @@ function dateStr(daysAgo: number): string {
 
 // ── Main export ────────────────────────────────────────────────────────────
 
-export async function seedDemoOrg(admin: SupabaseClient, userId: string): Promise<string> {
+export async function seedDemoOrg(
+  admin: SupabaseClient,
+  userId: string,
+  slug: string,
+  profile: DemoProfile = DEMO_PROFILES[0],
+): Promise<string> {
+  const nights = shapeNights(NIGHTS, profile);
+  const dropE = new Set(profile.dropEmployees);
+  const dropI = new Set(profile.dropItems);
+  const items = ITEMS.filter((i) => !dropI.has(i.name));
 
   // ── 1. Organization ──────────────────────────────────────────────────────
   const { data: org, error: orgErr } = await admin
     .from('organizations')
     .insert({
-      name: 'Demo Bar — The Tipsy Tavern',
-      slug: `${DEMO_SLUG_PREFIX}${Date.now().toString(36)}`,
-      bar_type: 'bar',
-      bar_address: '123 Demo St, Chicago, IL',
+      name: profile.name,
+      slug,
+      bar_type: profile.barType,
+      bar_address: profile.address,
       bar_settings: {
         tip_split_percent:    18,
         barback_tip_pct:      15,
@@ -221,7 +230,7 @@ export async function seedDemoOrg(admin: SupabaseClient, userId: string): Promis
         default_pour_oz:      1.5,
         opener_bonus_type:    'fixed',
         opener_bonus_value:   25,
-        bar_type: 'bar', bar_city: 'Chicago', bar_state: 'IL',
+        bar_type: profile.barType, bar_city: profile.city, bar_state: profile.state,
         hourly_rates: { bartender: 15, barback: 13, manager: 18, server: 13, security: 14, other: 13 },
         auto_reorder_enabled: true,
         bottle_sizes_ml: [375, 750, 1000, 1750],
@@ -233,7 +242,8 @@ export async function seedDemoOrg(admin: SupabaseClient, userId: string): Promis
   const orgId = org.id as string;
 
   // ── 2. Membership ────────────────────────────────────────────────────────
-  await admin.from('memberships').insert({ user_id: userId, organization_id: orgId, role: 'owner' });
+  const { error: memErr } = await admin.from('memberships').insert({ user_id: userId, organization_id: orgId, role: profile.role });
+  if (memErr) throw new Error('Demo membership creation failed');
 
   // ── 3. Categories ────────────────────────────────────────────────────────
   const { data: catRows } = await admin
@@ -252,7 +262,7 @@ export async function seedDemoOrg(admin: SupabaseClient, userId: string): Promis
   // ── 5. Inventory items ───────────────────────────────────────────────────
   const { data: itemRows } = await admin
     .from('inventory_items')
-    .insert(ITEMS.map(i => ({
+    .insert(items.map(i => ({
       organization_id: orgId,
       name: i.name, category_id: catMap.get(i.category) ?? null,
       rep_id: repMap.get(i.rep_name) ?? null, unit: i.unit,
@@ -266,12 +276,12 @@ export async function seedDemoOrg(admin: SupabaseClient, userId: string): Promis
   // ── 6. Employees ─────────────────────────────────────────────────────────
   const { data: empRows } = await admin
     .from('employees')
-    .insert(EMPLOYEES_SEED.map(e => ({ ...e, organization_id: orgId })))
+    .insert(EMPLOYEES_SEED.filter(e => !dropE.has(e.name)).map(e => ({ ...e, organization_id: orgId })))
     .select('id, name');
   const empByName = new Map((empRows ?? []).map(e => [e.name as string, e.id as string]));
 
   // ── 7. Z report days + per-server tips + employee shifts ─────────────────
-  for (const night of NIGHTS) {
+  for (const night of nights) {
     const reportDate = dateStr(night.offset);
 
     // z_report_days

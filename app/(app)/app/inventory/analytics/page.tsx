@@ -43,7 +43,7 @@ export default async function InventoryAnalyticsPage() {
   ];
 
   return (
-    <main className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
       <div>
         <p className="text-sm text-muted-foreground">Inventory</p>
         <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -63,7 +63,7 @@ export default async function InventoryAnalyticsPage() {
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground truncate">{kpi.label}</p>
                     <p className={`text-xl sm:text-2xl font-bold mt-1 ${kpi.color}`}>{kpi.value}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{kpi.sub}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{kpi.sub}</p>
                   </div>
                   <div className={`p-2 rounded-lg shrink-0 ${kpi.bg}`}><Icon className={`h-4 w-4 ${kpi.color}`} /></div>
                 </div>
@@ -264,6 +264,6 @@ export default async function InventoryAnalyticsPage() {
           )}
         </CardContent>
       </Card>
-    </main>
+    </div>
   );
 }

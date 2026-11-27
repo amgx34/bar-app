@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseAgentVersion, applyAgentVersion, applySyncOutcome } from './pos-config';
+import { parseAgentVersion, applyAgentVersion, applySyncOutcome, applyProviderSettings, applyToastConnection } from './pos-config';
 
 const NOW = '2026-10-13T22:00:00.000Z';
 
@@ -78,5 +78,22 @@ describe('pos_config writers', () => {
     const next = applySyncOutcome({}, [], null, NOW);
 
     expect(next.last_sync_summary).toBeNull();
+  });
+});
+
+describe('applyProviderSettings', () => {
+  it('merges over the latest config without dropping what a later writer stored', () => {
+    const afterOutcome = applySyncOutcome({ merchant_id: 'M1', agent_version: '1.4.0' }, [], null, '2026-11-25T00:00:00Z');
+    const next = applyProviderSettings(afterOutcome, { needs_reauth: true });
+    expect(next).toMatchObject({ merchant_id: 'M1', agent_version: '1.4.0', needs_reauth: true, last_sync_at: '2026-11-25T00:00:00Z' });
+  });
+});
+
+describe('applyToastConnection', () => {
+  it('merges the settings over the latest config and scrubs plaintext credentials', () => {
+    const latest = { client_id: 'cid', client_secret: 'sec', restaurant_guid: 'old', last_sync_at: 'x', credentials_enc: 'enc' };
+    const next = applyToastConnection(latest, { restaurant_guid: 'new', timezone: 'America/Chicago', needs_reauth: false });
+    expect(next).toEqual({ restaurant_guid: 'new', timezone: 'America/Chicago', needs_reauth: false, last_sync_at: 'x', credentials_enc: 'enc' });
+    expect(latest.client_secret).toBe('sec'); // pure: the input is untouched
   });
 });

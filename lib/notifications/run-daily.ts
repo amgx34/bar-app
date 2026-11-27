@@ -3,9 +3,15 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { dispatch, getOrgRecipients, getLastNotificationPayload } from './deliver';
 import {
   detectLowStock, detectZReportClosed, detectSalesAnomaly,
-  detectSalesTax, detectHourlyTips,
+  detectSalesTax, detectHourlyTips, detectFeedStale,
+  detectWeeklySummary, weekEndingOn,
   type StockItem, type ZDay,
 } from './detect';
+import { isActiveItem } from '@/lib/inventory/par';
+import { deliverWeekly, type WeeklyDeps } from './weekly';
+import { sendEmail } from '@/lib/reps/email';
+import { SITE_URL } from '@/lib/site';
+import { assessSyncHealth, type PosConfigShape } from '@/lib/pos/sync-health';
 import { salesTaxFromSettings } from '@/lib/books/sales-tax';
 
 /**
@@ -56,6 +62,12 @@ function sameWeekdayWindow(iso: string, weeks = 4): string[] {
   return out;
 }
 
+/**
+ * Weekly summaries stay OFF until the owner sets WEEKLY_SUMMARY_ENABLED=true:
+ * they send real email through the shared Gmail login.
+ */
+const weeklyEnabled = () => process.env.WEEKLY_SUMMARY_ENABLED === 'true';
+
 export async function runDailyNotifications(): Promise<DailyRunResult> {
   const supabase = createAdminClient();
   const result: DailyRunResult = { orgsScanned: 0, notified: 0, errors: [] };
@@ -64,13 +76,16 @@ export async function runDailyNotifications(): Promise<DailyRunResult> {
   // organization by design. Each query inside the loop is scoped to one org.
   const { data: orgs, error } = await supabase
     .from('organizations')
-    .select('id, name, bar_settings');
+    .select('id, name, bar_settings, pos_provider, pos_config');
   if (error) {
     result.errors.push(`org list failed: ${error.message}`);
     return result;
   }
 
   const businessDate = yesterdayISO();
+  // Yesterday a Sunday means today is Monday: the week just closed.
+  const week = weeklyEnabled() ? weekEndingOn(businessDate) : null;
+  const emailBudget = { left: 50 };
 
   for (const org of orgs ?? []) {
     const orgId = org.id as string;
@@ -89,20 +104,78 @@ export async function runDailyNotifications(): Promise<DailyRunResult> {
       const preferences = prefs ?? [];
       const opts = { recipients, preferences };
 
+      // ── POS feed went quiet ───────────────────────────────────────────────
+      // Reads the org row already fetched above, so no extra query to scope.
+      const feed = detectFeedStale(
+        assessSyncHealth((org.pos_config ?? null) as PosConfigShape | null, org.pos_provider as string | null),
+        org.pos_provider as string | null,
+      );
+      if (feed) result.notified += await dispatch(orgId, feed, opts);
+
       // ── Low stock ──────────────────────────────────────────────────────────
       const { data: items } = await supabase
         .from('inventory_items')
-        .select('id, name, current_stock, par_level')
-        .eq('organization_id', orgId)
-        .eq('is_active', true);
+        .select('id, name, current_stock, par_level, is_active')
+        // is_active filtered in memory: SQL equality would drop NULL rows the dashboard keeps.
+        .eq('organization_id', orgId);
 
       const previous = await getLastNotificationPayload(orgId, 'inventory.low_stock');
       const lowStock = detectLowStock(
-        (items ?? []) as StockItem[],
+        ((items ?? []) as (StockItem & { is_active: boolean | null })[]).filter(isActiveItem),
         previous ? { itemIds: (previous.itemIds as string[]) ?? [] } : null,
         businessDate,
       );
       if (lowStock) result.notified += await dispatch(orgId, lowStock, opts);
+
+      // ── Weekly owner summary (Mondays, only when switched on) ───────────────
+      if (week) {
+        const [{ data: wDays }, { data: wShifts }, { count: pending }] = await Promise.all([
+          supabase.from('z_report_days')
+            .select('report_date, total_sales, cash_tips, cc_tips')
+            .eq('organization_id', orgId)
+            .gte('report_date', week.priorStart).lte('report_date', week.end),
+          supabase.from('employee_shifts')
+            .select('regular_hours, overtime_hours')
+            .eq('organization_id', orgId)
+            .gte('shift_date', week.start).lte('shift_date', week.end),
+          supabase.from('payroll_runs')
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', orgId)
+            .eq('status', 'pending_approval'),
+        ]);
+        const hours = (wShifts ?? []).reduce((t, r) => {
+          const n = (x: unknown) => (Number.isFinite(Number(x)) && Number(x) > 0 ? Number(x) : 0);
+          return t + n(r.regular_hours) + n(r.overtime_hours);
+        }, 0);
+        const built = detectWeeklySummary({
+          week, days: wDays ?? [], hoursThisWeek: hours,
+          items: ((items ?? []) as (StockItem & { is_active: boolean | null })[]).filter(isActiveItem),
+          pendingPayrollRuns: pending ?? 0,
+          feedNote: feed?.title ?? null,
+        });
+        if (built) {
+          const weeklyDeps: WeeklyDeps = {
+            dispatch: (draft) => dispatch(orgId, draft, opts),
+            alreadySent: async (key) => {
+              const { count } = await supabase.from('notifications')
+                .select('id', { count: 'exact', head: true })
+                .eq('organization_id', orgId).eq('dedupe_key', key);
+              return (count ?? 0) > 0;
+            },
+            emailFor: async (userId) => {
+              // admin-scope-ok: userId comes from this org's memberships (recipients above).
+              const { data } = await supabase.auth.admin.getUserById(userId);
+              return data.user?.email ?? null;
+            },
+            sendEmail: (to, subject, html) => sendEmail(to, subject, html),
+            siteUrl: SITE_URL,
+            emailBudget,
+          };
+          const w = await deliverWeekly(built, recipients, preferences, weeklyDeps);
+          result.notified += w.notified;
+          result.errors.push(...w.errors.map((e) => `${org.name ?? orgId}: ${e}`));
+        }
+      }
 
       // ── Nightly sales + anomaly ────────────────────────────────────────────
       const window = sameWeekdayWindow(businessDate);

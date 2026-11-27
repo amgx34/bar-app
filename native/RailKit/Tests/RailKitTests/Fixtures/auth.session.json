@@ -1,0 +1,12 @@
+{
+  "data": {
+    "accessToken": "fixture-access-token",
+    "refreshToken": "fixture-refresh-token",
+    "expiresAt": "2026-11-25T13:00:00.000Z",
+    "tokenType": "bearer",
+    "user": {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "email": "member@example.com"
+    }
+  }
+}

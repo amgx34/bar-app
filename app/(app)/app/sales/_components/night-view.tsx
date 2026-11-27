@@ -8,6 +8,7 @@ import { HourlyCurve } from './hourly-curve';
 import { CumulativeChart } from './cumulative-chart';
 import { PaymentSplit, CategoryBars } from './night-bits';
 import { money } from './sales-bits';
+import { TieOutCard } from './tie-out-card';
 
 /**
  * One night, read on a phone.
@@ -31,6 +32,8 @@ export function NightView({
   asOf,
   items,
   categories,
+  provider,
+  tieOutDate,
 }: {
   data: PeriodSalesData;
   title: string;
@@ -40,9 +43,31 @@ export function NightView({
   asOf: string | null;
   items: ItemMargin[];
   categories: CategoryMargin[];
+  provider?: string | null;
+  /** Set only for owner and manager; the drawer count is not for every role. */
+  tieOutDate?: string;
 }) {
   if (!data.capabilities.hasHourly || !data.daypart) {
-    return <MissingPanel title="When the money came in" capability="hasHourly" />;
+    // The tie-out needs only the Z row, not hourly data, so it stays outside this gate.
+    return (
+      <>
+        {data.night?.totalSales != null && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Sales for the night</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                The day total from the close-out report. It is a daily total, not hour by hour.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold tabular-nums">{money(data.night.totalSales)}</p>
+            </CardContent>
+          </Card>
+        )}
+        <MissingPanel title="When the money came in" capability="hasHourly" provider={provider} />
+        {tieOutDate && <TieOutCard date={tieOutDate} live={live} />}
+      </>
+    );
   }
 
   const cumulative = buildCumulative(data.daypart);
@@ -138,6 +163,8 @@ export function NightView({
           <CardContent><PaymentSplit night={data.night} /></CardContent>
         </Card>
       )}
+
+      {tieOutDate && <TieOutCard date={tieOutDate} live={live} />}
     </>
   );
 }

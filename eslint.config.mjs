@@ -12,6 +12,14 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Other full copies of this repo and tool output. Scanning them reported
+    // 42,000 problems that were not in this tree.
+    ".worktrees/**",
+    ".superpowers/**",
+    "graphify-out/**",
+    // Sibling non-app codebases (Node agent, test servers) with their own toolchains.
+    "2touch-agent/**",
+    "2touch-agent-dotnet/**",
   ]),
 ]);
 

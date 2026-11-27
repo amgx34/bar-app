@@ -1,5 +1,6 @@
 'use client';
 
+import { formatMoney } from '@/lib/money';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Check, ChevronDown, HandCoins, X } from 'lucide-react';
@@ -8,7 +9,7 @@ import { PayoutDialog } from './payout-dialog';
 import { PayEveryoneDialog } from './pay-everyone-dialog';
 import { deletePayout } from '../payout-actions';
 import {
-  PAYOUT_METHOD_LABEL, totalPaidTo,
+  PAYOUT_METHOD_LABEL, SETTLED_WITHIN, totalPaidTo,
   type BulkPayableEntry, type Payout, type PayoutSummary,
 } from '@/lib/payroll/payouts';
 
@@ -73,7 +74,7 @@ function PaymentsList({
             <span className="min-w-0 truncate text-muted-foreground">
               {shortDate(p.paidAt)} · {PAYOUT_METHOD_LABEL[p.method]} ·{' '}
               <span className="font-medium tabular-nums text-foreground">
-                ${p.amountPaid.toFixed(2)}
+                {formatMoney(p.amountPaid)}
               </span>
               {days && <span> · {days}</span>}
             </span>
@@ -82,7 +83,7 @@ function PaymentsList({
                 type="button"
                 onClick={() => remove(p.id)}
                 disabled={pending && removingId === p.id}
-                aria-label={`Remove the ${PAYOUT_METHOD_LABEL[p.method].toLowerCase()} payment of $${p.amountPaid.toFixed(2)} from ${shortDate(p.paidAt)}`}
+                aria-label={`Remove the ${PAYOUT_METHOD_LABEL[p.method].toLowerCase()} payment of ${formatMoney(p.amountPaid)} from ${shortDate(p.paidAt)}`}
                 className="shrink-0 rounded p-0.5 text-muted-foreground/70 hover:bg-muted hover:text-destructive disabled:opacity-50"
               >
                 <X className="h-3 w-3" aria-hidden />
@@ -238,12 +239,12 @@ export function PayoutProgress({ summary, bulk }: ProgressProps) {
                   already fully paid, so this figure FALLS as people are
                   settled even though more money keeps leaving the building. */}
               <span className="text-muted-foreground">advanced </span>
-              <span className="font-semibold">${summary.advancedTotal.toFixed(2)}</span>
+              <span className="font-semibold">{formatMoney(summary.advancedTotal)}</span>
               <span className="text-muted-foreground"> · </span>
             </>
           )}
           <span className="text-muted-foreground">still owed </span>
-          <span className="font-semibold">${outstanding.toFixed(2)}</span>
+          <span className="font-semibold">{formatMoney(outstanding)}</span>
         </span>
       )}
     </div>
@@ -286,8 +287,10 @@ export function PayoutCell({
 
   const paidSoFar = totalPaidTo(payouts);
   const balance = Math.max(0, amount - paidSoFar);
-  const fullyPaid = payouts.length > 0 && balance <= 0;
-  const partly = payouts.length > 0 && balance > 0;
+  // Same tolerance as the summary and the bulk planner (lib/payroll/payouts.ts):
+  // a few thousandths of float residue is not money still owed.
+  const fullyPaid = payouts.length > 0 && balance <= SETTLED_WITHIN;
+  const partly = payouts.length > 0 && balance > SETTLED_WITHIN;
 
   function undoLast() {
     const last = payouts[payouts.length - 1];
@@ -348,7 +351,7 @@ export function PayoutCell({
           type="button"
           onClick={undoLast}
           disabled={pending}
-          title={`Paid $${paidSoFar.toFixed(2)} across ${payouts.length} payment(s). Click to remove the last one.`}
+          title={`Paid ${formatMoney(paidSoFar)} across ${payouts.length} payment(s). Click to remove the last one.`}
           aria-label={`${employeeName} is paid. Undo the last payment.`}
           className={cn(
             'group inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-200 disabled:opacity-50 dark:bg-emerald-950/60 dark:text-emerald-200 dark:hover:bg-emerald-900',
@@ -379,7 +382,7 @@ export function PayoutCell({
       return (
         <div className={cn('inline-flex flex-col items-start', block && 'w-full items-center')}>
           <span className={cn('text-xs text-muted-foreground', block && 'block text-center')}>
-            ${paidSoFar.toFixed(2)} of ${amount.toFixed(2)}
+            {formatMoney(paidSoFar)} of {formatMoney(amount)}
           </span>
           <PaymentsDisclosure payouts={payouts} canAdjust={false} onChanged={onChanged} block={block} />
         </div>
@@ -390,7 +393,7 @@ export function PayoutCell({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label={`Pay ${employeeName} the remaining $${balance.toFixed(2)}`}
+          aria-label={`Pay ${employeeName} the remaining ${formatMoney(balance)}`}
           className={cn(
             'inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-200 dark:bg-amber-950/60 dark:text-amber-200 dark:hover:bg-amber-900',
             block && 'h-11 w-full justify-center text-sm',
@@ -398,7 +401,7 @@ export function PayoutCell({
         >
           <HandCoins className="h-3.5 w-3.5 shrink-0" aria-hidden />
           <span className="truncate tabular-nums">
-            ${paidSoFar.toFixed(2)} of ${amount.toFixed(2)}
+            {formatMoney(paidSoFar)} of {formatMoney(amount)}
           </span>
         </button>
         {/* This is the only way to remove a mis-recorded advance while a

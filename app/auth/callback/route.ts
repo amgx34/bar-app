@@ -1,16 +1,18 @@
 import { createClient } from '@/lib/supabase/server';
+import { authErrorCode } from '@/lib/auth/errors';
+import { safeNext } from '@/lib/auth/safe-next';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function GET(req: NextRequest) {
   const { searchParams, origin } = new URL(req.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/app/dashboard';
+  const next = safeNext(searchParams.get('next'), '/app/dashboard');
 
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
-      return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
+      return NextResponse.redirect(`${origin}/login?error=${authErrorCode(error)}`);
     }
 
     // New users with no org go through the setup wizard

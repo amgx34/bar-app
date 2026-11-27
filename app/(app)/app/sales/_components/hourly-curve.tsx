@@ -22,7 +22,7 @@ export function HourlyCurve({ daypart }: { daypart: Daypart }) {
 
   return (
     <div className="h-48 w-full sm:h-56">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 224 }}>
         <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           {/*
             preserveStartEnd + a minimum gap, not a fixed interval={2}: a fixed

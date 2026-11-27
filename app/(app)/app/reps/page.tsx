@@ -26,7 +26,7 @@ export default async function RepsPage({
 
   // Get product counts per rep
   const repIds = (repsRaw ?? []).map((r) => r.id as string);
-  let countMap: Record<string, number> = {};
+  const countMap: Record<string, number> = {};
   if (repIds.length > 0) {
     const { data: countRows } = await admin
       .from('inventory_items')

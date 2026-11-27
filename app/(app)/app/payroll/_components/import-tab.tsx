@@ -8,9 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import EmployeeShiftsUpload from './employee-shifts-upload';
 import ZReportTextUpload from './z-report-text-upload';
 import CSVUpload from './csv-upload';
-import { FileSpreadsheet, BarChart2, FileText, Flame, RefreshCw, Users, Package, Settings } from 'lucide-react';
+import { FileSpreadsheet, BarChart2, FileText, Flame, RefreshCw, Package, Settings } from 'lucide-react';
 import Link from 'next/link';
-import { syncToastSales, syncToastInventory, syncToastShifts } from '../../settings/actions';
+import { syncToastSales, syncToastInventory } from '../../settings/actions';
 
 interface ImportTabProps {
   posProvider?: 'clover' | 'toast' | '2touch' | null;
@@ -20,7 +20,6 @@ function ToastSyncPanel() {
   const [, startTransition]  = useTransition();
   const [syncingSales,   setSyncingSales]   = useState(false);
   const [syncingInv,     setSyncingInv]     = useState(false);
-  const [syncingShifts,  setSyncingShifts]  = useState(false);
 
   async function run<T>(
     setter: (v: boolean) => void,
@@ -62,9 +61,9 @@ function ToastSyncPanel() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid sm:grid-cols-3 gap-3">
+        <div className="grid sm:grid-cols-2 gap-3">
           <button
-            disabled={syncingSales || syncingInv || syncingShifts}
+            disabled={syncingSales || syncingInv}
             onClick={() => run(setSyncingSales, () => syncToastSales(14), (r) => `${(r as {upserted:number}).upserted} days of sales synced`)}
             className="flex flex-col items-start gap-2 rounded-lg border bg-card p-3 text-left hover:bg-muted/50 transition-colors disabled:opacity-50"
           >
@@ -72,11 +71,11 @@ function ToastSyncPanel() {
               <RefreshCw className={`h-4 w-4 text-orange-700 dark:text-orange-300 ${syncingSales ? 'animate-spin' : ''}`} />
               <span className="text-sm font-medium">{syncingSales ? 'Syncing…' : 'Sync Sales'}</span>
             </div>
-            <p className="text-xs text-muted-foreground">Last 14 nights of orders → Dashboard &amp; Books</p>
+            <p className="text-xs text-muted-foreground">Last 14 nights of sales, items and hours → Dashboard, Books &amp; Payroll</p>
           </button>
 
           <button
-            disabled={syncingSales || syncingInv || syncingShifts}
+            disabled={syncingSales || syncingInv}
             onClick={() => run(setSyncingInv, () => syncToastInventory(), (r) => { const res = r as {created:number;updated:number}; return `${res.created} created, ${res.updated} updated`; })}
             className="flex flex-col items-start gap-2 rounded-lg border bg-card p-3 text-left hover:bg-muted/50 transition-colors disabled:opacity-50"
           >
@@ -87,17 +86,6 @@ function ToastSyncPanel() {
             <p className="text-xs text-muted-foreground">Import Toast menu items → Inventory</p>
           </button>
 
-          <button
-            disabled={syncingSales || syncingInv || syncingShifts}
-            onClick={() => run(setSyncingShifts, () => syncToastShifts(14), (r) => { const res = r as {upserted:number;newEmployees:number}; return `${res.upserted} shifts, ${res.newEmployees} new employees`; })}
-            className="flex flex-col items-start gap-2 rounded-lg border bg-card p-3 text-left hover:bg-muted/50 transition-colors disabled:opacity-50"
-          >
-            <div className="flex items-center gap-2 w-full">
-              <Users className={`h-4 w-4 text-orange-700 dark:text-orange-300 ${syncingShifts ? 'animate-spin' : ''}`} />
-              <span className="text-sm font-medium">{syncingShifts ? 'Syncing…' : 'Sync Shifts'}</span>
-            </div>
-            <p className="text-xs text-muted-foreground">Last 14 days of labor → Payroll</p>
-          </button>
         </div>
       </CardContent>
     </Card>

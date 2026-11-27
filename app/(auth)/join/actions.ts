@@ -21,8 +21,8 @@ import { dispatch } from '@/lib/notifications/deliver';
  * read by the person who signed up until that approval happens.
  */
 
-const SENT = 'Thanks — your request has been sent to your manager for approval.';
-const BAD_CODE = 'That code was not recognised.';
+const SENT = 'Thanks, your request has been sent to your manager for approval.';
+const BAD_CODE = 'That code was not recognised. If your bar has not opened staff sign-up yet, ask your manager.';
 
 export async function claimEmployeeAccount(
   email: string,
@@ -96,7 +96,7 @@ export async function claimEmployeeAccount(
       eventType: 'staff.claim_pending',
       title:     'Someone wants a staff login',
       body:      `${typedName.trim()} signed up with the bar's join code and is waiting to be approved.`,
-      link:      '/app/employees',
+      link:      '/app/payroll/employees',
       payload:   { claimedName: typedName.trim() },
       // Keyed on the user, not the date: one person asking once is one alert,
       // and a repeated sign-up is the same ask rather than a new one.

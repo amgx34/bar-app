@@ -176,7 +176,7 @@ export function EmployeeDaysPanel({
             <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
               <th className="py-1.5 pr-3 text-left font-medium">Night</th>
               <th className="py-1.5 pr-3 text-right font-medium">Hours</th>
-              <th className="py-1.5 pr-3 text-left font-medium">Recorded by</th>
+              <th className="hidden py-1.5 pr-3 text-left font-medium sm:table-cell">Recorded by</th>
               {canAdjust && <th className="py-1.5 text-right font-medium">Set to</th>}
             </tr>
           </thead>
@@ -201,6 +201,13 @@ export function EmployeeDaysPanel({
                         opener
                       </span>
                     )}
+                    {/* Below sm the Recorded-by column is hidden so the Set-to
+                        field and its save button stay on screen. */}
+                    {row.source && (
+                      <span className="block text-[11px] text-muted-foreground sm:hidden">
+                        {row.source === 'manual' ? 'corrected by hand' : row.source === 'pos' ? 'POS' : ''}
+                      </span>
+                    )}
                   </td>
 
                   <td className="py-1.5 pr-3 text-right tabular-nums">
@@ -213,7 +220,7 @@ export function EmployeeDaysPanel({
                     )}
                   </td>
 
-                  <td className="py-1.5 pr-3 text-xs">
+                  <td className="hidden py-1.5 pr-3 text-xs sm:table-cell">
                     {row.source === 'manual' ? (
                       <span className="text-foreground">corrected by hand</span>
                     ) : row.source === 'pos' ? (
@@ -238,11 +245,12 @@ export function EmployeeDaysPanel({
                           onChange={(e) =>
                             setDrafts((prev) => ({ ...prev, [row.date]: e.target.value }))
                           }
-                          className="h-8 w-20 tabular-nums"
+                          className="h-9 w-16 tabular-nums sm:w-20"
                         />
                         <Button
                           type="button"
                           size="icon-sm"
+                          className="size-9"
                           variant={changed ? 'default' : 'outline'}
                           disabled={!changed || savingDate !== null}
                           aria-label={`Save ${row.weekday} ${fmtDate(row.date)}`}

@@ -142,9 +142,9 @@ export default function DirectDepositTab({ employees, accountsByEmployee, adminP
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5 space-y-4">
           <div className="flex items-center gap-2">
             <Phone className="h-4 w-4 text-amber-700 dark:text-amber-300" />
-            <p className="text-sm font-semibold text-amber-300">Phone number required</p>
+            <p className="text-sm font-semibold text-accent-text">Phone number required</p>
           </div>
-          <p className="text-xs text-amber-300/70 leading-relaxed">
+          <p className="text-xs text-accent-text leading-relaxed">
             A phone number is needed to receive SMS verification codes before any direct deposit change is committed.
           </p>
           <form onSubmit={handleSavePhone} className="flex gap-2">

@@ -44,3 +44,37 @@ export function applySyncOutcome(
     last_sync_summary: summary ?? null,
   };
 }
+
+/**
+ * Stores encrypted provider secrets inside pos_config. Only used while the
+ * pos_credentials table does not exist (see lib/pos/credentials.ts), and it
+ * drops the plaintext `access_token` key older Clover connections stored, in
+ * the same write.
+ */
+export function applyCredentialsEnc(cfg: PosConfig, enc: string): PosConfig {
+  const { access_token: _plaintext, ...rest } = cfg;
+  void _plaintext;
+  return { ...rest, credentials_enc: enc };
+}
+
+/**
+ * Merges non-secret provider settings (merchant id, region, timezone, cutoff,
+ * needs_reauth) over the latest config. Spreads what it is handed, so the caller
+ * must pass the config as it stands NOW, never a copy read earlier in the request.
+ */
+export function applyProviderSettings(cfg: PosConfig, patch: PosConfig): PosConfig {
+  return { ...cfg, ...patch };
+}
+
+/**
+ * The non-secret half of a Toast connection, merged over the latest config. It
+ * also drops `client_id` and `client_secret`: connections made before the
+ * encrypted credentials store kept both here in plaintext, and this column is
+ * selected into every membership row (lib/org.ts), so reconnecting must scrub
+ * them rather than leave them next to the new settings.
+ */
+export function applyToastConnection(cfg: PosConfig, settings: PosConfig): PosConfig {
+  const { client_id: _id, client_secret: _secret, ...rest } = cfg;
+  void _id; void _secret;
+  return { ...rest, ...settings };
+}

@@ -52,5 +52,14 @@ export async function getCurrentEmployee(): Promise<EmployeeSession> {
   const state = await getEmployeeAccountState();
   if (state.kind === 'active') return state.session;
   if (state.kind === 'pending') redirect('/me/pending');
-  redirect('/login');
+  return redirectStranger();
+}
+
+/**
+ * A signed-in person with no employee account (an owner, say) is not logged
+ * out, so /login would look like a sign-out. Send them to their own app, whose
+ * gate handles the no-bar case. Only a real stranger goes to /login.
+ */
+export async function redirectStranger(): Promise<never> {
+  redirect((await getAuthUser()) ? '/app' : '/login');
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatMoney } from '@/lib/money';
 import { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { getDaySplitData, computePayroll, DaySplitData, DaySplitEmployee } from '../actions';
@@ -146,7 +147,7 @@ function computeSplit(
 /** How the configured bonus reads on screen, in the operator's words. */
 function describeBonus(type: OpenerBonusConfig['type'], value: number): string {
   if (type === 'none' || !(value > 0)) return 'No opener bonus set';
-  if (type === 'fixed')      return `$${value.toFixed(2)} off the bartender pool`;
+  if (type === 'fixed')      return `${formatMoney(value)} off the bartender pool`;
   if (type === 'percentage') return `${value}% of the bartender pool`;
   return `${value} extra paid hours — paid by the bar, not from tips`;
 }
@@ -319,13 +320,18 @@ export default function DaySplitTab({
       };
     }
     return computeSplit(
-      data.employees, states, data.totalTips, data.openerBonus, data.barbackFraction,
+      // The pool is shared from what is left after individual and sales_pct staff
+      // take theirs, the same as the pay run.
+      data.employees, states, data.totalTips - data.removedTips - data.keptTips, data.openerBonus, data.barbackFraction,
       data.barbackSplitMethod, data.barbackTiers,
     );
   }, [data, states]);
 
-  const pctOfTips = (n: number) =>
-    data && data.totalTips > 0 ? `${((n / data.totalTips) * 100).toFixed(0)}% of tips` : '—';
+  // Every percentage on this screen is of the shared pool: the night's tips less
+  // removals and less what staff keep themselves. The barback cut is taken from it.
+  const poolBase = data ? data.totalTips - data.removedTips - data.keptTips : 0;
+  const pctOfPool = (n: number) =>
+    data && poolBase > 0 ? `${((n / poolBase) * 100).toFixed(0)}% of the ${formatMoney(poolBase)} shared pool` : '—';
 
   const bartenders = (data?.employees ?? []).filter((e) => e.tipRole === 'pool');
   const barbacks   = (data?.employees ?? []).filter((e) => e.tipRole === 'barback');
@@ -359,6 +365,7 @@ export default function DaySplitTab({
         </button>
         <input
           type="date"
+          aria-label="Night"
           value={date}
           onChange={(e) => e.target.value && setDate(e.target.value)}
           className="ml-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
@@ -387,15 +394,15 @@ export default function DaySplitTab({
           </div>
           <div className="rounded-xl border bg-card p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Wages</p>
-            <p className="text-2xl font-bold tabular-nums mt-1">${nightPay.wages.toFixed(2)}</p>
+            <p className="text-2xl font-bold tabular-nums mt-1">{formatMoney(nightPay.wages)}</p>
           </div>
           <div className="rounded-xl border bg-card p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Tips</p>
-            <p className="text-2xl font-bold tabular-nums mt-1">${nightPay.tips.toFixed(2)}</p>
+            <p className="text-2xl font-bold tabular-nums mt-1">{formatMoney(nightPay.tips)}</p>
           </div>
           <div className="rounded-xl border bg-primary/5 p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Night Total</p>
-            <p className="text-2xl font-bold tabular-nums mt-1 text-primary">${nightPay.total.toFixed(2)}</p>
+            <p className="text-2xl font-bold tabular-nums mt-1 text-primary">{formatMoney(nightPay.total)}</p>
           </div>
           {/* Said plainly rather than left for somebody to discover by adding
               up seven nights and finding they miss the week. */}
@@ -419,23 +426,39 @@ export default function DaySplitTab({
 
       {data && (
         <>
+          {data.overAllocated && (
+            <p role="alert" className="rounded-lg border border-amber-600/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+              Staff-kept tips for this night add up to more than the night&apos;s tips; they were scaled down. Check the per-server tips.
+            </p>
+          )}
+
           {/* Summary cards */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-xl border bg-card p-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Tips</p>
-              <p className="text-2xl font-bold tabular-nums mt-1">${data.totalTips.toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Tips (all staff)</p>
+              <p className="text-2xl font-bold tabular-nums mt-1">{formatMoney(data.totalTips)}</p>
+              {data.removedTips > 0 && (
+                <p className="text-xs text-muted-foreground tabular-nums">
+                  less {formatMoney(data.removedTips)} removed
+                </p>
+              )}
+              {data.keptTips > 0 && (
+                <p className="text-xs text-muted-foreground tabular-nums">
+                  includes {formatMoney(data.keptTips)} kept by staff on their own tips
+                </p>
+              )}
             </div>
             <div className="rounded-xl border bg-card p-4 border-l-4 border-l-emerald-600 dark:border-l-emerald-400">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Bartender Pool</p>
-              <p className="text-2xl font-bold tabular-nums mt-1 text-emerald-700 dark:text-emerald-300">${bartenderPool.toFixed(2)}</p>
-              <p className="text-xs text-muted-foreground">{pctOfTips(bartenderPool)}</p>
+              <p className="text-2xl font-bold tabular-nums mt-1 text-emerald-700 dark:text-emerald-300">{formatMoney(bartenderPool)}</p>
+              <p className="text-xs text-muted-foreground">{pctOfPool(bartenderPool)}</p>
             </div>
             <div className="rounded-xl border bg-card p-4 border-l-4 border-l-cyan-600 dark:border-l-cyan-400">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Barback Pool</p>
-              <p className="text-2xl font-bold tabular-nums mt-1 text-cyan-700 dark:text-cyan-300">${barbackPool.toFixed(2)}</p>
+              <p className="text-2xl font-bold tabular-nums mt-1 text-cyan-700 dark:text-cyan-300">{formatMoney(barbackPool)}</p>
               <p className="text-xs text-muted-foreground">
                 {barbackPool > 0
-                  ? `${(appliedFraction * 100).toFixed(0)}% of tips`
+                  ? `${(appliedFraction * 100).toFixed(0)}% of the ${formatMoney(poolBase)} shared pool`
                   : 'no barback on shift'}
               </p>
             </div>
@@ -447,17 +470,26 @@ export default function DaySplitTab({
               <p className={`text-2xl font-bold tabular-nums mt-1 ${hasOpener && (openerPool > 0 || bonusHoursEach > 0) ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}>
                 {bonusType === 'hours'
                   ? (hasOpener ? `+${bonusHoursEach} hrs` : '—')
-                  : `$${openerPool.toFixed(2)}`}
+                  : `${formatMoney(openerPool)}`}
               </p>
               <p className="text-xs text-muted-foreground">{describeBonus(bonusType, bonusValue)}</p>
             </div>
           </div>
 
+          {/* The one place the percentages are reconciled: each card's share is
+              of the shared pool, which is not the same number as all tips. */}
+          <p className="text-xs text-muted-foreground tabular-nums">
+            Shared pool {formatMoney(poolBase)} = all tips {formatMoney(data.totalTips)}
+            {data.removedTips > 0 && <>, less {formatMoney(data.removedTips)} removed</>}
+            {data.keptTips > 0 && <>, less {formatMoney(data.keptTips)} kept by staff on their own tips</>}.
+            Percentages on this screen are of the shared pool.
+          </p>
+
           {/* Bartenders table */}
           {bartenders.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Bartenders — {pctOfTips(bartenderPool)}, shared by hours
+                Bartenders — {pctOfPool(bartenderPool)}, shared by hours
               </h3>
               <div className="overflow-x-auto rounded-xl border">
                 <table className="w-full text-sm">
@@ -487,7 +519,7 @@ export default function DaySplitTab({
                                   ? `Opener +${bonusHoursEach}h`
                                   : bonusType === 'none'
                                     ? 'Opener'
-                                    : `Opener +$${(openerPool / Math.max(1, Object.keys(states).filter((k) => states[k]?.opener).length)).toFixed(2)}`}
+                                    : `Opener +${formatMoney((openerPool / Math.max(1, Object.keys(states).filter((k) => states[k]?.opener).length)))}`}
                               </span>
                             )}
                           </td>
@@ -503,7 +535,7 @@ export default function DaySplitTab({
                             />
                           </td>
                           <td className="px-3 py-3 sm:px-4 text-right tabular-nums font-semibold text-primary">
-                            {active ? `$${(shares[emp.id] ?? 0).toFixed(2)}` : '—'}
+                            {active ? `${formatMoney((shares[emp.id] ?? 0))}` : '—'}
                           </td>
                           <td className="px-3 py-3 sm:px-4 text-center">
                             <button
@@ -531,7 +563,7 @@ export default function DaySplitTab({
           {barbacks.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Barbacks — {(appliedFraction * 100).toFixed(0)}%{' '}
+                Barbacks — {(appliedFraction * 100).toFixed(0)}% of the {formatMoney(poolBase)} shared pool,{' '}
                 {data.barbackSplitMethod === 'hours' ? 'split by hours' : 'split equally'}
                 {/* Only worth saying when the cut DEPENDS on the headcount —
                     otherwise it reads as a rule that is not actually running. */}
@@ -561,7 +593,7 @@ export default function DaySplitTab({
                             <HoursCell employee={emp} canEdit={canEdit} onEdit={setEditing} />
                           </td>
                           <td className="px-3 py-3 sm:px-4 text-right tabular-nums font-semibold text-cyan-700 dark:text-cyan-300">
-                            {active ? `$${(shares[emp.id] ?? 0).toFixed(2)}` : '—'}
+                            {active ? `${formatMoney((shares[emp.id] ?? 0))}` : '—'}
                           </td>
                           <td className="px-3 py-3 sm:px-4 text-center">
                             <button
@@ -618,6 +650,9 @@ export default function DaySplitTab({
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {emp.excludedReason}
+                        {data.keptByEmployee[emp.id] > 0 && (
+                          <span className="tabular-nums"> · {formatMoney(data.keptByEmployee[emp.id])} tonight</span>
+                        )}
                       </span>
                     </span>
                   </div>
@@ -656,7 +691,7 @@ export default function DaySplitTab({
 
       {/* No tips warning */}
           {data.totalTips === 0 && (
-            <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm text-yellow-400">
+            <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm text-accent-text">
               No tip data for this date — import a Z report to see tip distributions.
             </div>
           )}

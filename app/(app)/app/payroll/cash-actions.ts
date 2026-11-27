@@ -41,6 +41,10 @@ export type NightCash = {
   cashTipsCounted: boolean;
   /** False when no Z report exists for the night yet. */
   hasZReport: boolean;
+  /** Cash a person counted in the drawer. Null: not counted, or the column is not migrated yet. */
+  countedCash: number | null;
+  /** False until the counted_cash migration is applied; the tie-out then says so. */
+  countedCashAvailable: boolean;
 };
 
 /** What is currently recorded for one night. */
@@ -48,12 +52,23 @@ export async function getNightCash(reportDate: string): Promise<NightCash> {
   const { org } = await getCurrentOrg();
   const supabase = createAdminClient();
 
-  const { data } = await supabase
+  const cols = 'report_date, cash_tips, cc_tips, total_sales, cash_sales, card_sales, cash_tips_source';
+  const fetchNight = (select: string) => supabase
     .from('z_report_days')
-    .select('report_date, cash_tips, cc_tips, total_sales, cash_sales, card_sales, cash_tips_source')
+    .select(select)
     .eq('organization_id', org.id)
     .eq('report_date', reportDate)
     .maybeSingle();
+
+  // counted_cash arrives with a migration; until it is applied the first query
+  // errors, and the screen must still load without it.
+  let countedCashAvailable = true;
+  let res = await fetchNight(`${cols}, counted_cash`);
+  if (res.error) {
+    countedCashAvailable = false;
+    res = await fetchNight(cols);
+  }
+  const data = res.data as unknown as Record<string, number | string | null> | null;
 
   return {
     reportDate,
@@ -65,6 +80,8 @@ export async function getNightCash(reportDate: string): Promise<NightCash> {
     cardSales: data?.card_sales == null ? null : Number(data.card_sales),
     cashTipsCounted: data?.cash_tips_source === 'manual',
     hasZReport: Boolean(data),
+    countedCash: data?.counted_cash == null ? null : Number(data.counted_cash),
+    countedCashAvailable,
   };
 }
 
@@ -136,5 +153,51 @@ export async function logCashTips(raw: unknown): Promise<NightCash> {
   revalidatePath('/app/books');
   revalidatePath('/app/dashboard');
 
+  return getNightCash(input.reportDate);
+}
+
+const countedCashSchema = z.object({
+  reportDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD'),
+  // null clears a count entered by mistake.
+  countedCash: z.number().min(0, 'Cannot be negative').max(1000000).nullable(),
+});
+
+/**
+ * Sets the cash counted in the drawer for a night. Touches only counted_cash:
+ * cash_tips and its 'manual' source belong to the tips entry above, and the POS
+ * columns belong to the POS. Needs the night's Z row to exist, since a gap
+ * against no sales figure would mean nothing.
+ */
+export async function logCountedCash(raw: unknown): Promise<NightCash> {
+  const { org, role } = await getCurrentOrg();
+  if (!canManagePayroll(role)) throw new Error('Not authorized');
+
+  const input = countedCashSchema.parse(raw);
+  const supabase = createAdminClient();
+
+  const { data: existing } = await supabase
+    .from('z_report_days')
+    .select('id')
+    .eq('organization_id', org.id)
+    .eq('report_date', input.reportDate)
+    .maybeSingle();
+  if (!existing) throw new Error('The POS has not sent this night yet, so there is nothing to count against');
+
+  // admin-scope-ok: fetched above with .eq('organization_id', org.id), so this
+  // id is always in-org.
+  const { error } = await supabase
+    .from('z_report_days')
+    .update({
+      counted_cash: input.countedCash === null ? null : Math.round(input.countedCash * 100) / 100,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', existing.id);
+  if (error) {
+    throw new Error(/counted_cash/.test(error.message)
+      ? 'Counting the drawer is not switched on for this bar yet'
+      : `Could not save that count: ${error.message}`);
+  }
+
+  revalidatePath('/app/sales');
   return getNightCash(input.reportDate);
 }

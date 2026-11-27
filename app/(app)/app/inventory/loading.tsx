@@ -2,7 +2,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function InventoryLoading() {
   return (
-    <main className="p-6 space-y-4">
+    <div className="p-6 space-y-4">
       {/* Header controls */}
       <div className="flex items-center gap-3 pb-2">
         <Skeleton className="h-9 flex-1 max-w-xs" />
@@ -32,6 +32,6 @@ export default function InventoryLoading() {
           </div>
         ))}
       </div>
-    </main>
+    </div>
   );
 }

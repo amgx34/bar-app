@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/card';
 
 const FIELD =
-  'bg-white/10 border-white/20 text-white placeholder:text-white/30 focus-visible:ring-white/30';
+  'bg-white/10 border-white/20 text-white placeholder:text-white/60 focus-visible:ring-white/30';
 
 /**
  * Staff sign-up.

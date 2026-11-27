@@ -30,7 +30,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
           <form action={signOut}>
             <button
               type="submit"
-              className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-3 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
             >
               Sign out
             </button>

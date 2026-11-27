@@ -6,7 +6,26 @@ import { Select as SelectPrimitive } from "@base-ui/react/select"
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
-const Select = SelectPrimitive.Root
+const SelectLabelContext = React.createContext<string | undefined>(undefined)
+
+// `label` names the control for assistive tech: Base UI's hidden form input and
+// the trigger both read it, since neither is reached by a visible <Label>.
+function Select<Value, Multiple extends boolean | undefined = false>({
+  label,
+  ...props
+}: SelectPrimitive.Root.Props<Value, Multiple> & { label?: string }) {
+  const setLabel = React.useCallback(
+    (el: HTMLInputElement | null) => {
+      if (el && label) el.setAttribute("aria-label", label)
+    },
+    [label]
+  )
+  return (
+    <SelectLabelContext.Provider value={label}>
+      <SelectPrimitive.Root<Value, Multiple> inputRef={setLabel} {...props} />
+    </SelectLabelContext.Provider>
+  )
+}
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (
@@ -36,8 +55,10 @@ function SelectTrigger({
 }: SelectPrimitive.Trigger.Props & {
   size?: "sm" | "default"
 }) {
+  const label = React.useContext(SelectLabelContext)
   return (
     <SelectPrimitive.Trigger
+      aria-label={label}
       data-slot="select-trigger"
       data-size={size}
       className={cn(

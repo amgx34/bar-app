@@ -10,6 +10,7 @@
  *   - Audit log entry written for every export
  */
 
+import { validateRoutingNumber } from '@/lib/direct-deposit/routing';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient }              from '@/lib/supabase/server';
 import { createAdminClient }         from '@/lib/supabase/admin';
@@ -54,6 +55,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       error: 'NACHA not configured',
       detail: 'Add your bank routing number and company EIN in Settings → General → Payroll & ACH.',
+    }, { status: 422 });
+  }
+
+  // Defence in depth: a value saved before routing numbers were validated.
+  if (!validateRoutingNumber(odfiRouting)) {
+    return NextResponse.json({
+      error: 'NACHA not configured',
+      detail: 'The bank routing number in Settings → General → Payroll & ACH is not a valid 9-digit routing number. Correct it before exporting.',
     }, { status: 422 });
   }
 

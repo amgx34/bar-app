@@ -87,6 +87,7 @@ export default function ZReportTextUpload() {
       {state === 'idle' && (
         <>
           <Textarea
+            aria-label="Z report text"
             placeholder={"Paste your full Z report text here…\n\nAny POS format is supported — text is parsed automatically, with AI as fallback."}
             className="min-h-[180px] font-mono text-xs resize-none"
             value={text}

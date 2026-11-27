@@ -1,4 +1,5 @@
-import { CheckCircle2, AlertTriangle, CloudOff, Clock } from 'lucide-react';
+import Link from 'next/link';
+import { CheckCircle2, AlertTriangle, CloudOff, Clock, KeyRound } from 'lucide-react';
 import type { SyncHealth, SyncStatus } from '@/lib/pos/sync-health';
 
 /**
@@ -10,7 +11,7 @@ import type { SyncHealth, SyncStatus } from '@/lib/pos/sync-health';
  * already recorded enough to catch that early and nothing displayed it. This is
  * that display.
  *
- * Rendered only when there is an agent to have an opinion about — a Clover bar
+ * Rendered only when there is a connected POS to have an opinion about — a Clover bar
  * seeing a permanent "never synced" would teach everyone to ignore the strip.
  */
 
@@ -51,6 +52,12 @@ const STYLES: Record<Exclude<SyncStatus, 'not-configured'>, {
     wrap: 'border-amber-500/40 bg-amber-500/5',
     dot: 'text-amber-600 dark:text-amber-400',
     label: 'No recent data',
+  },
+  'needs-reauth': {
+    icon: KeyRound,
+    wrap: 'border-amber-500/40 bg-amber-500/5',
+    dot: 'text-amber-600 dark:text-amber-400',
+    label: 'Reconnect your POS',
   },
   down: {
     icon: CloudOff,
@@ -103,6 +110,15 @@ export function SyncStatusStrip({ health }: { health: SyncHealth }) {
           <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
             {health.message}
           </p>
+
+          {(health.status === 'needs-reauth' || health.status === 'stale' || health.status === 'down') && (
+            <Link
+              href="/app/settings?tab=pos"
+              className="mt-2 inline-flex min-h-11 items-center text-xs font-medium text-primary underline underline-offset-2 sm:min-h-0"
+            >
+              {health.status === 'needs-reauth' ? 'Reconnect in Settings' : 'Open POS settings'}
+            </Link>
+          )}
 
           {counts && (
             <p className="mt-1 text-xs tabular-nums text-muted-foreground">

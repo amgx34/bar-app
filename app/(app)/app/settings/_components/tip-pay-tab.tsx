@@ -187,7 +187,7 @@ export function TipPayTab({ role, settings }: Props) {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label>Bonus Type</Label>
-            <Select value={form.opener_bonus_type}
+            <Select label="Opener bonus type" value={form.opener_bonus_type}
               onValueChange={(v) => setForm({ ...form, opener_bonus_type: v as typeof form.opener_bonus_type })}
               disabled={!canEdit}>
               <SelectTrigger>

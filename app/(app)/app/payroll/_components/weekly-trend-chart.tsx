@@ -7,6 +7,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from 'recharts';
 
@@ -17,13 +18,12 @@ interface Props {
 }
 
 function fmtDollar(v: number) {
-  if (v >= 1000) return `$${(v / 1000).toFixed(1)}k`;
-  return `$${v.toFixed(0)}`;
+  return `$${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 }
 
 export default function WeeklyTrendChart({ data }: Props) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 224 }}>
       <ComposedChart data={data} margin={{ top: 4, right: 16, left: -10, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
         <XAxis
@@ -50,6 +50,7 @@ export default function WeeklyTrendChart({ data }: Props) {
             name,
           ]}
         />
+        <Legend iconType="square" wrapperStyle={{ fontSize: 12 }} />
         <Bar dataKey="sales" name="Sales" fill="#10b981" radius={[3, 3, 0, 0]} maxBarSize={40} />
         <Bar dataKey="tips" name="Tips" fill="#22d3ee" radius={[3, 3, 0, 0]} maxBarSize={40} />
       </ComposedChart>

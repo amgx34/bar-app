@@ -64,7 +64,7 @@ export default function AnalyticsTab({
               <div className="flex items-center gap-3 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-4 cursor-pointer hover:bg-yellow-500/15 transition-colors">
                 <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-yellow-400">
+                  <p className="text-sm font-semibold text-accent-text">
                     {flaggedCount} bartender{flaggedCount > 1 ? 's' : ''} flagged for unusual tip %
                   </p>
                   <p className="text-xs text-yellow-500/80 mt-0.5">

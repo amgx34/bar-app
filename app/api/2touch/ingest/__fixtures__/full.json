@@ -1,0 +1,27 @@
+{
+  "org_id": "org-1",
+  "source": "rail-2touch-agent/1.4.0",
+  "pulledAt": "2026-11-21T05:00:00Z",
+  "zReports": [
+    { "report_date": "2026-11-20", "total_sales": 4521.505, "cc_tips": 612.1, "cash_tips": 0, "cash_sales": 1200.25, "card_sales": 3321.26 },
+    { "report_date": "2026-11-21", "total_sales": 100, "cc_tips": 10, "cash_tips": 5 }
+  ],
+  "ewReports": [
+    { "shift_date": "2026-11-20", "employee_name": "Alice", "total_sales": 900, "tips_paid_out": 0, "regular_hours": 8, "overtime_hours": 1.5 },
+    { "shift_date": "2026-11-20", "employee_name": "  Bob ", "total_sales": 700.5, "tips_paid_out": 20, "regular_hours": 6, "overtime_hours": 0 }
+  ],
+  "itemAudit": [
+    { "sale_date": "2026-11-20", "item_name": "DBL TITO'S", "category_name": "Spirits", "qty_sold": 10, "net_sales": 120 },
+    { "sale_date": "2026-11-20", "item_name": "Bud Light", "category_name": "Beer", "qty_sold": 30, "net_sales": 150 },
+    { "sale_date": "2026-11-20", "item_name": "Bucket of 5", "category_name": "Deals", "qty_sold": 2, "net_sales": 30 },
+    { "sale_date": "2026-11-20", "item_name": "Happy  Hour Deal", "category_name": "Deals", "qty_sold": 4, "net_sales": 20 }
+  ],
+  "hourlySales": [
+    { "business_date": "2026-11-20", "hour": 21, "net_sales": 800, "ticket_count": 40, "tips": 90 },
+    { "business_date": "2026-11-20", "hour": 22, "net_sales": 900, "ticket_count": 45, "tips": 100 }
+  ],
+  "serverSales": [
+    { "business_date": "2026-11-20", "server_name": "Alice", "net_sales": 900, "ticket_count": 50, "tips": 120 }
+  ],
+  "agentErrors": ["items feed: bad mapping"]
+}

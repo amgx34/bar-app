@@ -1,6 +1,6 @@
 import { Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { CAPABILITY_HELP, type SalesCapabilities } from '@/lib/pos/sales-capabilities';
+import { capabilityHelp, type SalesCapabilities } from '@/lib/pos/sales-capabilities';
 
 /**
  * What stands in for a panel this bar's data cannot support.
@@ -12,9 +12,11 @@ import { CAPABILITY_HELP, type SalesCapabilities } from '@/lib/pos/sales-capabil
 export function MissingPanel({
   title,
   capability,
+  provider,
 }: {
   title: string;
   capability: keyof SalesCapabilities;
+  provider?: string | null;
 }) {
   return (
     <Card>
@@ -22,7 +24,7 @@ export function MissingPanel({
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
         <div className="min-w-0">
           <p className="text-sm font-medium">{title}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{CAPABILITY_HELP[capability]}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{capabilityHelp(capability, provider)}</p>
         </div>
       </CardContent>
     </Card>

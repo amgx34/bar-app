@@ -1,0 +1,2600 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`2touch ingest, full payload > writes every feed in a fixed order > calls 1`] = `
+[
+  {
+    "columns": "id, pos_provider, pos_config, bar_settings",
+    "filters": [
+      "eq id="org-1"",
+      "eq pos_provider="2touch"",
+    ],
+    "op": "select",
+    "single": true,
+    "table": "organizations",
+  },
+  {
+    "filters": [
+      "eq id="org-1"",
+    ],
+    "op": "update",
+    "payload": {
+      "pos_config": {
+        "agent_seen_at": "2026-11-21T12:00:00.000Z",
+        "agent_token": "org-token",
+        "agent_version": "1.4.0",
+        "keep_me": true,
+      },
+    },
+    "single": false,
+    "table": "organizations",
+  },
+  {
+    "columns": "report_date, cash_tips, cash_tips_source",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq cash_tips_source="manual"",
+      "in report_date=["2026-11-20","2026-11-21"]",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "z_report_days",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,report_date",
+    },
+    "payload": [
+      {
+        "card_sales": 3321.26,
+        "cash_sales": 1200.25,
+        "cash_tips": 0,
+        "cash_tips_source": "pos",
+        "cc_tips": 612.1,
+        "organization_id": "org-1",
+        "report_date": "2026-11-20",
+        "total_sales": 4521.51,
+      },
+      {
+        "card_sales": null,
+        "cash_sales": null,
+        "cash_tips": 5,
+        "cash_tips_source": "pos",
+        "cc_tips": 10,
+        "organization_id": "org-1",
+        "report_date": "2026-11-21",
+        "total_sales": 100,
+      },
+    ],
+    "single": false,
+    "table": "z_report_days",
+  },
+  {
+    "columns": "id, name",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "employees",
+  },
+  {
+    "filters": [],
+    "op": "insert",
+    "payload": [
+      {
+        "name": "Bob",
+        "organization_id": "org-1",
+        "tip_mode": "pool",
+      },
+    ],
+    "returning": "id, name",
+    "single": false,
+    "table": "employees",
+  },
+  {
+    "columns": "employee_id, shift_date",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq hours_source="manual"",
+      "in shift_date=["2026-11-20"]",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "employee_shifts",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,employee_id,shift_date",
+    },
+    "payload": [
+      {
+        "employee_id": "e-alice",
+        "organization_id": "org-1",
+        "overtime_hours": 1.5,
+        "regular_hours": 8,
+        "shift_date": "2026-11-20",
+      },
+      {
+        "employee_id": "e-bob",
+        "organization_id": "org-1",
+        "overtime_hours": 0,
+        "regular_hours": 6,
+        "shift_date": "2026-11-20",
+      },
+    ],
+    "single": false,
+    "table": "employee_shifts",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,report_date,employee_name",
+    },
+    "payload": [
+      {
+        "employee_name": "Bob",
+        "organization_id": "org-1",
+        "report_date": "2026-11-20",
+        "tips_paid_out": 20,
+        "total_sales": 700.5,
+      },
+    ],
+    "single": false,
+    "table": "z_report_server_tips",
+  },
+  {
+    "columns": "match_key",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_excluded_items",
+  },
+  {
+    "columns": "id, match_key, pos_bundle_components(inventory_item_id, quantity, unit)",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq is_active=true",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_bundles",
+  },
+  {
+    "columns": "token, multiplier, label, mixer",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_size_tokens",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,name",
+    },
+    "payload": [
+      {
+        "name": "Spirits",
+        "organization_id": "org-1",
+      },
+      {
+        "name": "Beer",
+        "organization_id": "org-1",
+      },
+    ],
+    "returning": "id, name",
+    "single": false,
+    "table": "inventory_categories",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "ignoreDuplicates": true,
+      "onConflict": "organization_id,name",
+    },
+    "payload": [
+      {
+        "category_id": "c-spirits",
+        "is_active": true,
+        "name": "TITO'S",
+        "organization_id": "org-1",
+        "unit": "each",
+      },
+      {
+        "category_id": "c-beer",
+        "is_active": true,
+        "name": "Bud Light",
+        "organization_id": "org-1",
+        "unit": "each",
+      },
+    ],
+    "single": false,
+    "table": "inventory_items",
+  },
+  {
+    "columns": "id, name, bottle_size_ml, pour_size_oz, inventory_categories(default_pour_oz)",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "inventory_items",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,sale_date,match_key",
+    },
+    "payload": [
+      {
+        "base_match_key": "tito's",
+        "category_name": "Spirits",
+        "is_bundle": false,
+        "item_name": "DBL TITO'S",
+        "match_key": "dbl tito's",
+        "net_sales": 120,
+        "organization_id": "org-1",
+        "qty_sold": 10,
+        "sale_date": "2026-11-20",
+        "size_token": "dbl",
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "base_match_key": "bud light",
+        "category_name": "Beer",
+        "is_bundle": false,
+        "item_name": "Bud Light",
+        "match_key": "bud light",
+        "net_sales": 150,
+        "organization_id": "org-1",
+        "qty_sold": 30,
+        "sale_date": "2026-11-20",
+        "size_token": null,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "base_match_key": "bucket of 5",
+        "category_name": "Deals",
+        "is_bundle": true,
+        "item_name": "Bucket of 5",
+        "match_key": "bucket of 5",
+        "net_sales": 30,
+        "organization_id": "org-1",
+        "qty_sold": 2,
+        "sale_date": "2026-11-20",
+        "size_token": null,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_item_sales",
+  },
+  {
+    "args": {
+      "p_components": [
+        {
+          "item_id": "i-titos",
+          "qty": 1.1829,
+        },
+        {
+          "item_id": "i-bud",
+          "qty": 40,
+        },
+      ],
+      "p_org": "org-1",
+      "p_sale_date": "2026-11-20",
+    },
+    "rpc": "pos_apply_item_sales",
+  },
+  {
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq business_date="2026-11-20"",
+    ],
+    "op": "delete",
+    "payload": undefined,
+    "single": false,
+    "table": "pos_hourly_sales",
+  },
+  {
+    "filters": [],
+    "op": "insert",
+    "payload": [
+      {
+        "business_date": "2026-11-20",
+        "hour": 21,
+        "net_sales": 800,
+        "organization_id": "org-1",
+        "ticket_count": 40,
+        "tips": 90,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "business_date": "2026-11-20",
+        "hour": 22,
+        "net_sales": 900,
+        "organization_id": "org-1",
+        "ticket_count": 45,
+        "tips": 100,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_hourly_sales",
+  },
+  {
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq business_date="2026-11-20"",
+    ],
+    "op": "delete",
+    "payload": undefined,
+    "single": false,
+    "table": "pos_server_sales",
+  },
+  {
+    "filters": [],
+    "op": "insert",
+    "payload": [
+      {
+        "business_date": "2026-11-20",
+        "net_sales": 900,
+        "organization_id": "org-1",
+        "server_name": "Alice",
+        "ticket_count": 50,
+        "tips": 120,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_server_sales",
+  },
+  {
+    "filters": [
+      "eq id="org-1"",
+    ],
+    "op": "update",
+    "payload": {
+      "pos_config": {
+        "agent_seen_at": "2026-11-21T12:00:00.000Z",
+        "agent_token": "org-token",
+        "agent_version": "1.4.0",
+        "keep_me": true,
+        "last_sync_at": "2026-11-21T12:00:00.000Z",
+        "last_sync_errors": [
+          "agent: items feed: bad mapping",
+        ],
+        "last_sync_summary": {
+          "ewReports": 2,
+          "hoursRecorded": 2,
+          "itemAudit": 2,
+          "serversRecorded": 1,
+          "shiftsProtected": 0,
+          "stockMoved": 1,
+          "unresolvedItems": 0,
+          "zReports": 2,
+        },
+      },
+    },
+    "single": false,
+    "table": "organizations",
+  },
+]
+`;
+
+exports[`2touch ingest, full payload > writes every feed in a fixed order > response 1`] = `
+{
+  "bundlesExpanded": 1,
+  "errors": [
+    "agent: items feed: bad mapping",
+  ],
+  "ewReports": 2,
+  "hoursRecorded": 2,
+  "itemAudit": 2,
+  "itemAuditSkipped": 1,
+  "salesRecorded": 3,
+  "serversRecorded": 1,
+  "shiftsProtected": 0,
+  "stockMoved": 1,
+  "unresolvedItems": 0,
+  "zReports": 2,
+}
+`;
+
+exports[`2touch ingest, guards > manual cash tips freeze the figure and the source > calls 1`] = `
+[
+  {
+    "columns": "id, pos_provider, pos_config, bar_settings",
+    "filters": [
+      "eq id="org-1"",
+      "eq pos_provider="2touch"",
+    ],
+    "op": "select",
+    "single": true,
+    "table": "organizations",
+  },
+  {
+    "filters": [
+      "eq id="org-1"",
+    ],
+    "op": "update",
+    "payload": {
+      "pos_config": {
+        "agent_seen_at": "2026-11-21T12:00:00.000Z",
+        "agent_token": "org-token",
+        "agent_version": "1.4.0",
+        "keep_me": true,
+      },
+    },
+    "single": false,
+    "table": "organizations",
+  },
+  {
+    "columns": "report_date, cash_tips, cash_tips_source",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq cash_tips_source="manual"",
+      "in report_date=["2026-11-20","2026-11-21"]",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "z_report_days",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,report_date",
+    },
+    "payload": [
+      {
+        "card_sales": 3321.26,
+        "cash_sales": 1200.25,
+        "cash_tips": 55,
+        "cash_tips_source": "manual",
+        "cc_tips": 612.1,
+        "organization_id": "org-1",
+        "report_date": "2026-11-20",
+        "total_sales": 4521.51,
+      },
+      {
+        "card_sales": null,
+        "cash_sales": null,
+        "cash_tips": 5,
+        "cash_tips_source": "pos",
+        "cc_tips": 10,
+        "organization_id": "org-1",
+        "report_date": "2026-11-21",
+        "total_sales": 100,
+      },
+    ],
+    "single": false,
+    "table": "z_report_days",
+  },
+  {
+    "columns": "id, name",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "employees",
+  },
+  {
+    "filters": [],
+    "op": "insert",
+    "payload": [
+      {
+        "name": "Bob",
+        "organization_id": "org-1",
+        "tip_mode": "pool",
+      },
+    ],
+    "returning": "id, name",
+    "single": false,
+    "table": "employees",
+  },
+  {
+    "columns": "employee_id, shift_date",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq hours_source="manual"",
+      "in shift_date=["2026-11-20"]",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "employee_shifts",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,employee_id,shift_date",
+    },
+    "payload": [
+      {
+        "employee_id": "e-alice",
+        "organization_id": "org-1",
+        "overtime_hours": 1.5,
+        "regular_hours": 8,
+        "shift_date": "2026-11-20",
+      },
+      {
+        "employee_id": "e-bob",
+        "organization_id": "org-1",
+        "overtime_hours": 0,
+        "regular_hours": 6,
+        "shift_date": "2026-11-20",
+      },
+    ],
+    "single": false,
+    "table": "employee_shifts",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,report_date,employee_name",
+    },
+    "payload": [
+      {
+        "employee_name": "Bob",
+        "organization_id": "org-1",
+        "report_date": "2026-11-20",
+        "tips_paid_out": 20,
+        "total_sales": 700.5,
+      },
+    ],
+    "single": false,
+    "table": "z_report_server_tips",
+  },
+  {
+    "columns": "match_key",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_excluded_items",
+  },
+  {
+    "columns": "id, match_key, pos_bundle_components(inventory_item_id, quantity, unit)",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq is_active=true",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_bundles",
+  },
+  {
+    "columns": "token, multiplier, label, mixer",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_size_tokens",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,name",
+    },
+    "payload": [
+      {
+        "name": "Spirits",
+        "organization_id": "org-1",
+      },
+      {
+        "name": "Beer",
+        "organization_id": "org-1",
+      },
+    ],
+    "returning": "id, name",
+    "single": false,
+    "table": "inventory_categories",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "ignoreDuplicates": true,
+      "onConflict": "organization_id,name",
+    },
+    "payload": [
+      {
+        "category_id": "c-spirits",
+        "is_active": true,
+        "name": "TITO'S",
+        "organization_id": "org-1",
+        "unit": "each",
+      },
+      {
+        "category_id": "c-beer",
+        "is_active": true,
+        "name": "Bud Light",
+        "organization_id": "org-1",
+        "unit": "each",
+      },
+    ],
+    "single": false,
+    "table": "inventory_items",
+  },
+  {
+    "columns": "id, name, bottle_size_ml, pour_size_oz, inventory_categories(default_pour_oz)",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "inventory_items",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,sale_date,match_key",
+    },
+    "payload": [
+      {
+        "base_match_key": "tito's",
+        "category_name": "Spirits",
+        "is_bundle": false,
+        "item_name": "DBL TITO'S",
+        "match_key": "dbl tito's",
+        "net_sales": 120,
+        "organization_id": "org-1",
+        "qty_sold": 10,
+        "sale_date": "2026-11-20",
+        "size_token": "dbl",
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "base_match_key": "bud light",
+        "category_name": "Beer",
+        "is_bundle": false,
+        "item_name": "Bud Light",
+        "match_key": "bud light",
+        "net_sales": 150,
+        "organization_id": "org-1",
+        "qty_sold": 30,
+        "sale_date": "2026-11-20",
+        "size_token": null,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "base_match_key": "bucket of 5",
+        "category_name": "Deals",
+        "is_bundle": true,
+        "item_name": "Bucket of 5",
+        "match_key": "bucket of 5",
+        "net_sales": 30,
+        "organization_id": "org-1",
+        "qty_sold": 2,
+        "sale_date": "2026-11-20",
+        "size_token": null,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_item_sales",
+  },
+  {
+    "args": {
+      "p_components": [
+        {
+          "item_id": "i-titos",
+          "qty": 1.1829,
+        },
+        {
+          "item_id": "i-bud",
+          "qty": 40,
+        },
+      ],
+      "p_org": "org-1",
+      "p_sale_date": "2026-11-20",
+    },
+    "rpc": "pos_apply_item_sales",
+  },
+  {
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq business_date="2026-11-20"",
+    ],
+    "op": "delete",
+    "payload": undefined,
+    "single": false,
+    "table": "pos_hourly_sales",
+  },
+  {
+    "filters": [],
+    "op": "insert",
+    "payload": [
+      {
+        "business_date": "2026-11-20",
+        "hour": 21,
+        "net_sales": 800,
+        "organization_id": "org-1",
+        "ticket_count": 40,
+        "tips": 90,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "business_date": "2026-11-20",
+        "hour": 22,
+        "net_sales": 900,
+        "organization_id": "org-1",
+        "ticket_count": 45,
+        "tips": 100,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_hourly_sales",
+  },
+  {
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq business_date="2026-11-20"",
+    ],
+    "op": "delete",
+    "payload": undefined,
+    "single": false,
+    "table": "pos_server_sales",
+  },
+  {
+    "filters": [],
+    "op": "insert",
+    "payload": [
+      {
+        "business_date": "2026-11-20",
+        "net_sales": 900,
+        "organization_id": "org-1",
+        "server_name": "Alice",
+        "ticket_count": 50,
+        "tips": 120,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_server_sales",
+  },
+  {
+    "filters": [
+      "eq id="org-1"",
+    ],
+    "op": "update",
+    "payload": {
+      "pos_config": {
+        "agent_seen_at": "2026-11-21T12:00:00.000Z",
+        "agent_token": "org-token",
+        "agent_version": "1.4.0",
+        "keep_me": true,
+        "last_sync_at": "2026-11-21T12:00:00.000Z",
+        "last_sync_errors": [
+          "agent: items feed: bad mapping",
+        ],
+        "last_sync_summary": {
+          "ewReports": 2,
+          "hoursRecorded": 2,
+          "itemAudit": 2,
+          "serversRecorded": 1,
+          "shiftsProtected": 0,
+          "stockMoved": 1,
+          "unresolvedItems": 0,
+          "zReports": 2,
+        },
+      },
+    },
+    "single": false,
+    "table": "organizations",
+  },
+]
+`;
+
+exports[`2touch ingest, guards > manual hours are skipped and counted as protected > calls 1`] = `
+[
+  {
+    "columns": "id, pos_provider, pos_config, bar_settings",
+    "filters": [
+      "eq id="org-1"",
+      "eq pos_provider="2touch"",
+    ],
+    "op": "select",
+    "single": true,
+    "table": "organizations",
+  },
+  {
+    "filters": [
+      "eq id="org-1"",
+    ],
+    "op": "update",
+    "payload": {
+      "pos_config": {
+        "agent_seen_at": "2026-11-21T12:00:00.000Z",
+        "agent_token": "org-token",
+        "agent_version": "1.4.0",
+        "keep_me": true,
+      },
+    },
+    "single": false,
+    "table": "organizations",
+  },
+  {
+    "columns": "report_date, cash_tips, cash_tips_source",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq cash_tips_source="manual"",
+      "in report_date=["2026-11-20","2026-11-21"]",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "z_report_days",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,report_date",
+    },
+    "payload": [
+      {
+        "card_sales": 3321.26,
+        "cash_sales": 1200.25,
+        "cash_tips": 0,
+        "cash_tips_source": "pos",
+        "cc_tips": 612.1,
+        "organization_id": "org-1",
+        "report_date": "2026-11-20",
+        "total_sales": 4521.51,
+      },
+      {
+        "card_sales": null,
+        "cash_sales": null,
+        "cash_tips": 5,
+        "cash_tips_source": "pos",
+        "cc_tips": 10,
+        "organization_id": "org-1",
+        "report_date": "2026-11-21",
+        "total_sales": 100,
+      },
+    ],
+    "single": false,
+    "table": "z_report_days",
+  },
+  {
+    "columns": "id, name",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "employees",
+  },
+  {
+    "filters": [],
+    "op": "insert",
+    "payload": [
+      {
+        "name": "Bob",
+        "organization_id": "org-1",
+        "tip_mode": "pool",
+      },
+    ],
+    "returning": "id, name",
+    "single": false,
+    "table": "employees",
+  },
+  {
+    "columns": "employee_id, shift_date",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq hours_source="manual"",
+      "in shift_date=["2026-11-20"]",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "employee_shifts",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,employee_id,shift_date",
+    },
+    "payload": [
+      {
+        "employee_id": "e-bob",
+        "organization_id": "org-1",
+        "overtime_hours": 0,
+        "regular_hours": 6,
+        "shift_date": "2026-11-20",
+      },
+    ],
+    "single": false,
+    "table": "employee_shifts",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,report_date,employee_name",
+    },
+    "payload": [
+      {
+        "employee_name": "Bob",
+        "organization_id": "org-1",
+        "report_date": "2026-11-20",
+        "tips_paid_out": 20,
+        "total_sales": 700.5,
+      },
+    ],
+    "single": false,
+    "table": "z_report_server_tips",
+  },
+  {
+    "columns": "match_key",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_excluded_items",
+  },
+  {
+    "columns": "id, match_key, pos_bundle_components(inventory_item_id, quantity, unit)",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq is_active=true",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_bundles",
+  },
+  {
+    "columns": "token, multiplier, label, mixer",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_size_tokens",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,name",
+    },
+    "payload": [
+      {
+        "name": "Spirits",
+        "organization_id": "org-1",
+      },
+      {
+        "name": "Beer",
+        "organization_id": "org-1",
+      },
+    ],
+    "returning": "id, name",
+    "single": false,
+    "table": "inventory_categories",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "ignoreDuplicates": true,
+      "onConflict": "organization_id,name",
+    },
+    "payload": [
+      {
+        "category_id": "c-spirits",
+        "is_active": true,
+        "name": "TITO'S",
+        "organization_id": "org-1",
+        "unit": "each",
+      },
+      {
+        "category_id": "c-beer",
+        "is_active": true,
+        "name": "Bud Light",
+        "organization_id": "org-1",
+        "unit": "each",
+      },
+    ],
+    "single": false,
+    "table": "inventory_items",
+  },
+  {
+    "columns": "id, name, bottle_size_ml, pour_size_oz, inventory_categories(default_pour_oz)",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "inventory_items",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,sale_date,match_key",
+    },
+    "payload": [
+      {
+        "base_match_key": "tito's",
+        "category_name": "Spirits",
+        "is_bundle": false,
+        "item_name": "DBL TITO'S",
+        "match_key": "dbl tito's",
+        "net_sales": 120,
+        "organization_id": "org-1",
+        "qty_sold": 10,
+        "sale_date": "2026-11-20",
+        "size_token": "dbl",
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "base_match_key": "bud light",
+        "category_name": "Beer",
+        "is_bundle": false,
+        "item_name": "Bud Light",
+        "match_key": "bud light",
+        "net_sales": 150,
+        "organization_id": "org-1",
+        "qty_sold": 30,
+        "sale_date": "2026-11-20",
+        "size_token": null,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "base_match_key": "bucket of 5",
+        "category_name": "Deals",
+        "is_bundle": true,
+        "item_name": "Bucket of 5",
+        "match_key": "bucket of 5",
+        "net_sales": 30,
+        "organization_id": "org-1",
+        "qty_sold": 2,
+        "sale_date": "2026-11-20",
+        "size_token": null,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_item_sales",
+  },
+  {
+    "args": {
+      "p_components": [
+        {
+          "item_id": "i-titos",
+          "qty": 1.1829,
+        },
+        {
+          "item_id": "i-bud",
+          "qty": 40,
+        },
+      ],
+      "p_org": "org-1",
+      "p_sale_date": "2026-11-20",
+    },
+    "rpc": "pos_apply_item_sales",
+  },
+  {
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq business_date="2026-11-20"",
+    ],
+    "op": "delete",
+    "payload": undefined,
+    "single": false,
+    "table": "pos_hourly_sales",
+  },
+  {
+    "filters": [],
+    "op": "insert",
+    "payload": [
+      {
+        "business_date": "2026-11-20",
+        "hour": 21,
+        "net_sales": 800,
+        "organization_id": "org-1",
+        "ticket_count": 40,
+        "tips": 90,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "business_date": "2026-11-20",
+        "hour": 22,
+        "net_sales": 900,
+        "organization_id": "org-1",
+        "ticket_count": 45,
+        "tips": 100,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_hourly_sales",
+  },
+  {
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq business_date="2026-11-20"",
+    ],
+    "op": "delete",
+    "payload": undefined,
+    "single": false,
+    "table": "pos_server_sales",
+  },
+  {
+    "filters": [],
+    "op": "insert",
+    "payload": [
+      {
+        "business_date": "2026-11-20",
+        "net_sales": 900,
+        "organization_id": "org-1",
+        "server_name": "Alice",
+        "ticket_count": 50,
+        "tips": 120,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_server_sales",
+  },
+  {
+    "filters": [
+      "eq id="org-1"",
+    ],
+    "op": "update",
+    "payload": {
+      "pos_config": {
+        "agent_seen_at": "2026-11-21T12:00:00.000Z",
+        "agent_token": "org-token",
+        "agent_version": "1.4.0",
+        "keep_me": true,
+        "last_sync_at": "2026-11-21T12:00:00.000Z",
+        "last_sync_errors": [
+          "agent: items feed: bad mapping",
+        ],
+        "last_sync_summary": {
+          "ewReports": 1,
+          "hoursRecorded": 2,
+          "itemAudit": 2,
+          "serversRecorded": 1,
+          "shiftsProtected": 1,
+          "stockMoved": 1,
+          "unresolvedItems": 0,
+          "zReports": 2,
+        },
+      },
+    },
+    "single": false,
+    "table": "organizations",
+  },
+]
+`;
+
+exports[`2touch ingest, hourly and servers > a failed delete skips that night only and never inserts on top > calls 1`] = `
+[
+  {
+    "columns": "id, pos_provider, pos_config, bar_settings",
+    "filters": [
+      "eq id="org-1"",
+      "eq pos_provider="2touch"",
+    ],
+    "op": "select",
+    "single": true,
+    "table": "organizations",
+  },
+  {
+    "filters": [
+      "eq id="org-1"",
+    ],
+    "op": "update",
+    "payload": {
+      "pos_config": {
+        "agent_seen_at": "2026-11-21T12:00:00.000Z",
+        "agent_token": "org-token",
+        "agent_version": "1.4.0",
+        "keep_me": true,
+      },
+    },
+    "single": false,
+    "table": "organizations",
+  },
+  {
+    "columns": "report_date, cash_tips, cash_tips_source",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq cash_tips_source="manual"",
+      "in report_date=["2026-11-20","2026-11-21"]",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "z_report_days",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,report_date",
+    },
+    "payload": [
+      {
+        "card_sales": 3321.26,
+        "cash_sales": 1200.25,
+        "cash_tips": 0,
+        "cash_tips_source": "pos",
+        "cc_tips": 612.1,
+        "organization_id": "org-1",
+        "report_date": "2026-11-20",
+        "total_sales": 4521.51,
+      },
+      {
+        "card_sales": null,
+        "cash_sales": null,
+        "cash_tips": 5,
+        "cash_tips_source": "pos",
+        "cc_tips": 10,
+        "organization_id": "org-1",
+        "report_date": "2026-11-21",
+        "total_sales": 100,
+      },
+    ],
+    "single": false,
+    "table": "z_report_days",
+  },
+  {
+    "columns": "id, name",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "employees",
+  },
+  {
+    "filters": [],
+    "op": "insert",
+    "payload": [
+      {
+        "name": "Bob",
+        "organization_id": "org-1",
+        "tip_mode": "pool",
+      },
+    ],
+    "returning": "id, name",
+    "single": false,
+    "table": "employees",
+  },
+  {
+    "columns": "employee_id, shift_date",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq hours_source="manual"",
+      "in shift_date=["2026-11-20"]",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "employee_shifts",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,employee_id,shift_date",
+    },
+    "payload": [
+      {
+        "employee_id": "e-alice",
+        "organization_id": "org-1",
+        "overtime_hours": 1.5,
+        "regular_hours": 8,
+        "shift_date": "2026-11-20",
+      },
+      {
+        "employee_id": "e-bob",
+        "organization_id": "org-1",
+        "overtime_hours": 0,
+        "regular_hours": 6,
+        "shift_date": "2026-11-20",
+      },
+    ],
+    "single": false,
+    "table": "employee_shifts",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,report_date,employee_name",
+    },
+    "payload": [
+      {
+        "employee_name": "Bob",
+        "organization_id": "org-1",
+        "report_date": "2026-11-20",
+        "tips_paid_out": 20,
+        "total_sales": 700.5,
+      },
+    ],
+    "single": false,
+    "table": "z_report_server_tips",
+  },
+  {
+    "columns": "match_key",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_excluded_items",
+  },
+  {
+    "columns": "id, match_key, pos_bundle_components(inventory_item_id, quantity, unit)",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq is_active=true",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_bundles",
+  },
+  {
+    "columns": "token, multiplier, label, mixer",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_size_tokens",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,name",
+    },
+    "payload": [
+      {
+        "name": "Spirits",
+        "organization_id": "org-1",
+      },
+      {
+        "name": "Beer",
+        "organization_id": "org-1",
+      },
+    ],
+    "returning": "id, name",
+    "single": false,
+    "table": "inventory_categories",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "ignoreDuplicates": true,
+      "onConflict": "organization_id,name",
+    },
+    "payload": [
+      {
+        "category_id": "c-spirits",
+        "is_active": true,
+        "name": "TITO'S",
+        "organization_id": "org-1",
+        "unit": "each",
+      },
+      {
+        "category_id": "c-beer",
+        "is_active": true,
+        "name": "Bud Light",
+        "organization_id": "org-1",
+        "unit": "each",
+      },
+    ],
+    "single": false,
+    "table": "inventory_items",
+  },
+  {
+    "columns": "id, name, bottle_size_ml, pour_size_oz, inventory_categories(default_pour_oz)",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "inventory_items",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,sale_date,match_key",
+    },
+    "payload": [
+      {
+        "base_match_key": "tito's",
+        "category_name": "Spirits",
+        "is_bundle": false,
+        "item_name": "DBL TITO'S",
+        "match_key": "dbl tito's",
+        "net_sales": 120,
+        "organization_id": "org-1",
+        "qty_sold": 10,
+        "sale_date": "2026-11-20",
+        "size_token": "dbl",
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "base_match_key": "bud light",
+        "category_name": "Beer",
+        "is_bundle": false,
+        "item_name": "Bud Light",
+        "match_key": "bud light",
+        "net_sales": 150,
+        "organization_id": "org-1",
+        "qty_sold": 30,
+        "sale_date": "2026-11-20",
+        "size_token": null,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "base_match_key": "bucket of 5",
+        "category_name": "Deals",
+        "is_bundle": true,
+        "item_name": "Bucket of 5",
+        "match_key": "bucket of 5",
+        "net_sales": 30,
+        "organization_id": "org-1",
+        "qty_sold": 2,
+        "sale_date": "2026-11-20",
+        "size_token": null,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_item_sales",
+  },
+  {
+    "args": {
+      "p_components": [
+        {
+          "item_id": "i-titos",
+          "qty": 1.1829,
+        },
+        {
+          "item_id": "i-bud",
+          "qty": 40,
+        },
+      ],
+      "p_org": "org-1",
+      "p_sale_date": "2026-11-20",
+    },
+    "rpc": "pos_apply_item_sales",
+  },
+  {
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq business_date="2026-11-20"",
+    ],
+    "op": "delete",
+    "payload": undefined,
+    "single": false,
+    "table": "pos_hourly_sales",
+  },
+  {
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq business_date="2026-11-20"",
+    ],
+    "op": "delete",
+    "payload": undefined,
+    "single": false,
+    "table": "pos_server_sales",
+  },
+  {
+    "filters": [],
+    "op": "insert",
+    "payload": [
+      {
+        "business_date": "2026-11-20",
+        "net_sales": 900,
+        "organization_id": "org-1",
+        "server_name": "Alice",
+        "ticket_count": 50,
+        "tips": 120,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_server_sales",
+  },
+  {
+    "filters": [
+      "eq id="org-1"",
+    ],
+    "op": "update",
+    "payload": {
+      "pos_config": {
+        "agent_seen_at": "2026-11-21T12:00:00.000Z",
+        "agent_token": "org-token",
+        "agent_version": "1.4.0",
+        "keep_me": true,
+        "last_sync_at": "2026-11-21T12:00:00.000Z",
+        "last_sync_errors": [
+          "pos_hourly_sales delete(2026-11-20): locked",
+          "agent: items feed: bad mapping",
+        ],
+        "last_sync_summary": {
+          "ewReports": 2,
+          "hoursRecorded": 0,
+          "itemAudit": 2,
+          "serversRecorded": 1,
+          "shiftsProtected": 0,
+          "stockMoved": 1,
+          "unresolvedItems": 0,
+          "zReports": 2,
+        },
+      },
+    },
+    "single": false,
+    "table": "organizations",
+  },
+]
+`;
+
+exports[`2touch ingest, items > a bundle sale is expanded into component stock and not created as an item > calls 1`] = `
+[
+  {
+    "columns": "id, pos_provider, pos_config, bar_settings",
+    "filters": [
+      "eq id="org-1"",
+      "eq pos_provider="2touch"",
+    ],
+    "op": "select",
+    "single": true,
+    "table": "organizations",
+  },
+  {
+    "filters": [
+      "eq id="org-1"",
+    ],
+    "op": "update",
+    "payload": {
+      "pos_config": {
+        "agent_seen_at": "2026-11-21T12:00:00.000Z",
+        "agent_token": "org-token",
+        "agent_version": "1.4.0",
+        "keep_me": true,
+      },
+    },
+    "single": false,
+    "table": "organizations",
+  },
+  {
+    "columns": "match_key",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_excluded_items",
+  },
+  {
+    "columns": "id, match_key, pos_bundle_components(inventory_item_id, quantity, unit)",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq is_active=true",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_bundles",
+  },
+  {
+    "columns": "token, multiplier, label, mixer",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_size_tokens",
+  },
+  {
+    "columns": "id, name, bottle_size_ml, pour_size_oz, inventory_categories(default_pour_oz)",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "inventory_items",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,sale_date,match_key",
+    },
+    "payload": [
+      {
+        "base_match_key": "bucket of 5",
+        "category_name": "Deals",
+        "is_bundle": true,
+        "item_name": "Bucket of 5",
+        "match_key": "bucket of 5",
+        "net_sales": 30,
+        "organization_id": "org-1",
+        "qty_sold": 2,
+        "sale_date": "2026-11-20",
+        "size_token": null,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_item_sales",
+  },
+  {
+    "args": {
+      "p_components": [
+        {
+          "item_id": "i-bud",
+          "qty": 10,
+        },
+      ],
+      "p_org": "org-1",
+      "p_sale_date": "2026-11-20",
+    },
+    "rpc": "pos_apply_item_sales",
+  },
+  {
+    "filters": [
+      "eq id="org-1"",
+    ],
+    "op": "update",
+    "payload": {
+      "pos_config": {
+        "agent_seen_at": "2026-11-21T12:00:00.000Z",
+        "agent_token": "org-token",
+        "agent_version": "1.4.0",
+        "keep_me": true,
+        "last_sync_at": "2026-11-21T12:00:00.000Z",
+        "last_sync_errors": [],
+        "last_sync_summary": {
+          "ewReports": 0,
+          "hoursRecorded": 0,
+          "itemAudit": 0,
+          "serversRecorded": 0,
+          "shiftsProtected": 0,
+          "stockMoved": 1,
+          "unresolvedItems": 0,
+          "zReports": 0,
+        },
+      },
+    },
+    "single": false,
+    "table": "organizations",
+  },
+]
+`;
+
+exports[`2touch ingest, items > an excluded item never reaches inventory or sales > calls 1`] = `
+[
+  {
+    "columns": "id, pos_provider, pos_config, bar_settings",
+    "filters": [
+      "eq id="org-1"",
+      "eq pos_provider="2touch"",
+    ],
+    "op": "select",
+    "single": true,
+    "table": "organizations",
+  },
+  {
+    "filters": [
+      "eq id="org-1"",
+    ],
+    "op": "update",
+    "payload": {
+      "pos_config": {
+        "agent_seen_at": "2026-11-21T12:00:00.000Z",
+        "agent_token": "org-token",
+        "agent_version": "1.4.0",
+        "keep_me": true,
+      },
+    },
+    "single": false,
+    "table": "organizations",
+  },
+  {
+    "columns": "match_key",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_excluded_items",
+  },
+  {
+    "columns": "id, match_key, pos_bundle_components(inventory_item_id, quantity, unit)",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq is_active=true",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_bundles",
+  },
+  {
+    "columns": "token, multiplier, label, mixer",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_size_tokens",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,name",
+    },
+    "payload": [
+      {
+        "name": "Spirits",
+        "organization_id": "org-1",
+      },
+      {
+        "name": "Beer",
+        "organization_id": "org-1",
+      },
+    ],
+    "returning": "id, name",
+    "single": false,
+    "table": "inventory_categories",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "ignoreDuplicates": true,
+      "onConflict": "organization_id,name",
+    },
+    "payload": [
+      {
+        "category_id": "c-spirits",
+        "is_active": true,
+        "name": "TITO'S",
+        "organization_id": "org-1",
+        "unit": "each",
+      },
+      {
+        "category_id": "c-beer",
+        "is_active": true,
+        "name": "Bud Light",
+        "organization_id": "org-1",
+        "unit": "each",
+      },
+    ],
+    "single": false,
+    "table": "inventory_items",
+  },
+  {
+    "columns": "id, name, bottle_size_ml, pour_size_oz, inventory_categories(default_pour_oz)",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "inventory_items",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,sale_date,match_key",
+    },
+    "payload": [
+      {
+        "base_match_key": "tito's",
+        "category_name": "Spirits",
+        "is_bundle": false,
+        "item_name": "DBL TITO'S",
+        "match_key": "dbl tito's",
+        "net_sales": 120,
+        "organization_id": "org-1",
+        "qty_sold": 10,
+        "sale_date": "2026-11-20",
+        "size_token": "dbl",
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "base_match_key": "bud light",
+        "category_name": "Beer",
+        "is_bundle": false,
+        "item_name": "Bud Light",
+        "match_key": "bud light",
+        "net_sales": 150,
+        "organization_id": "org-1",
+        "qty_sold": 30,
+        "sale_date": "2026-11-20",
+        "size_token": null,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "base_match_key": "bucket of 5",
+        "category_name": "Deals",
+        "is_bundle": true,
+        "item_name": "Bucket of 5",
+        "match_key": "bucket of 5",
+        "net_sales": 30,
+        "organization_id": "org-1",
+        "qty_sold": 2,
+        "sale_date": "2026-11-20",
+        "size_token": null,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_item_sales",
+  },
+  {
+    "args": {
+      "p_components": [
+        {
+          "item_id": "i-titos",
+          "qty": 1.1829,
+        },
+        {
+          "item_id": "i-bud",
+          "qty": 40,
+        },
+      ],
+      "p_org": "org-1",
+      "p_sale_date": "2026-11-20",
+    },
+    "rpc": "pos_apply_item_sales",
+  },
+  {
+    "filters": [
+      "eq id="org-1"",
+    ],
+    "op": "update",
+    "payload": {
+      "pos_config": {
+        "agent_seen_at": "2026-11-21T12:00:00.000Z",
+        "agent_token": "org-token",
+        "agent_version": "1.4.0",
+        "keep_me": true,
+        "last_sync_at": "2026-11-21T12:00:00.000Z",
+        "last_sync_errors": [],
+        "last_sync_summary": {
+          "ewReports": 0,
+          "hoursRecorded": 0,
+          "itemAudit": 2,
+          "serversRecorded": 0,
+          "shiftsProtected": 0,
+          "stockMoved": 1,
+          "unresolvedItems": 0,
+          "zReports": 0,
+        },
+      },
+    },
+    "single": false,
+    "table": "organizations",
+  },
+]
+`;
+
+exports[`2touch ingest, sync status > a backfill writes its data but leaves last_sync_* alone > calls 1`] = `
+[
+  {
+    "columns": "id, pos_provider, pos_config, bar_settings",
+    "filters": [
+      "eq id="org-1"",
+      "eq pos_provider="2touch"",
+    ],
+    "op": "select",
+    "single": true,
+    "table": "organizations",
+  },
+  {
+    "filters": [
+      "eq id="org-1"",
+    ],
+    "op": "update",
+    "payload": {
+      "pos_config": {
+        "agent_seen_at": "2026-11-21T12:00:00.000Z",
+        "agent_token": "org-token",
+        "agent_version": "1.4.0",
+        "keep_me": true,
+      },
+    },
+    "single": false,
+    "table": "organizations",
+  },
+  {
+    "columns": "report_date, cash_tips, cash_tips_source",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq cash_tips_source="manual"",
+      "in report_date=["2026-11-20","2026-11-21"]",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "z_report_days",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,report_date",
+    },
+    "payload": [
+      {
+        "card_sales": 3321.26,
+        "cash_sales": 1200.25,
+        "cash_tips": 0,
+        "cash_tips_source": "pos",
+        "cc_tips": 612.1,
+        "organization_id": "org-1",
+        "report_date": "2026-11-20",
+        "total_sales": 4521.51,
+      },
+      {
+        "card_sales": null,
+        "cash_sales": null,
+        "cash_tips": 5,
+        "cash_tips_source": "pos",
+        "cc_tips": 10,
+        "organization_id": "org-1",
+        "report_date": "2026-11-21",
+        "total_sales": 100,
+      },
+    ],
+    "single": false,
+    "table": "z_report_days",
+  },
+  {
+    "columns": "id, name",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "employees",
+  },
+  {
+    "filters": [],
+    "op": "insert",
+    "payload": [
+      {
+        "name": "Bob",
+        "organization_id": "org-1",
+        "tip_mode": "pool",
+      },
+    ],
+    "returning": "id, name",
+    "single": false,
+    "table": "employees",
+  },
+  {
+    "columns": "employee_id, shift_date",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq hours_source="manual"",
+      "in shift_date=["2026-11-20"]",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "employee_shifts",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,employee_id,shift_date",
+    },
+    "payload": [
+      {
+        "employee_id": "e-alice",
+        "organization_id": "org-1",
+        "overtime_hours": 1.5,
+        "regular_hours": 8,
+        "shift_date": "2026-11-20",
+      },
+      {
+        "employee_id": "e-bob",
+        "organization_id": "org-1",
+        "overtime_hours": 0,
+        "regular_hours": 6,
+        "shift_date": "2026-11-20",
+      },
+    ],
+    "single": false,
+    "table": "employee_shifts",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,report_date,employee_name",
+    },
+    "payload": [
+      {
+        "employee_name": "Bob",
+        "organization_id": "org-1",
+        "report_date": "2026-11-20",
+        "tips_paid_out": 20,
+        "total_sales": 700.5,
+      },
+    ],
+    "single": false,
+    "table": "z_report_server_tips",
+  },
+  {
+    "columns": "match_key",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_excluded_items",
+  },
+  {
+    "columns": "id, match_key, pos_bundle_components(inventory_item_id, quantity, unit)",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq is_active=true",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_bundles",
+  },
+  {
+    "columns": "token, multiplier, label, mixer",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_size_tokens",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,name",
+    },
+    "payload": [
+      {
+        "name": "Spirits",
+        "organization_id": "org-1",
+      },
+      {
+        "name": "Beer",
+        "organization_id": "org-1",
+      },
+    ],
+    "returning": "id, name",
+    "single": false,
+    "table": "inventory_categories",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "ignoreDuplicates": true,
+      "onConflict": "organization_id,name",
+    },
+    "payload": [
+      {
+        "category_id": "c-spirits",
+        "is_active": true,
+        "name": "TITO'S",
+        "organization_id": "org-1",
+        "unit": "each",
+      },
+      {
+        "category_id": "c-beer",
+        "is_active": true,
+        "name": "Bud Light",
+        "organization_id": "org-1",
+        "unit": "each",
+      },
+    ],
+    "single": false,
+    "table": "inventory_items",
+  },
+  {
+    "columns": "id, name, bottle_size_ml, pour_size_oz, inventory_categories(default_pour_oz)",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "inventory_items",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,sale_date,match_key",
+    },
+    "payload": [
+      {
+        "base_match_key": "tito's",
+        "category_name": "Spirits",
+        "is_bundle": false,
+        "item_name": "DBL TITO'S",
+        "match_key": "dbl tito's",
+        "net_sales": 120,
+        "organization_id": "org-1",
+        "qty_sold": 10,
+        "sale_date": "2026-11-20",
+        "size_token": "dbl",
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "base_match_key": "bud light",
+        "category_name": "Beer",
+        "is_bundle": false,
+        "item_name": "Bud Light",
+        "match_key": "bud light",
+        "net_sales": 150,
+        "organization_id": "org-1",
+        "qty_sold": 30,
+        "sale_date": "2026-11-20",
+        "size_token": null,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "base_match_key": "bucket of 5",
+        "category_name": "Deals",
+        "is_bundle": true,
+        "item_name": "Bucket of 5",
+        "match_key": "bucket of 5",
+        "net_sales": 30,
+        "organization_id": "org-1",
+        "qty_sold": 2,
+        "sale_date": "2026-11-20",
+        "size_token": null,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_item_sales",
+  },
+  {
+    "args": {
+      "p_components": [
+        {
+          "item_id": "i-titos",
+          "qty": 1.1829,
+        },
+        {
+          "item_id": "i-bud",
+          "qty": 40,
+        },
+      ],
+      "p_org": "org-1",
+      "p_sale_date": "2026-11-20",
+    },
+    "rpc": "pos_apply_item_sales",
+  },
+  {
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq business_date="2026-11-20"",
+    ],
+    "op": "delete",
+    "payload": undefined,
+    "single": false,
+    "table": "pos_hourly_sales",
+  },
+  {
+    "filters": [],
+    "op": "insert",
+    "payload": [
+      {
+        "business_date": "2026-11-20",
+        "hour": 21,
+        "net_sales": 800,
+        "organization_id": "org-1",
+        "ticket_count": 40,
+        "tips": 90,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "business_date": "2026-11-20",
+        "hour": 22,
+        "net_sales": 900,
+        "organization_id": "org-1",
+        "ticket_count": 45,
+        "tips": 100,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_hourly_sales",
+  },
+  {
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq business_date="2026-11-20"",
+    ],
+    "op": "delete",
+    "payload": undefined,
+    "single": false,
+    "table": "pos_server_sales",
+  },
+  {
+    "filters": [],
+    "op": "insert",
+    "payload": [
+      {
+        "business_date": "2026-11-20",
+        "net_sales": 900,
+        "organization_id": "org-1",
+        "server_name": "Alice",
+        "ticket_count": 50,
+        "tips": 120,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_server_sales",
+  },
+]
+`;
+
+exports[`2touch ingest, sync status > an old agent sending only z, ew and items still succeeds with a null split and no hourly work > calls 1`] = `
+[
+  {
+    "columns": "id, pos_provider, pos_config, bar_settings",
+    "filters": [
+      "eq id="org-1"",
+      "eq pos_provider="2touch"",
+    ],
+    "op": "select",
+    "single": true,
+    "table": "organizations",
+  },
+  {
+    "filters": [
+      "eq id="org-1"",
+    ],
+    "op": "update",
+    "payload": {
+      "pos_config": {
+        "agent_seen_at": "2026-11-21T12:00:00.000Z",
+        "agent_token": "org-token",
+        "agent_version": "1.4.0",
+        "keep_me": true,
+      },
+    },
+    "single": false,
+    "table": "organizations",
+  },
+  {
+    "columns": "report_date, cash_tips, cash_tips_source",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq cash_tips_source="manual"",
+      "in report_date=["2026-11-20"]",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "z_report_days",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,report_date",
+    },
+    "payload": [
+      {
+        "card_sales": null,
+        "cash_sales": null,
+        "cash_tips": 2,
+        "cash_tips_source": "pos",
+        "cc_tips": 1,
+        "organization_id": "org-1",
+        "report_date": "2026-11-20",
+        "total_sales": 100,
+      },
+    ],
+    "single": false,
+    "table": "z_report_days",
+  },
+  {
+    "columns": "id, name",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "employees",
+  },
+  {
+    "filters": [],
+    "op": "insert",
+    "payload": [
+      {
+        "name": "Bob",
+        "organization_id": "org-1",
+        "tip_mode": "pool",
+      },
+    ],
+    "returning": "id, name",
+    "single": false,
+    "table": "employees",
+  },
+  {
+    "columns": "employee_id, shift_date",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq hours_source="manual"",
+      "in shift_date=["2026-11-20"]",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "employee_shifts",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,employee_id,shift_date",
+    },
+    "payload": [
+      {
+        "employee_id": "e-alice",
+        "organization_id": "org-1",
+        "overtime_hours": 1.5,
+        "regular_hours": 8,
+        "shift_date": "2026-11-20",
+      },
+      {
+        "employee_id": "e-bob",
+        "organization_id": "org-1",
+        "overtime_hours": 0,
+        "regular_hours": 6,
+        "shift_date": "2026-11-20",
+      },
+    ],
+    "single": false,
+    "table": "employee_shifts",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,report_date,employee_name",
+    },
+    "payload": [
+      {
+        "employee_name": "Bob",
+        "organization_id": "org-1",
+        "report_date": "2026-11-20",
+        "tips_paid_out": 20,
+        "total_sales": 700.5,
+      },
+    ],
+    "single": false,
+    "table": "z_report_server_tips",
+  },
+  {
+    "columns": "match_key",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_excluded_items",
+  },
+  {
+    "columns": "id, match_key, pos_bundle_components(inventory_item_id, quantity, unit)",
+    "filters": [
+      "eq organization_id="org-1"",
+      "eq is_active=true",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_bundles",
+  },
+  {
+    "columns": "token, multiplier, label, mixer",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "pos_size_tokens",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,name",
+    },
+    "payload": [
+      {
+        "name": "Spirits",
+        "organization_id": "org-1",
+      },
+      {
+        "name": "Beer",
+        "organization_id": "org-1",
+      },
+    ],
+    "returning": "id, name",
+    "single": false,
+    "table": "inventory_categories",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "ignoreDuplicates": true,
+      "onConflict": "organization_id,name",
+    },
+    "payload": [
+      {
+        "category_id": "c-spirits",
+        "is_active": true,
+        "name": "TITO'S",
+        "organization_id": "org-1",
+        "unit": "each",
+      },
+      {
+        "category_id": "c-beer",
+        "is_active": true,
+        "name": "Bud Light",
+        "organization_id": "org-1",
+        "unit": "each",
+      },
+    ],
+    "single": false,
+    "table": "inventory_items",
+  },
+  {
+    "columns": "id, name, bottle_size_ml, pour_size_oz, inventory_categories(default_pour_oz)",
+    "filters": [
+      "eq organization_id="org-1"",
+    ],
+    "op": "select",
+    "single": false,
+    "table": "inventory_items",
+  },
+  {
+    "filters": [],
+    "op": "upsert",
+    "opts": {
+      "onConflict": "organization_id,sale_date,match_key",
+    },
+    "payload": [
+      {
+        "base_match_key": "tito's",
+        "category_name": "Spirits",
+        "is_bundle": false,
+        "item_name": "DBL TITO'S",
+        "match_key": "dbl tito's",
+        "net_sales": 120,
+        "organization_id": "org-1",
+        "qty_sold": 10,
+        "sale_date": "2026-11-20",
+        "size_token": "dbl",
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "base_match_key": "bud light",
+        "category_name": "Beer",
+        "is_bundle": false,
+        "item_name": "Bud Light",
+        "match_key": "bud light",
+        "net_sales": 150,
+        "organization_id": "org-1",
+        "qty_sold": 30,
+        "sale_date": "2026-11-20",
+        "size_token": null,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+      {
+        "base_match_key": "bucket of 5",
+        "category_name": "Deals",
+        "is_bundle": true,
+        "item_name": "Bucket of 5",
+        "match_key": "bucket of 5",
+        "net_sales": 30,
+        "organization_id": "org-1",
+        "qty_sold": 2,
+        "sale_date": "2026-11-20",
+        "size_token": null,
+        "updated_at": "2026-11-21T12:00:00.000Z",
+      },
+    ],
+    "single": false,
+    "table": "pos_item_sales",
+  },
+  {
+    "args": {
+      "p_components": [
+        {
+          "item_id": "i-titos",
+          "qty": 1.1829,
+        },
+        {
+          "item_id": "i-bud",
+          "qty": 40,
+        },
+      ],
+      "p_org": "org-1",
+      "p_sale_date": "2026-11-20",
+    },
+    "rpc": "pos_apply_item_sales",
+  },
+  {
+    "filters": [
+      "eq id="org-1"",
+    ],
+    "op": "update",
+    "payload": {
+      "pos_config": {
+        "agent_seen_at": "2026-11-21T12:00:00.000Z",
+        "agent_token": "org-token",
+        "agent_version": "1.4.0",
+        "keep_me": true,
+        "last_sync_at": "2026-11-21T12:00:00.000Z",
+        "last_sync_errors": [],
+        "last_sync_summary": {
+          "ewReports": 2,
+          "hoursRecorded": 0,
+          "itemAudit": 2,
+          "serversRecorded": 0,
+          "shiftsProtected": 0,
+          "stockMoved": 1,
+          "unresolvedItems": 0,
+          "zReports": 1,
+        },
+      },
+    },
+    "single": false,
+    "table": "organizations",
+  },
+]
+`;
+
+exports[`2touch ingest, sync status > an old agent sending only z, ew and items still succeeds with a null split and no hourly work > response 1`] = `
+{
+  "bundlesExpanded": 1,
+  "errors": [],
+  "ewReports": 2,
+  "hoursRecorded": 0,
+  "itemAudit": 2,
+  "itemAuditSkipped": 1,
+  "salesRecorded": 3,
+  "serversRecorded": 0,
+  "shiftsProtected": 0,
+  "stockMoved": 1,
+  "unresolvedItems": 0,
+  "zReports": 1,
+}
+`;

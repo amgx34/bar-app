@@ -1,5 +1,6 @@
 'use server';
 
+import { validateRoutingNumber } from '@/lib/direct-deposit/routing';
 import { revalidatePath } from 'next/cache';
 import { randomBytes }    from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -7,6 +8,15 @@ import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
 import { SITE_URL } from '@/lib/site';
 import type { BarSettings, HourlyRates } from '@/lib/org';
+import { deleteCredentials } from '@/lib/pos/credentials';
+import type { PosConfig } from '@/lib/pos/pos-config';
+import { runProviderSync } from '@/lib/pos/sync-run';
+import { syncCooldownMessage } from '@/lib/pos/sync-cooldown';
+import type { PosConfigShape } from '@/lib/pos/sync-health';
+import { NeedsReauthError } from '@/lib/pos/providers/types';
+import { openCloverClient } from '@/lib/pos/providers/clover/adapter';
+import { openToastClient } from '@/lib/pos/providers/toast/adapter';
+import { flattenMenuItems } from '@/lib/toast/client';
 
 // ── Shared helper: safely merge into pos_config without overwriting other keys ──
 async function mergePosConfig(orgId: string, updates: Record<string, unknown>) {
@@ -65,6 +75,14 @@ export async function updateGeneralInfo(data: {
 }) {
   const { org, role } = await getCurrentOrg();
   assertEditor(role);
+
+  // This number is the ODFI routing in every ACH file the bar sends. A value that
+  // is not a real ABA routing number used to save with a "Saved" toast ("12345"
+  // did) and would then be padded into the file. Blank is allowed: it clears the
+  // field, and the NACHA export refuses to run until one is set.
+  if (data.nacha_routing_number && !validateRoutingNumber(data.nacha_routing_number)) {
+    throw new Error('Routing number must be 9 digits and pass the bank routing check. Check it against a check or your bank statement.');
+  }
 
   const admin = createAdminClient();
   const { error } = await admin
@@ -128,109 +146,48 @@ export async function updateInventoryDefaults(data: {
   await mergeBarSettings(org.id, data);
 }
 
-// ── Bar settings (legacy shim — used by bar-settings-form.tsx) ────────────────
-
-export async function updateBarSettings(data: Partial<BarSettings>) {
-  const { org, role } = await getCurrentOrg();
-  assertEditor(role);
-  await mergeBarSettings(org.id, data);
-}
-
 // ── Clover sync / disconnect ──────────────────────────────────────────────────
 
 export type SyncResult = { created: number; updated: number; skipped: number };
 
-/** Pull the last N days of Clover orders → z_report_days */
+/**
+ * Pull the last N business dates of Clover trade through the shared pipeline:
+ * Z totals net of tax, tips, cash/card split, hourly, per-server, hours and
+ * items (which deplete stock by delta). Same writer as the nightly cron.
+ */
 export async function syncCloverSales(days = 7): Promise<{ upserted: number }> {
-  const { org } = await getCurrentOrg();
-  if (org.pos_provider !== 'clover') throw new Error('Not connected to Clover');
+  return pullSales('clover', 'Clover', days);
+}
 
-  const cfg = org.pos_config as { merchant_id: string; access_token: string };
-  if (!cfg.access_token || !cfg.merchant_id) throw new Error('Clover connection incomplete — please reconnect');
+/** One owner/manager-triggered pull for a pull-based POS, through the same writer as the nightly cron. */
+async function pullSales(provider: 'clover' | 'toast', name: string, days: number): Promise<{ upserted: number }> {
+  const { org, role } = await getCurrentOrg();
+  assertEditor(role);
+  if (org.pos_provider !== provider) throw new Error(`Not connected to ${name}`);
+  const cooling = syncCooldownMessage(org.pos_config as PosConfigShape, new Date());
+  if (cooling) throw new Error(cooling);
 
-  const base = process.env.CLOVER_SANDBOX === 'true' ? 'https://apisandbox.dev.clover.com' : 'https://api.clover.com';
-  const headers = { Authorization: `Bearer ${cfg.access_token}` };
-
-  // Build per-day buckets over the requested window
-  const now = new Date();
-  const dayMs = 24 * 60 * 60 * 1000;
-  const startMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - (days - 1) * dayMs;
-
-  // Paginate through all orders — a busy bar can have thousands per week
-  const endMs   = Date.now();
-  const PAGE    = 500;
-  const elements: Array<{
-    createdTime: number;
-    total?: number;
-    payments?: { elements?: Array<{ amount?: number; tipAmount?: number; result?: string }> };
-  }> = [];
-
-  let offset = 0;
-  for (;;) {
-    const url = `${base}/v3/merchants/${cfg.merchant_id}/orders`
-      + `?expand=payments`
-      + `&filter=createdTime>=${startMs}&filter=createdTime<=${endMs}`
-      + `&limit=${PAGE}&offset=${offset}`;
-    const res = await fetch(url, { headers });
-    if (!res.ok) throw new Error(`Clover API error: ${res.status}`);
-    const page = await res.json() as { elements?: typeof elements };
-    const batch = page.elements ?? [];
-    elements.push(...batch);
-    if (batch.length < PAGE) break; // last page
-    offset += PAGE;
-    if (offset > 50_000) break;     // safety cap: 50k orders max per sync
-  }
-
-  // Aggregate by calendar date (local date string YYYY-MM-DD)
-  const byDate = new Map<string, { sales: number; tips: number }>();
-  for (const order of elements) {
-    const d = new Date(order.createdTime);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    if (!byDate.has(key)) byDate.set(key, { sales: 0, tips: 0 });
-    const bucket = byDate.get(key)!;
-    bucket.sales += (order.total ?? 0) / 100;
-    for (const payment of order.payments?.elements ?? []) {
-      if (payment.result === 'SUCCESS') bucket.tips += (payment.tipAmount ?? 0) / 100;
-    }
-  }
-
-  if (!byDate.size) return { upserted: 0 };
-
-  const admin = createAdminClient();
-  const rows = [...byDate.entries()].map(([report_date, { sales, tips }]) => ({
-    organization_id: org.id,
-    report_date,
-    total_sales: Math.round(sales * 100) / 100,
-    cc_tips:     Math.round(tips * 100) / 100,
-    // cash_tips is deliberately absent. Clover reports card tips; it has no
-    // view of the jar. Sending a hard 0 overwrote whatever was there on every
-    // sync — including a manager's counted figure. Omitted, an existing row
-    // keeps its value and a new one takes the column default of 0.
-  }));
-
-  const { error } = await admin
-    .from('z_report_days')
-    .upsert(rows, { onConflict: 'organization_id,report_date' });
-
-  if (error) throw new Error(error.message);
+  const r = await runProviderSync(org.id, { days: Math.min(Math.max(1, Math.trunc(days) || 1), 31) });
+  if (!r.ran) throw new Error(r.reason === 'already-running' ? 'A sync is already running. Try again in a minute.' : `Not connected to ${name}`);
+  if (r.needsReauth) throw new Error(`${name} no longer accepts the saved login. Reconnect ${name} in Settings.`);
+  if (!r.ok && !r.summary?.zReports) throw new Error(r.errors[0] ?? `${name} sync failed`);
   revalidatePath('/app/dashboard');
-  return { upserted: rows.length };
+  return { upserted: r.summary?.zReports ?? 0 };
 }
 
 export async function syncCloverInventory(): Promise<SyncResult> {
   const { org } = await getCurrentOrg();
   if (org.pos_provider !== 'clover') throw new Error('Not connected to Clover');
 
-  const cfg = org.pos_config as { merchant_id: string; access_token: string; expires_at: number | null };
-  if (!cfg.access_token || !cfg.merchant_id) throw new Error('Clover connection is incomplete — please reconnect');
-  if (cfg.expires_at && Date.now() > cfg.expires_at) throw new Error('Clover access token has expired — please reconnect');
-
-  const base = process.env.CLOVER_SANDBOX === 'true' ? 'https://apisandbox.dev.clover.com' : 'https://api.clover.com';
-  const res  = await fetch(`${base}/v3/merchants/${cfg.merchant_id}/items?limit=1000&filter=hidden=false`, { headers: { Authorization: `Bearer ${cfg.access_token}` } });
-
-  if (!res.ok) throw new Error(`Clover API error: ${res.status}`);
-
-  const { elements = [] } = await res.json() as { elements: { id: string; name: string; price?: number; code?: string; stockCount?: number }[] };
+  // Token handling, refresh and the region host all live behind the client.
+  let elements: { id: string; name: string; price?: number; code?: string }[];
+  try {
+    elements = await openCloverClient(createAdminClient(), org.id, org.pos_config as PosConfig)
+      .list('/items', { filter: ['hidden=false'] });
+  } catch (e) {
+    if (e instanceof NeedsReauthError) throw new Error('Clover no longer accepts the saved login. Reconnect Clover in Settings.');
+    throw e;
+  }
   if (!elements.length) return { created: 0, updated: 0, skipped: 0 };
 
   const supabase = await createClient();
@@ -245,10 +202,10 @@ export async function syncCloverInventory(): Promise<SyncResult> {
     const match = (item.code && bySku.get(item.code)) ?? byName.get(item.name.toLowerCase());
     if (match) {
       // admin-scope-ok: match.id comes from `existing`, fetched with .eq('organization_id', org.id)
-      const { error } = await admin.from('inventory_items').update({ sale_price: item.price != null ? item.price / 100 : undefined, sku: item.code || match.sku || null, ...(item.stockCount != null ? { current_stock: item.stockCount } : {}) }).eq('id', match.id);
+      const { error } = await admin.from('inventory_items').update({ sale_price: item.price != null ? item.price / 100 : undefined, sku: item.code || match.sku || null }).eq('id', match.id);
       error ? result.skipped++ : result.updated++;
     } else {
-      const { error } = await admin.from('inventory_items').insert({ organization_id: org.id, name: item.name.trim(), sku: item.code || null, sale_price: item.price != null ? item.price / 100 : null, current_stock: item.stockCount ?? 0, unit: 'each' });
+      const { error } = await admin.from('inventory_items').insert({ organization_id: org.id, name: item.name.trim(), sku: item.code || null, sale_price: item.price != null ? item.price / 100 : null, current_stock: 0, unit: 'each' });
       error ? result.skipped++ : result.created++;
     }
   }
@@ -260,6 +217,8 @@ export async function disconnectPOS() {
   const { org, role } = await getCurrentOrg();
   if (role !== 'owner') throw new Error('Only owners can disconnect a POS');
   const admin = createAdminClient();
+  // The stored login goes first. If this fails the org stays connected and the owner can retry.
+  await deleteCredentials(admin, org.id);
   const { error } = await admin.from('organizations').update({ pos_provider: null, pos_config: {} }).eq('id', org.id);
   if (error) throw new Error(error.message);
   revalidatePath('/app/settings');
@@ -341,125 +300,46 @@ export async function triggerTwoTouchPoll(): Promise<{ processed: number; zRepor
 }
 
 // ── Toast POS ─────────────────────────────────────────────────────────────────
+// Connecting lives in app/(app)/setup/pos/toast/actions.ts. Credentials are
+// encrypted in pos_credentials; nothing secret is kept in pos_config.
 
-type ToastConfig = { client_id: string; client_secret: string; restaurant_guid: string };
-
-async function getToastClient() {
-  const { org } = await getCurrentOrg();
-  if (org.pos_provider !== 'toast') throw new Error('Toast is not connected');
-  const cfg = org.pos_config as ToastConfig;
-  if (!cfg.client_id || !cfg.client_secret || !cfg.restaurant_guid) {
-    throw new Error('Toast connection is incomplete — please reconnect in Settings → POS Integration');
-  }
-  const { ToastClient } = await import('@/lib/toast/client');
-  const client = await ToastClient.authenticate(cfg.client_id, cfg.client_secret, cfg.restaurant_guid);
-  return { client, org };
+/** Pull the last N business dates of Toast trade through the shared pipeline: Z totals, tips, split, hourly, servers, hours and items. */
+export async function syncToastSales(days = 7): Promise<{ upserted: number }> {
+  return pullSales('toast', 'Toast', days);
 }
 
-/** Save Toast credentials after verifying they authenticate successfully. */
-export async function connectToast(data: ToastConfig): Promise<void> {
+/** Pull Toast menu items into the inventory table (names and prices; stock comes from sales, never from here). */
+export async function syncToastInventory(): Promise<SyncResult> {
   const { org, role } = await getCurrentOrg();
   assertEditor(role);
-
-  const { ToastClient } = await import('@/lib/toast/client');
-  // Test credentials — throws if invalid
-  await ToastClient.authenticate(data.client_id, data.client_secret, data.restaurant_guid);
+  if (org.pos_provider !== 'toast') throw new Error('Toast is not connected');
 
   const admin = createAdminClient();
-  const { error } = await admin.from('organizations').update({
-    pos_provider: 'toast',
-    pos_config:   data,
-  }).eq('id', org.id);
-  if (error) throw new Error(error.message);
-  revalidatePath('/app/settings');
-}
-
-/** Pull the last N business days of Toast orders → z_report_days. */
-export async function syncToastSales(days = 7): Promise<{ upserted: number }> {
-  const { client, org } = await getToastClient();
-  const { toToastDate, fromToastDate } = await import('@/lib/toast/client');
-  const admin = createAdminClient();
-
-  const rows: Array<{
-    organization_id: string;
-    report_date: string;
-    total_sales: number;
-    cc_tips: number;
-    cash_tips: number;
-  }> = [];
-
-  const now = new Date();
-  for (let i = 0; i < days; i++) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    const bizDate    = toToastDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
-    const reportDate = fromToastDate(Number(bizDate));
-
-    const orders = await client.getOrdersByBusinessDate(bizDate);
-
-    let totalSales = 0, ccTips = 0, cashTips = 0;
-    for (const order of orders) {
-      if (order.voided || order.deleted) continue;
-      for (const check of order.checks ?? []) {
-        if (check.paymentStatus === 'VOID') continue;
-        // sales = total - tip (Toast includes tip in totalAmount)
-        const checkTip   = (check.tipAmount ?? 0) / 100;
-        const checkTotal = (check.totalAmount ?? 0) / 100;
-        totalSales += checkTotal - checkTip;
-        // Split by payment type
-        if (check.payments?.length) {
-          for (const p of check.payments) {
-            const t = (p.tipAmount ?? 0) / 100;
-            if (p.type === 'CASH') cashTips += t; else ccTips += t;
-          }
-        } else {
-          ccTips += checkTip; // default to CC if no payment breakdown
-        }
-      }
-    }
-
-    if (totalSales > 0 || ccTips > 0 || cashTips > 0) {
-      rows.push({
-        organization_id: org.id,
-        report_date: reportDate,
-        total_sales: Math.round(totalSales * 100) / 100,
-        cc_tips:     Math.round(ccTips    * 100) / 100,
-        cash_tips:   Math.round(cashTips  * 100) / 100,
-      });
-    }
+  let items;
+  try {
+    items = flattenMenuItems(await openToastClient(admin, org.id, org.pos_config as PosConfig).menus());
+  } catch (e) {
+    if (e instanceof NeedsReauthError) throw new Error('Toast no longer accepts the saved login. Reconnect Toast in Settings.');
+    throw e;
   }
-
-  if (!rows.length) return { upserted: 0 };
-
-  const { error } = await admin
-    .from('z_report_days')
-    .upsert(rows, { onConflict: 'organization_id,report_date' });
-  if (error) throw new Error(error.message);
-
-  revalidatePath('/app/dashboard');
-  return { upserted: rows.length };
-}
-
-/** Pull Toast menu items into the inventory table. */
-export async function syncToastInventory(): Promise<SyncResult> {
-  const { client, org } = await getToastClient();
-  const items = await client.getAllMenuItems();
   if (!items.length) return { created: 0, updated: 0, skipped: 0 };
 
-  const admin = createAdminClient();
   const { data: existing } = await admin
     .from('inventory_items').select('id, name, sku').eq('organization_id', org.id);
   const byName = new Map((existing ?? []).map(i => [i.name.toLowerCase(), i]));
   const bySku  = new Map((existing ?? []).filter(i => i.sku).map(i => [i.sku!, i]));
   const result: SyncResult = { created: 0, updated: 0, skipped: 0 };
+  // Toast documents dollars; TOAST_AMOUNTS_IN_CENTS flips it if a sandbox says otherwise.
+  const div = process.env.TOAST_AMOUNTS_IN_CENTS === 'true' ? 100 : 1;
 
   for (const item of items) {
-    if (!item.name?.trim() || item.hidden) { result.skipped++; continue; }
+    if (!item.name?.trim()) { result.skipped++; continue; }
+    const price = typeof item.price === 'number' ? item.price / div : null;
     const match = (item.sku && bySku.get(item.sku)) ?? byName.get(item.name.toLowerCase());
     if (match) {
       // admin-scope-ok: match.id comes from `existing`, fetched with .eq('organization_id', org.id)
       const { error } = await admin.from('inventory_items').update({
-        sale_price: item.price != null ? item.price / 100 : undefined,
+        sale_price: price ?? undefined,
         sku: item.sku || match.sku || null,
       }).eq('id', match.id);
       error ? result.skipped++ : result.updated++;
@@ -468,7 +348,7 @@ export async function syncToastInventory(): Promise<SyncResult> {
         organization_id: org.id,
         name:       item.name.trim(),
         sku:        item.sku || null,
-        sale_price: item.price != null ? item.price / 100 : null,
+        sale_price: price,
         current_stock: 0,
         unit:       'each',
         is_active:  true,
@@ -479,77 +359,4 @@ export async function syncToastInventory(): Promise<SyncResult> {
 
   revalidatePath('/app/inventory');
   return result;
-}
-
-/** Pull Toast employee shifts for the last N business days → employee_shifts. */
-export async function syncToastShifts(days = 7): Promise<{ upserted: number; newEmployees: number }> {
-  const { client, org } = await getToastClient();
-  const { toToastDate } = await import('@/lib/toast/client');
-  const admin = createAdminClient();
-
-  // Fetch Toast employees for name lookup
-  const toastEmps = await client.getEmployees();
-  const empByGuid = new Map(toastEmps.filter(e => !e.deleted).map(e => [
-    e.guid,
-    `${e.firstName} ${e.lastName}`.trim(),
-  ]));
-
-  // Get existing Rail employees for this org
-  const { data: railEmps } = await admin
-    .from('employees').select('id, name').eq('organization_id', org.id);
-  const railByName = new Map((railEmps ?? []).map(e => [e.name.toLowerCase(), e.id]));
-
-  let upserted = 0, newEmployees = 0;
-
-  const now = new Date();
-  for (let i = 0; i < days; i++) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    const bizDate    = toToastDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
-    const shiftDate  = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-
-    const shifts = await client.getShiftsByBusinessDate(bizDate);
-    for (const shift of shifts) {
-      if (shift.deleted) continue;
-      const empName = empByGuid.get(shift.employee?.guid ?? '') ?? '';
-      if (!empName) continue;
-
-      // Create employee if missing
-      let empId = railByName.get(empName.toLowerCase());
-      if (!empId) {
-        const { data: newEmp } = await admin.from('employees').insert({
-          organization_id: org.id,
-          name: empName,
-          tip_mode: 'pool',
-        }).select('id').single();
-        if (newEmp) {
-          empId = newEmp.id;
-          railByName.set(empName.toLowerCase(), empId);
-          newEmployees++;
-        }
-      }
-      if (!empId) continue;
-
-      // Calculate hours
-      const inMs  = shift.inDate  ? new Date(shift.inDate).getTime()  : 0;
-      const outMs = shift.outDate ? new Date(shift.outDate).getTime() : 0;
-      const hoursWorked = outMs > inMs ? (outMs - inMs) / (1000 * 60 * 60) : 0;
-
-      await admin.from('employee_shifts').upsert({
-        organization_id: org.id,
-        employee_id:     empId,
-        shift_date:      shiftDate,
-        // Hours as worked, with no split. Overtime is a weekly rule applied by
-        // the pay run (splitWeeklyOvertime), and a bar's shifts do not fit an
-        // eight-hour day: a close runs past midnight, so this used to book
-        // three hours of premium on an ordinary eleven-hour Friday.
-        regular_hours:   Math.round(hoursWorked * 100) / 100,
-        overtime_hours:  0,
-      }, { onConflict: 'organization_id,employee_id,shift_date' });
-      upserted++;
-    }
-  }
-
-  revalidatePath('/app/payroll');
-  return { upserted, newEmployees };
 }

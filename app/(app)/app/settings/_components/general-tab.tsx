@@ -11,6 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select';
 import { updateGeneralInfo } from '../actions';
+import { validateRoutingNumber } from '@/lib/direct-deposit/routing';
 import type { BarSettings } from '@/lib/org';
 import type { Role } from '@/lib/permissions';
 
@@ -66,6 +67,12 @@ export function GeneralTab({ orgName, role, settings }: Props) {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    // Checked here as well as on the server: Next hides a thrown server-action
+    // message in production, and the person needs to be told which field is wrong.
+    if (routingInvalid) {
+      toast.error('Fix the bank routing number before saving.');
+      return;
+    }
     setSaving(true);
     try {
       await updateGeneralInfo({
@@ -82,6 +89,8 @@ export function GeneralTab({ orgName, role, settings }: Props) {
     }
   }
 
+  const routingInvalid = form.nacha_routing_number !== '' && !validateRoutingNumber(form.nacha_routing_number);
+
   return (
     <form onSubmit={handleSave} className="space-y-6">
       {/* Identity */}
@@ -97,7 +106,7 @@ export function GeneralTab({ orgName, role, settings }: Props) {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label>Venue Type</Label>
-            <Select value={form.bar_type} onValueChange={(v) => setForm({ ...form, bar_type: v ?? 'bar' })} disabled={!canEdit}>
+            <Select label="Venue type" value={form.bar_type} onValueChange={(v) => setForm({ ...form, bar_type: v ?? 'bar' })} disabled={!canEdit}>
               <SelectTrigger>
                 <span className="text-sm">{BAR_TYPES.find(b => b.value === form.bar_type)?.label ?? 'Bar / Tavern'}</span>
               </SelectTrigger>
@@ -127,7 +136,7 @@ export function GeneralTab({ orgName, role, settings }: Props) {
           </div>
           <div className="space-y-1.5">
             <Label>State</Label>
-            <Select value={form.bar_state || 'none'} onValueChange={(v) => setForm({ ...form, bar_state: !v || v === 'none' ? '' : v })} disabled={!canEdit}>
+            <Select label="State" value={form.bar_state || 'none'} onValueChange={(v) => setForm({ ...form, bar_state: !v || v === 'none' ? '' : v })} disabled={!canEdit}>
               <SelectTrigger>
                 <span className="text-sm">{form.bar_state || 'Select state'}</span>
               </SelectTrigger>
@@ -234,7 +243,7 @@ export function GeneralTab({ orgName, role, settings }: Props) {
         <div>
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest">Payroll &amp; ACH Direct Deposit</h3>
           <p className="text-xs text-muted-foreground mt-1">
-            Used to generate NACHA files for direct deposit. Upload the file to your bank's
+            Used to generate NACHA files for direct deposit. Upload the file to your bank&rsquo;s
             business portal (Chase ACH Manager, BofA CashPro, etc.) — no third-party service needed.
           </p>
         </div>
@@ -249,8 +258,14 @@ export function GeneralTab({ orgName, role, settings }: Props) {
               onChange={(e) => setForm({ ...form, nacha_routing_number: e.target.value.replace(/\D/g, '') })}
               disabled={!canEdit}
               className="font-mono"
+              aria-invalid={routingInvalid}
+              aria-describedby="routing-help"
             />
-            <p className="text-xs text-muted-foreground">Your business bank's 9-digit routing number</p>
+            <p id="routing-help" className={`text-xs ${routingInvalid ? 'text-red-700 dark:text-red-300' : 'text-muted-foreground'}`}>
+              {routingInvalid
+                ? 'That is not a valid routing number. It must be 9 digits and pass the bank routing check.'
+                : "Your business bank's 9-digit routing number"}
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label>Bank Name <span className="text-destructive">*</span></Label>

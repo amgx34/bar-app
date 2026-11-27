@@ -111,7 +111,7 @@ export default function WellSettingsDialog({
           <div className="space-y-3">
             <Label>Well Names &amp; Weights</Label>
             <p className="text-xs text-muted-foreground -mt-1">
-              Weight controls each well's share of expected sales. Equal weights = equal share.
+              Weight controls each well&apos;s share of expected sales. Equal weights = equal share.
             </p>
             {wells.slice(0, count).map((w) => (
               <div key={w.id} className="flex items-center gap-2">

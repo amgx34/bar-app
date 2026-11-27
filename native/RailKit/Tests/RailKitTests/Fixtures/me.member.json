@@ -1,0 +1,29 @@
+{
+  "data": {
+    "user": {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "email": "member@example.com"
+    },
+    "memberships": [
+      {
+        "orgId": "00000000-0000-4000-8000-0000000000a1",
+        "orgName": "Fixture Bar One",
+        "role": "manager",
+        "destinations": [
+          "today",
+          "stock",
+          "sales",
+          "team-pay",
+          "books"
+        ]
+      }
+    ],
+    "activeOrgId": "00000000-0000-4000-8000-0000000000a1",
+    "staff": {
+      "kind": "none"
+    }
+  },
+  "meta": {
+    "asOf": "2026-11-25T12:00:00.000Z"
+  }
+}

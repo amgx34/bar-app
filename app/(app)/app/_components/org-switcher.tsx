@@ -48,10 +48,10 @@ export function OrgSwitcher({ currentOrg, allMemberships }: Props) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'gap-2')}
+        className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'gap-2 min-h-11 min-w-11 shrink max-w-[10rem] sm:max-w-none')}
         disabled={isPending}
       >
-        <span className="truncate max-w-[160px]">{currentOrg.name}</span>
+        <span className="truncate sm:max-w-[160px]">{currentOrg.name}</span>
         <ChevronsUpDown className="h-3 w-3 opacity-50" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">

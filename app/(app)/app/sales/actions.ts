@@ -13,6 +13,7 @@ import {
   resolveDateRange, todayIso, addDays, type DateRange, type SalesView,
 } from '@/lib/date-range';
 import { cutoffHourFromSettings } from '@/lib/business-date';
+import { comparisonWindows, compareSales, type PeriodDelta } from '@/lib/pos/deltas';
 import { assessCapabilities, type SalesCapabilities } from '@/lib/pos/sales-capabilities';
 import { buildDaypart, type Daypart } from '@/lib/pos/daypart';
 import { summariseTickets, type TicketMetrics } from '@/lib/pos/tickets';
@@ -273,6 +274,8 @@ export async function getSalesData(
  * whole Z-report path is careful about (see AGENTS.md).
  */
 export type NightLedger = {
+  /** The Z report's day total. Null when the Z row carries none. */
+  totalSales: number | null;
   cashSales: number | null;
   cardSales: number | null;
   /** Cash and card tips added together. Null when no Z row exists at all. */
@@ -455,6 +458,7 @@ export async function getPeriodSalesData(
         ));
 
         return {
+          totalSales:  z.total_sales === null ? null : Number(z.total_sales),
           cashSales:   z.cash_sales === null ? null : Number(z.cash_sales),
           cardSales:   z.card_sales === null ? null : Number(z.card_sales),
           tips,
@@ -475,4 +479,25 @@ export async function getPeriodSalesData(
     menu,
     night,
   };
+}
+
+/**
+ * Change in Z-report sales against the prior week or month, or null when there
+ * is nothing finished to compare. Both sides read z_report_days, so the chip
+ * compares like with like (it can differ from the item-audit revenue shown).
+ */
+export async function getSalesComparison(
+  view: 'week' | 'month', start: string, end: string, today: string,
+): Promise<{ delta: PeriodDelta; label: string } | null> {
+  const w = comparisonWindows(view, start, end, today);
+  if (!w) return null;
+  const { org } = await getCurrentOrg();
+  const { data } = await createAdminClient()
+    .from('z_report_days')
+    .select('report_date, total_sales')
+    .eq('organization_id', org.id)
+    .gte('report_date', w.prior.start)
+    .lte('report_date', w.cur.end);
+  const days = (data ?? []).map((r) => ({ date: r.report_date as string, total: Number(r.total_sales) || 0 }));
+  return { delta: compareSales(w, days, days), label: view === 'week' ? 'last week' : 'last month' };
 }

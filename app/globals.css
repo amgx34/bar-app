@@ -42,6 +42,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -272,6 +273,13 @@
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
+  }
+
+  /* Always-dark surfaces (sidebar, login, setup) keep the dark ring in light mode:
+     the light ring is 2:1 on navy. */
+  .bg-sidebar {
+    --ring: var(--sidebar-ring);
+    --color-ring: var(--sidebar-ring);
   }
 
   ::-webkit-scrollbar {

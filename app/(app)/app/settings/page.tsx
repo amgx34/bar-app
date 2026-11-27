@@ -10,6 +10,11 @@ import { canEditInventory } from '@/lib/permissions';
 import { TeamTab } from './_components/team-tab';
 import { listTeamMembers } from './team-actions';
 import ImportTab from '../payroll/_components/import-tab';
+import { BillingTab } from './_components/billing-tab';
+import { getOrgBilling, isDemoOrg } from '@/lib/billing/store';
+import { stripeConfigured } from '@/lib/billing/stripe';
+import { DataTab } from './_components/data-tab';
+import { deletionEnabled } from '@/lib/account/delete-org';
 import { NotificationsTab } from './_components/notifications-tab';
 import { getNotificationPreferences, getRegisteredDevices } from '../actions/notifications';
 
@@ -23,23 +28,14 @@ const TABS = [
   { key: 'pos',         label: 'POS Integration' },
   { key: 'notifications', label: 'Notifications' },
   { key: 'team',        label: 'Team' },
+  { key: 'billing',     label: 'Billing' },
+  { key: 'data',        label: 'Data' },
 ];
 
-function buildCloverAuthUrl(orgId: string): string | null {
-  const clientId    = process.env.CLOVER_CLIENT_ID;
-  const redirectUri = process.env.CLOVER_REDIRECT_URI;
-  if (!clientId || !redirectUri) return null;
-
-  const base = process.env.CLOVER_SANDBOX === 'true'
-    ? 'https://sandbox.dev.clover.com/oauth/v2/authorize'
-    : 'https://www.clover.com/oauth/v2/authorize';
-
-  const url = new URL(base);
-  url.searchParams.set('client_id',     clientId);
-  url.searchParams.set('redirect_uri',  redirectUri);
-  url.searchParams.set('response_type', 'code');
-  url.searchParams.set('state',         orgId);
-  return url.toString();
+/** Clover's redirect needs a signed state and a region, so it starts on the setup page. */
+function cloverSetupUrl(): string | null {
+  const ready = process.env.CLOVER_CLIENT_ID && process.env.CLOVER_REDIRECT_URI && process.env.OAUTH_STATE_SECRET;
+  return ready ? '/setup/pos/clover' : null;
 }
 
 export const metadata: Metadata = { title: 'Settings' };
@@ -54,6 +50,8 @@ export default async function SettingsPage({
   const tab      = params.tab ?? 'general';
   const settings = org.bar_settings ?? { tip_split_percent: 15, default_hourly_rate: 15 };
   const team     = tab === 'team' ? await listTeamMembers() : null;
+
+  const billing = tab === 'billing' ? await getOrgBilling(org.id) : null;
 
   // Same pattern as the tabs above: fetched only for the tab that renders it.
   const notifications = tab === 'notifications'
@@ -77,12 +75,13 @@ export default async function SettingsPage({
       </div>
 
       {/* Tab nav */}
-      <div className="border-b overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex gap-6 min-w-max">
+      <div className="border-b">
+        <nav aria-label="Settings sections" className="flex flex-wrap gap-x-6 gap-y-2">
           {TABS.map(({ key, label }) => (
             <a
               key={key}
               href={`/app/settings?tab=${key}`}
+              aria-current={tab === key ? 'page' : undefined}
               className={`px-1 pb-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 tab === key
                   ? 'border-primary text-primary'
@@ -92,11 +91,18 @@ export default async function SettingsPage({
               {label}
             </a>
           ))}
-        </div>
+        </nav>
       </div>
 
       {/* Tab content */}
       {tab === 'general'     && <GeneralTab  orgName={org.name} role={role} settings={settings} />}
+      {tab === 'billing' && (
+        <BillingTab billing={billing} isOwner={role === 'owner'} configured={stripeConfigured()}
+          flash={params.billing} isDemo={isDemoOrg(org.slug)} />
+      )}
+      {tab === 'data' && (
+        <DataTab orgName={org.name} isOwner={role === 'owner'} isDemo={isDemoOrg(org.slug)} deletionOpen={deletionEnabled()} />
+      )}
       {tab === 'tip-pay'     && <TipPayTab   role={role}         settings={settings} />}
       {tab === 'inventory'   && <InventoryTab role={role}         settings={settings} />}
       {tab === 'import-data' && (
@@ -125,7 +131,7 @@ export default async function SettingsPage({
             role={role}
             posProvider={org.pos_provider}
             posConfig={(org.pos_config ?? {}) as Record<string, unknown>}
-            cloverAuthUrl={buildCloverAuthUrl(org.id)}
+            cloverAuthUrl={cloverSetupUrl()}
             flashConnected={params.connected === 'clover'}
             flashError={params.error}
           />

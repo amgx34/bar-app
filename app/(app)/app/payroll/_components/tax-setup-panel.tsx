@@ -105,6 +105,7 @@ export default function TaxSetupPanel({ initial, tables, frequencyChosen }: TaxS
         <div className="space-y-2">
           <Label htmlFor="taxPayFrequency">Pay frequency</Label>
           <Select
+            label="Pay frequency"
             value={chosen ? config.payFrequency : ''}
             onValueChange={(v) => save({ payFrequency: v as PayFrequency })}
           >

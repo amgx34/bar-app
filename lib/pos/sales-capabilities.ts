@@ -57,3 +57,22 @@ export function assessCapabilities(input: CapabilityInput): SalesCapabilities {
     hasTickets: present(input?.totalTicketCount),
   };
 }
+
+const PULL_NAMES: Record<string, string> = { clover: 'Clover', toast: 'Toast' };
+
+/**
+ * The help sentence for a missing panel. Clover and Toast bars have no agent to
+ * update, so they are told what to expect from the connection instead. Panels
+ * still light up from row counts alone, with no provider branch: this only
+ * changes the words.
+ */
+export function capabilityHelp(key: keyof SalesCapabilities, provider: string | null | undefined): string {
+  const name = provider ? PULL_NAMES[provider] : undefined;
+  if (!name) return CAPABILITY_HELP[key];
+  const wait = `Rail records it from ${name} as nights sync, so it fills in from the first sync onward. Nights from before you connected ${name} stay without it.`;
+  return {
+    hasHourly: `There is no record yet of when in the night the money came in. ${wait}`,
+    hasServer: `There is no record yet of who rang each ticket up, so sales cannot be split by bartender. ${wait}`,
+    hasTickets: `There is no ticket count yet, so average spend per visit cannot be worked out. ${wait}`,
+  }[key];
+}

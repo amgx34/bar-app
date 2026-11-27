@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withBotId } from "botid/next/config";
 
 /**
  * Content Security Policy.
@@ -72,6 +73,26 @@ const nextConfig: NextConfig = {
   // Trims the header that advertises the framework and version.
   poweredByHeader: false,
 
+  // Retired routes forward here, not from page files: a bare redirect() in a
+  // page threw "Rendered more hooks" in Next's client router in dev.
+  async redirects() {
+    const r = (source: string, destination: string) => ({ source, destination, permanent: false });
+    return [
+      r('/app/analytics', '/app/inventory/analytics'),
+      r('/app/employees', '/app/payroll/employees'),
+      r('/app/sales/categories', '/app/sales?view=week'),
+      r('/app/sales/margins', '/app/sales?view=month'),
+      r('/app/inventory/loss', '/app/inventory'),
+      {
+        source: '/app/payroll/split',
+        has: [{ type: 'query' as const, key: 'date', value: '(?<date>\\d{4}-\\d{2}-\\d{2})' }],
+        destination: '/app/payroll?view=day&date=:date',
+        permanent: false,
+      },
+      r('/app/payroll/split', '/app/payroll?view=day'),
+    ];
+  },
+
   async headers() {
     return [
       {
@@ -97,4 +118,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withBotId(nextConfig);

@@ -36,7 +36,7 @@ export function DemoButton({ size = 'default', className = '' }: Props) {
       // because otherwise landing on their own dashboard looks like the demo
       // failed to load.
       if (body?.alreadySignedIn) {
-        toast.info('You are already signed in — taking you to your own bar.');
+        toast.info('You are already signed in. Taking you to your own bar.');
       }
 
       window.location.href = body?.redirectTo ?? '/app/dashboard';
@@ -47,8 +47,8 @@ export function DemoButton({ size = 'default', className = '' }: Props) {
   }
 
   const sizeClasses = {
-    sm:      'h-9 px-4 text-sm',
-    default: 'h-10 px-6 text-sm',
+    sm:      'h-11 md:h-9 px-4 text-sm',
+    default: 'h-11 md:h-10 px-6 text-sm',
     lg:      'h-12 px-8 text-base',
   }[size];
 

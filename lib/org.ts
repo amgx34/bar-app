@@ -2,6 +2,7 @@ import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { selectActive } from '@/lib/api/org-scope';
 import { getEmployeeAccountState } from '@/lib/employee-portal/session';
 
 export const CURRENT_ORG_COOKIE = 'current_org_id';
@@ -17,9 +18,14 @@ export type HourlyRates = {
 
 export type BarSettings = {
   // ── Existing ──────────────────────────────────────────────────────────
-  tip_split_percent:   number;
-  default_hourly_rate: number;
+  /** Absent until the owner or a demo carry-over supplies them; they feed payroll. */
+  tip_split_percent?:   number;
+  default_hourly_rate?: number;
+  /** IANA zone, used for the nightly close. */
+  timezone?: string;
   auto_reorder_enabled?: boolean;
+  /** ISO time the owner hid the dashboard setup checklist. Absent means show it. */
+  onboarding_dismissed_at?: string;
   admin_phone?:          string;
 
   // ── Tip configuration ─────────────────────────────────────────────────
@@ -83,6 +89,8 @@ export type BarSettings = {
 };
 
 export type OrgMembership = {
+  user_id: string;
+  created_at: string;
   organization_id: string;
   role: 'owner' | 'manager' | 'accountant';
   organizations: {
@@ -138,7 +146,9 @@ export const getCurrentOrg = cache(async (): Promise<CurrentOrgResult> => {
 
   const { data: raw, error } = await supabase
     .from('memberships')
-    .select('organization_id, role, organizations(id, name, slug, pos_provider, pos_config, bar_settings)')
+    .select('user_id, created_at, organization_id, role, organizations(id, name, slug, pos_provider, pos_config, bar_settings)')
+    // RLS shows every member of the bar, so scope to the caller explicitly.
+    .eq('user_id', user.id)
     .order('created_at', { ascending: true });
 
   const memberships = raw as OrgMembership[] | null;
@@ -156,7 +166,7 @@ export const getCurrentOrg = cache(async (): Promise<CurrentOrgResult> => {
   const cookieStore = await cookies();
   const cookieOrgId = cookieStore.get(CURRENT_ORG_COOKIE)?.value;
 
-  const active = memberships.find((m) => m.organization_id === cookieOrgId) ?? memberships[0];
+  const active = selectActive(memberships, user.id, cookieOrgId) ?? memberships[0];
 
   return {
     org: active.organizations,

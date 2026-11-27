@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useTransition } from 'react';
 import Link from 'next/link';
-import { Bell, X, CheckCheck, Trash2, ExternalLink, RefreshCw, CheckCircle, XCircle, DollarSign, Package, TrendingUp, Wallet } from 'lucide-react';
+import { Bell, X, CheckCheck, Trash2, ExternalLink, RefreshCw, CheckCircle, XCircle, DollarSign, Package, TrendingUp, Wallet, Plug } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   getBarMessages, markMessageRead, markAllMessagesRead,
@@ -221,6 +221,7 @@ const ALERT_ICONS: Record<string, typeof Package> = {
   'payroll.approval_needed':   Wallet,
   'payroll.approved':          Wallet,
   'payroll.changes_requested': Wallet,
+  'pos.feed_stale':            Plug,
 };
 
 function AlertRow({

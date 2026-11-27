@@ -89,11 +89,5 @@ export function maskAccount(accountNumber: string): string {
   return accountNumber.slice(-4).padStart(4, '0');
 }
 
-/** NACHA ABA routing number checksum validation. */
-export function validateRoutingNumber(routing: string): boolean {
-  if (!/^\d{9}$/.test(routing)) return false;
-  const d = routing.split('').map(Number);
-  const checksum =
-    (3 * (d[0] + d[3] + d[6]) + 7 * (d[1] + d[4] + d[7]) + (d[2] + d[5] + d[8])) % 10;
-  return checksum === 0;
-}
+/** NACHA ABA routing number checksum validation (kept here for existing callers). */
+export { validateRoutingNumber } from './routing';

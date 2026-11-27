@@ -81,7 +81,8 @@ export async function sendMagicLink(
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email: normalisedEmail,
-    options: { emailRedirectTo: redirectTo },
+    // Login only: a link must never create an account. New owners use /signup.
+    options: { emailRedirectTo: redirectTo, shouldCreateUser: false },
   });
 
   if (error) {

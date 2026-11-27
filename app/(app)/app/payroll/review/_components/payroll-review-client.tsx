@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { Download, CheckCircle } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import type { PayrollEntry } from '../../actions';
+
+const NACHA_NEEDS_APPROVAL = 'The bank file unlocks once an owner approves this pay run.';
 
 interface Props {
   entries:      PayrollEntry[];
@@ -12,16 +13,11 @@ interface Props {
   endDate:      string;
   periodLabel:  string;
   orgName:      string;
+  approved:     boolean; // the bank file is refused until the run is approved; say so instead of inviting the click
   exportOnly?:  boolean; // true = render only the export button (used in sticky header)
 }
 
-function fmtMoney(n: number) {
-  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
-}
-
-export function PayrollReviewClient({ entries, startDate, endDate, periodLabel, orgName, exportOnly }: Props) {
-  const [confirmed, setConfirmed] = useState(false);
-
+export function PayrollReviewClient({ entries, startDate, endDate, periodLabel, orgName, approved, exportOnly }: Props) {
   function downloadCsv() {
     const header = [
       'Employee', 'Role', 'Rate ($/hr)',
@@ -104,43 +100,31 @@ export function PayrollReviewClient({ entries, startDate, endDate, periodLabel, 
 
   if (exportOnly) {
     return (
-      <div className="flex gap-2 shrink-0">
-        <Button size="sm" variant="outline" onClick={downloadCsv} className="gap-1.5">
-          <Download className="h-3.5 w-3.5" /> CSV
-        </Button>
-        <Button size="sm" variant="outline" onClick={downloadNacha} className="gap-1.5 text-primary border-primary/40 hover:bg-primary/5">
-          <Download className="h-3.5 w-3.5" /> NACHA File
-        </Button>
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={downloadCsv} className="min-h-11 gap-1.5 sm:min-h-0">
+            <Download className="h-3.5 w-3.5" /> CSV
+          </Button>
+          <Button size="sm" variant="outline" onClick={downloadNacha} disabled={!approved} aria-describedby={approved ? undefined : 'nacha-reason-hdr'} className="min-h-11 gap-1.5 text-primary border-primary/40 hover:bg-primary/5 sm:min-h-0">
+            <Download className="h-3.5 w-3.5" /> NACHA File
+          </Button>
+        </div>
+        {!approved && <p id="nacha-reason-hdr" className="text-xs text-muted-foreground">{NACHA_NEEDS_APPROVAL}</p>}
       </div>
     );
   }
 
   return (
-    <div className="flex flex-wrap gap-3">
-      <Button variant="outline" onClick={downloadCsv} className="gap-2">
-        <Download className="h-4 w-4" /> Export CSV
-      </Button>
-      <Button variant="outline" onClick={downloadNacha} className="gap-2 text-primary border-primary/40 hover:bg-primary/5">
-        <Download className="h-4 w-4" /> Download NACHA File
-      </Button>
-
-      {!confirmed ? (
-        <Button
-          onClick={() => {
-            setConfirmed(true);
-            toast.success('Payroll confirmed for this period. Provide the exported CSV to your payroll provider to process payments.');
-          }}
-          className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-        >
-          <CheckCircle className="h-4 w-4" />
-          Confirm Payroll
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-3">
+        <Button variant="outline" onClick={downloadCsv} className="min-h-11 gap-2">
+          <Download className="h-4 w-4" /> Export CSV
         </Button>
-      ) : (
-        <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-4 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">
-          <CheckCircle className="h-4 w-4" />
-          Confirmed — provide CSV to your payroll provider
-        </div>
-      )}
+        <Button variant="outline" onClick={downloadNacha} disabled={!approved} aria-describedby={approved ? undefined : 'nacha-reason'} className="min-h-11 gap-2 text-primary border-primary/40 hover:bg-primary/5">
+          <Download className="h-4 w-4" /> Download NACHA File
+        </Button>
+      </div>
+      {!approved && <p id="nacha-reason" className="text-sm text-muted-foreground">{NACHA_NEEDS_APPROVAL}</p>}
     </div>
   );
 }

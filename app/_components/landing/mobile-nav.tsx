@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
+import { SIGNUP_OPEN } from '@/lib/auth/signup-open';
 
 /**
  * The public site's navigation on phones.
@@ -49,7 +50,7 @@ export function MobileNav({
         aria-expanded={open}
         aria-controls={panelId}
         aria-label={open ? 'Close menu' : 'Open menu'}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors duration-200 cursor-pointer"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors duration-200 cursor-pointer"
       >
         {open ? <X className="h-5 w-5" aria-hidden /> : <Menu className="h-5 w-5" aria-hidden />}
       </button>
@@ -81,6 +82,15 @@ export function MobileNav({
           >
             Sign in
           </Link>
+          {SIGNUP_OPEN && (
+            <Link
+              href="/signup"
+              onClick={() => setOpen(false)}
+              className="py-3 text-sm font-medium text-muted-foreground hover:text-primary transition-colors duration-200"
+            >
+              Create an account
+            </Link>
+          )}
         </nav>
       </div>
     </div>

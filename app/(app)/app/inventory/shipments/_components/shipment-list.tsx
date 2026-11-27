@@ -115,8 +115,8 @@ export function ShipmentList({
           <TableRow>
             <TableHead>Date</TableHead>
             <TableHead>Vendor</TableHead>
-            <TableHead>Invoice #</TableHead>
-            <TableHead className="text-right">Lines</TableHead>
+            <TableHead className="hidden sm:table-cell">Invoice #</TableHead>
+            <TableHead className="hidden text-right sm:table-cell">Lines</TableHead>
             <TableHead className="text-right">Total</TableHead>
             <TableHead className="text-right">Invoice total</TableHead>
             <TableHead />
@@ -130,21 +130,38 @@ export function ShipmentList({
                 : null;
 
             return (
-              <TableRow key={s.id} className={s.voided ? 'opacity-60' : undefined}>
+              <TableRow key={s.id} className={s.voided ? 'bg-muted/40' : undefined}>
                 <TableCell className="tabular-nums">{formatDate(s.invoiceDate)}</TableCell>
-                <TableCell className="font-medium">{s.vendorName}</TableCell>
-                <TableCell className="text-muted-foreground">{s.invoiceNumber ?? '—'}</TableCell>
-                <TableCell className="text-right tabular-nums">{s.lineCount}</TableCell>
+                <TableCell className="font-medium">
+                  {s.vendorName}
+                  {/* Below sm the Invoice # and Lines columns are hidden so
+                      Total, Invoice total and Void stay on screen. */}
+                  <span className="block text-xs font-normal text-muted-foreground sm:hidden">
+                    {s.invoiceNumber ? `#${s.invoiceNumber} · ` : ''}{s.lineCount} lines
+                  </span>
+                </TableCell>
+                <TableCell className="hidden text-muted-foreground sm:table-cell">{s.invoiceNumber ?? '—'}</TableCell>
+                <TableCell className="hidden text-right tabular-nums sm:table-cell">{s.lineCount}</TableCell>
                 <TableCell className="text-right tabular-nums font-medium">
-                  {money(s.computedTotal)}
+                  {/* A voided total is reversed out of the books: strike it and
+                      say so, rather than dim it, which still reads as a live
+                      figure and fails contrast. */}
+                  {s.voided ? (
+                    <span className="flex flex-col items-end">
+                      <span className="font-normal text-muted-foreground line-through">{money(s.computedTotal)}</span>
+                      <span className="text-xs font-medium text-destructive">Reversed</span>
+                    </span>
+                  ) : (
+                    money(s.computedTotal)
+                  )}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {s.invoiceTotal === null ? (
                     <span className="text-muted-foreground">—</span>
                   ) : (
                     <div className="flex flex-col items-end">
-                      <span>{money(s.invoiceTotal)}</span>
-                      {discrepancy !== null && (
+                      <span className={s.voided ? 'text-muted-foreground line-through' : undefined}>{money(s.invoiceTotal)}</span>
+                      {discrepancy !== null && !s.voided && (
                         // The single most useful fact this screen can surface:
                         // what Rail posted does not match what the vendor
                         // billed. Shown as a signed delta so "we posted more

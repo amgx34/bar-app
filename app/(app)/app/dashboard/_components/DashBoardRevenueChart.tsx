@@ -37,13 +37,20 @@ export default function DashboardRevenueChart({ data, className = '' }: Props) {
       date: fmtDate(d.nightDate),
       Sales: d.totalSales,
       Tips: d.totalTips,
-      'Tip %': parseFloat(d.tipPercent.toFixed(1)),
+      // null, not 0: a night with no sales has no rate, and a 0% dot reads as a real reading.
+      'Tip %': d.totalSales > 0 ? parseFloat(d.tipPercent.toFixed(1)) : null,
     }));
 
   return (
-    <div className={`w-full h-56 ${className}`}>
-      <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={chartData} margin={{ top: 4, right: 20, left: -10, bottom: 0 }}>
+    <div
+      className={`w-full h-56 min-h-56 ${className}`}
+      role="img"
+      aria-label={`Sales and tips for the last ${chartData.length} nights. The same figures are listed below the chart.`}
+    >
+      {/* initialDimension: the container is measured before layout settles, which
+          logged "width(-1) and height(-1) should be greater than 0" on every load. */}
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 224 }}>
+        <ComposedChart accessibilityLayer={false} data={chartData} margin={{ top: 4, right: 20, left: -10, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
           <XAxis
             dataKey="date"
@@ -57,7 +64,7 @@ export default function DashboardRevenueChart({ data, className = '' }: Props) {
             tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
             axisLine={false}
             tickLine={false}
-            tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+            tickFormatter={(v: number) => (v === 0 ? '$0' : `$${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k`)}
           />
           <YAxis
             yAxisId="pct"
@@ -81,16 +88,19 @@ export default function DashboardRevenueChart({ data, className = '' }: Props) {
               return [`$${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}`, name];
             }}
           />
-          <Bar yAxisId="dollars" dataKey="Sales" fill="#10b981" radius={[3, 3, 0, 0]} maxBarSize={40} />
-          <Bar yAxisId="dollars" dataKey="Tips" fill="#22d3ee" radius={[3, 3, 0, 0]} maxBarSize={40} />
+          {/* The system's chart tokens (verified ≥3:1 in both themes), not loose hex. */}
+          <Bar yAxisId="dollars" dataKey="Sales" fill="var(--chart-1)" radius={[3, 3, 0, 0]} maxBarSize={40} isAnimationActive={false} />
+          <Bar yAxisId="dollars" dataKey="Tips" fill="var(--chart-3)" radius={[3, 3, 0, 0]} maxBarSize={40} isAnimationActive={false} />
           <Line
             yAxisId="pct"
-            type="monotone"
+            type="linear"
             dataKey="Tip %"
-            stroke="#a78bfa"
+            stroke="var(--chart-2)"
             strokeWidth={2}
-            dot={{ r: 3, fill: '#a78bfa', strokeWidth: 0 }}
+            dot={{ r: 3, fill: 'var(--chart-2)', strokeWidth: 0 }}
             activeDot={{ r: 5 }}
+            isAnimationActive={false}
+            connectNulls={false}
           />
         </ComposedChart>
       </ResponsiveContainer>

@@ -21,7 +21,7 @@ export default defineConfig({
     tsconfigPaths: true,
   },
   test: {
-    include: ['lib/**/*.test.ts'],
+    include: ['lib/**/*.test.ts', 'scripts/**/*.test.ts', 'app/**/*.test.ts'],
     environment: 'node',
   },
 });

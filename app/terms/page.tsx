@@ -113,7 +113,7 @@ export default function TermsPage() {
           agreed to anything with us. You are the controller of that data and we are
           your processor. You are responsible for having a lawful basis to put it in,
           for telling your staff you have, and for handling their requests to see or
-          delete it. We will help you action those requests.
+          delete it. We will help you with those requests where we can.
         </p>
         <p>
           Uploaded POS exports may be sent to a third-party AI service to be read.
@@ -169,8 +169,8 @@ export default function TermsPage() {
           moment.
         </p>
         <p>
-          Keep your own copies of anything you need for compliance. Export your data
-          before you close your account.
+          Keep your own copies of anything you need for compliance. Ask us for a copy of
+          your records before you close your account.
         </p>
       </section>
 
@@ -197,8 +197,8 @@ export default function TermsPage() {
         <h2>9. Ending the agreement</h2>
         <p>
           You may stop using {SITE_NAME} and close your account at any time. Ask us
-          and we will delete your data; some records are retained where the law
-          requires it, as set out in the{' '}
+          and we will tell you what we must keep and handle the rest; some
+          records are retained where the law requires it, as set out in the{' '}
           <Link href="/privacy">Privacy Policy</Link>.
         </p>
         <p>

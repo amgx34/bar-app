@@ -75,6 +75,15 @@ export type PayoutSummary = {
   allPaid:     boolean;
 };
 
+/**
+ * A balance this small is not owed. Payments are rounded to the cent, so a
+ * compensation figure carrying float residue (1234.564 paid as 1234.56) leaves
+ * a few thousandths that are not money. Both the summary and the bulk planner
+ * use this one number: with separate literals they disagreed, and the payout
+ * bar read "5 of 7, still owed $0.01" while the Pay dialog said all 7 were settled.
+ */
+export const SETTLED_WITHIN = 0.005;
+
 /** What somebody has been handed for a period. Zero when nothing is recorded. */
 export function totalPaidTo(payouts: readonly Payout[] | undefined): number {
   return (payouts ?? []).reduce((sum, p) => sum + p.amountPaid, 0);
@@ -111,7 +120,7 @@ export function summarizePayouts(
     const paidSoFar = totalPaidTo(payoutsByEmployee.get(entry.employeeId));
     const balance = entry.totalCompensation - paidSoFar;
 
-    if (balance <= 0) {
+    if (balance <= SETTLED_WITHIN) {
       paidCount += 1;
     } else {
       outstanding += balance;
@@ -219,7 +228,7 @@ export function planBulkPayout(
 
     // Square, or overpaid by a downward recompute. Either way nothing is owed
     // and nothing should be written.
-    if (balance <= 0.005) {
+    if (balance <= SETTLED_WITHIN) {
       skipped.push({
         employeeId: entry.employeeId, employeeName: entry.employeeName,
         reason: 'already-paid',
@@ -232,7 +241,7 @@ export function planBulkPayout(
     // rule and the balance is a convenience — if a future change lets the two
     // diverge, this refuses rather than quietly overpaying, and names who.
     const capacity = remainingAdvanceCapacity(entry.totalCompensation, alreadyPaid);
-    if (balance > capacity + 0.005) {
+    if (balance > capacity + SETTLED_WITHIN) {
       skipped.push({
         employeeId: entry.employeeId, employeeName: entry.employeeName,
         reason: 'over-cap', available: capacity,

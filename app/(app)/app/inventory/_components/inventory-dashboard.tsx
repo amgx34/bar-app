@@ -5,6 +5,8 @@ import { ChevronDown, ChevronUp, TrendingDown, DollarSign, Truck, ShoppingCart }
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
+import { rankTopSellers } from '@/lib/inventory/usage-rank';
+import { latestDelivery } from '@/lib/inventory/latest-delivery';
 import type { ShipmentSummary } from '../shipment-actions';
 
 export type DashboardUsageLog = {
@@ -106,17 +108,7 @@ export function InventoryDashboard({
 }) {
   const [open, setOpen] = useState(true);
 
-  const topSellers = useMemo<ChartEntry[]>(() => {
-    const map = new Map<string, ChartEntry>();
-    for (const log of usageLogs) {
-      if (log.reason === 'delivery' || log.reason === 'recount') continue;
-      const name = log.inventory_items?.name ?? 'Unknown';
-      const existing = map.get(log.item_id);
-      if (existing) existing.total += log.quantity;
-      else map.set(log.item_id, { name, total: log.quantity });
-    }
-    return Array.from(map.values()).sort((a, b) => b.total - a.total).slice(0, 5);
-  }, [usageLogs]);
+  const topSellers = useMemo<ChartEntry[]>(() => rankTopSellers(usageLogs), [usageLogs]);
 
   const biggestLosses = useMemo<ChartEntry[]>(() => {
     const map = new Map<string, ChartEntry>();
@@ -139,71 +131,14 @@ export function InventoryDashboard({
     stockedItemCount: items.filter(i => (i.current_stock ?? 0) > 0).length,
   }), [items]);
 
-  const { latestShipmentDate, latestShipmentItems, latestDayShipmentIds } = useMemo(() => {
-    const deliveries = usageLogs.filter(l => l.reason === 'delivery');
-    if (deliveries.length === 0) {
-      return {
-        latestShipmentDate: null,
-        latestShipmentItems: [] as { name: string; quantity: number }[],
-        latestDayShipmentIds: [] as string[],
-      };
-    }
-    // Sort deliveries newest first to find the latest delivery day
-    const sortedDeliveries = [...deliveries].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
-    const latestDay = sortedDeliveries[0].logged_at.slice(0, 10);
-    const sameDay = sortedDeliveries.filter(l => l.logged_at.slice(0, 10) === latestDay);
-    return {
-      latestShipmentDate: sortedDeliveries[0].logged_at,
-      latestShipmentItems: sameDay.map(l => ({
-        name: l.inventory_items?.name ?? 'Unknown',
-        quantity: l.quantity,
-      })),
-      // Distinct shipment_id values named by this same day's delivery rows.
-      // Not used by the inference render path itself (that still only reads
-      // latestShipmentDate/latestShipmentItems, untouched above) — it exists
-      // purely to hand latestRealShipment below something to match on that
-      // isn't a date.
-      latestDayShipmentIds: Array.from(
-        new Set(sameDay.map(l => l.shipment_id).filter((id): id is string => id !== null)),
-      ),
-    };
-  }, [usageLogs]);
-
-  // The grouped-by-day block above is an INFERENCE: before shipments were
-  // logged as their own documents, "the latest shipment" was just a guess
-  // built from usage_logs rows that happen to carry reason: 'delivery'. It
-  // has no vendor and no real invoice total, and it stays completely
-  // unchanged above so a bar that never logs a shipment — every delivery
-  // predating this feature, and any manual stock adjustment — keeps seeing
-  // exactly what it always has.
-  //
-  // When the org DOES log shipments, prefer the real document instead of a
-  // reconstruction — but matched by shipment_id, NOT by comparing dates.
-  // logged_at (when the delivery row was inserted) and invoice_date (the
-  // date printed on the vendor's invoice) are two different clocks: nothing
-  // copies one into the other, and a bar keying in yesterday's — or last
-  // week's — invoice is the normal case, not an edge case. Comparing dates
-  // here silently misses every one of those and quietly falls back to the
-  // inference with no indication why. usage_logs rows written by
-  // postShipment already carry shipment_id, which names the real document
-  // directly regardless of when it was typed in, so that is the only thing
-  // compared below.
-  //
-  // Voided shipments are excluded: their stock was reversed and their money
-  // excluded from the books (see voidShipment in shipment-actions.ts), so
-  // presenting one as "the latest shipment" — with a vendor and a total that
-  // no longer count — would contradict both. `shipments` is iterated in its
-  // given order (listShipments returns newest invoice_date first) and the
-  // first non-voided match wins — deterministic even on the rare day two
-  // shipments were both logged: it prefers whichever has the later invoice
-  // date, not whichever happened to sort first among usage_logs rows.
-  const latestRealShipment = useMemo(() => {
-    if (latestDayShipmentIds.length === 0) return null;
-    for (const shipment of shipments) {
-      if (!shipment.voided && latestDayShipmentIds.includes(shipment.id)) return shipment;
-    }
-    return null;
-  }, [shipments, latestDayShipmentIds]);
+  // Joined by shipment_id only, never by date; see lib/inventory/latest-delivery.ts.
+  const latest = useMemo(() => latestDelivery(usageLogs, shipments), [usageLogs, shipments]);
+  const latestRealShipment = useMemo(
+    () => (latest?.kind === 'shipment' ? shipments.find((sh) => sh.id === latest.shipmentId) ?? null : null),
+    [latest, shipments],
+  );
+  const latestShipmentDate = latest?.loggedAt ?? null;
+  const latestShipmentItems = latest?.kind === 'manual' ? latest.items : [];
 
   /**
    * `invoiceDate` is YYYY-MM-DD with no time component. `new Date(iso)` reads
@@ -252,7 +187,7 @@ export function InventoryDashboard({
             </CardHeader>
             <CardContent>
               {topSellers.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-4 text-center">No usage data yet</p>
+                <p className="text-xs text-muted-foreground py-4 text-center">No POS sales recorded yet — this counts what sold through the POS</p>
               ) : (
                 <>
                 <div className="sm:hidden">

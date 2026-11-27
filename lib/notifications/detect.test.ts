@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import { assessSyncHealth, type PosConfigShape } from '@/lib/pos/sync-health';
 import {
   detectLowStock, detectZReportClosed, detectSalesAnomaly,
-  detectSalesTax, detectHourlyTips,
+  detectSalesTax, detectHourlyTips, detectFeedStale,
   ANOMALY_THRESHOLD, MIN_SAMPLES, type ZDay,
 } from './detect';
 
@@ -232,5 +233,81 @@ describe('detectHourlyTips', () => {
     expect(detectHourlyTips({
       report_date: '2026-09-01', cash_tips: 200, cc_tips: 400, hoursWorked: 20,
     })?.dedupeKey).toBe('tips.hourly:2026-09-01');
+  });
+});
+
+// ── POS feed went quiet ──────────────────────────────────────────────────────
+
+describe('detectFeedStale', () => {
+  const NOW = new Date('2026-11-25T13:00:00Z');
+  const at = (hoursAgo: number) => new Date(NOW.getTime() - hoursAgo * 3600_000).toISOString();
+  const agent = (cfg: PosConfigShape) =>
+    detectFeedStale(assessSyncHealth({ agent_token: 't', ...cfg }, '2touch', NOW), '2touch');
+  const busy = { zReports: 1 };
+
+  it('never fires for a healthy sync', () => {
+    expect(agent({ last_sync_at: at(0.1), last_sync_summary: busy })).toBeNull();
+  });
+
+  it('treats no-data as amber, not an alarm', () => {
+    const cfg = { last_sync_at: at(0.1), last_sync_summary: { zReports: 0, ewReports: 0, itemAudit: 0 } };
+    expect(assessSyncHealth({ agent_token: 't', ...cfg }, '2touch', NOW).status).toBe('no-data');
+    expect(agent(cfg)).toBeNull();
+  });
+
+  it('treats an absent last_sync_summary as cannot say', () => {
+    expect(agent({ last_sync_at: at(0.1) })).toBeNull();
+  });
+
+  it('does not fire for errors, which are a different message', () => {
+    expect(agent({ last_sync_at: at(0.1), last_sync_errors: ['agent: x'] })).toBeNull();
+  });
+
+  it('does not fire for a bar with no agent', () => {
+    expect(detectFeedStale(assessSyncHealth({}, '2touch', NOW), '2touch')).toBeNull();
+  });
+
+  it('stays quiet for a POS box switched off overnight', () => {
+    // down (12h+) but under a day: ordinary for a bar that closes.
+    expect(agent({ last_sync_at: at(14) })).toBeNull();
+  });
+
+  it('fires after a day of silence, naming the last day and what to do', () => {
+    const d = agent({ last_sync_at: at(30) });
+    expect(d?.eventType).toBe('pos.feed_stale');
+    expect(d?.title).toBe('No sales since Nov 24');
+    expect(d?.body).not.toMatch(/—|fault|your fault|failed to/i);
+    expect(d?.body).toContain('POS');
+    expect(d?.link).toBe('/app/settings?tab=pos');
+  });
+
+  it('fires for a login Clover or Toast no longer accepts, however recent', () => {
+    const h = assessSyncHealth({ merchant_id: 'm', last_sync_at: at(2), needs_reauth: true }, 'clover', NOW);
+    const d = detectFeedStale(h, 'clover');
+    expect(d?.title).toBe('Clover needs reconnecting');
+    expect(d?.body).toContain('Reconnect Clover');
+  });
+
+  it('gives one key per episode and a new one after recovery and a new stall', () => {
+    const a = agent({ last_sync_at: at(30) });
+    const sameEpisodeLater = detectFeedStale(
+      assessSyncHealth({ agent_token: 't', last_sync_at: at(30) }, '2touch', new Date(NOW.getTime() + 86_400_000)),
+      '2touch',
+    );
+    expect(sameEpisodeLater?.dedupeKey).toBe(a?.dedupeKey);
+    const later = new Date('2026-12-10T13:00:00Z');
+    const second = detectFeedStale(
+      assessSyncHealth({ agent_token: 't', last_sync_at: '2026-12-08T09:00:00Z' }, '2touch', later),
+      '2touch',
+    );
+    expect(second?.dedupeKey).not.toBe(a?.dedupeKey);
+  });
+
+  it('fires once, not daily, for an agent that never checked in', () => {
+    const h = (now: Date) => assessSyncHealth({ agent_token: 't' }, '2touch', now);
+    const a = detectFeedStale(h(NOW), '2touch');
+    const b = detectFeedStale(h(new Date(NOW.getTime() + 86_400_000)), '2touch');
+    expect(a).not.toBeNull();
+    expect(b?.dedupeKey).toBe(a?.dedupeKey);
   });
 });

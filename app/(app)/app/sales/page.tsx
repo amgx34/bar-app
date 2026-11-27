@@ -2,8 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getSalesData, getPeriodSalesData } from './actions';
+import { getSalesData, getPeriodSalesData, getSalesComparison } from './actions';
 import { getCurrentOrg } from '@/lib/org';
+import { canManagePayroll } from '@/lib/permissions';
 import { PeriodToggle } from '../_components/period-toggle';
 import { MissingPanel } from './_components/missing-panel';
 import { ServerTable } from './_components/server-table';
@@ -11,7 +12,7 @@ import { NightView } from './_components/night-view';
 import { MenuQuadrant } from './_components/menu-quadrant';
 import { TrendChart } from './_components/trend-chart';
 import { TonightClock } from './_components/tonight-clock';
-import { Stat, CostCoverageNotice, TaxInclusiveNotice, SizeSplit, money, pct } from './_components/sales-bits';
+import { Stat, DeltaChip, CostCoverageNotice, TaxInclusiveNotice, SizeSplit, money, pct } from './_components/sales-bits';
 import { rankByMargin } from '@/lib/pos/sales-analytics';
 import { assessSyncHealth, describeAge } from '@/lib/pos/sync-health';
 import { cutoffHourFromSettings } from '@/lib/business-date';
@@ -62,7 +63,7 @@ export default async function SalesPage({
 
   const explicitPeriod = payPeriodFromParams(params.start, params.end);
 
-  const { org } = await getCurrentOrg();
+  const { org, role } = await getCurrentOrg();
   if (!org?.id) return <div className="p-6">Organization not found</div>;
 
   const cutoffHour = cutoffHourFromSettings(org.bar_settings ?? {});
@@ -75,10 +76,10 @@ export default async function SalesPage({
   // the fetch entirely and waits for the browser to say what night it is.
   if (view === 'tonight' && !explicitPeriod) {
     return (
-      <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+      <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
         <TonightClock cutoffHour={cutoffHour} active />
         <p className="text-sm text-muted-foreground">Loading tonight&rsquo;s numbers…</p>
-      </main>
+      </div>
     );
   }
 
@@ -97,9 +98,12 @@ export default async function SalesPage({
   const hourKnown = view === 'tonight' && Number.isInteger(rawHour) && rawHour >= 0 && rawHour <= 23;
   const upToHour = hourKnown ? rawHour : undefined;
 
-  const [data, legacy] = await Promise.all([
+  const [data, legacy, comparison] = await Promise.all([
     getPeriodSalesData(view, period.start, period.end, upToHour),
     getSalesData('custom', period.start, period.end),
+    view === 'week' || view === 'month'
+      ? getSalesComparison(view, period.start, period.end, today)
+      : Promise.resolve(null),
   ]);
 
   const prev = shiftSalesPeriod(view, period.start, period.end, 'prev');
@@ -127,7 +131,7 @@ export default async function SalesPage({
   const asOf = syncHealth.lastSyncAt ? describeAge(syncHealth.minutesAgo) : null;
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm text-muted-foreground">Sales</p>
@@ -182,11 +186,16 @@ export default async function SalesPage({
           asOf={asOf}
           items={legacy.items}
           categories={legacy.categories}
+          provider={org.pos_provider}
+          tieOutDate={canManagePayroll(role) ? period.start : undefined}
         />
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label="Revenue" value={money(legacy.summary.revenue)} sub={`${legacy.summary.itemCount} items sold`} />
+            <Stat label="Revenue" value={money(legacy.summary.revenue)} sub={`${legacy.summary.itemCount} items sold`}
+                  chip={comparison && legacy.summary.itemCount > 0 && (
+                    <DeltaChip delta={comparison.delta} label={comparison.label} partial={today <= period.end} />
+                  )} />
             <Stat label="Cost to pour" value={money(legacy.summary.cost)} sub="Ingredient cost" />
             <Stat label="Margin" value={money(legacy.summary.margin)} tone="good" />
             <Stat label="Margin %" value={pct(legacy.summary.marginPct)}
@@ -364,21 +373,25 @@ export default async function SalesPage({
               </p>
             </CardHeader>
             <CardContent>
-              {legacy.slowMovers.length === 0 ? (
+              {legacy.summary.itemCount === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
-                  Nothing stands out — every stocked item is moving.
+                  No sales in this window, so there is nothing to rank yet.
+                </p>
+              ) : legacy.slowMovers.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Nothing stands out. Every stocked item is moving.
                 </p>
               ) : (
                 <div className="space-y-2">
                   {legacy.slowMovers.map((s) => (
-                    <div key={s.matchKey} className="flex items-center justify-between gap-3 text-sm">
+                    <div key={s.matchKey} className="flex flex-col gap-0.5 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                       <div className="min-w-0">
-                        <span className="truncate">{s.itemName}</span>
+                        <span className="break-words">{s.itemName}</span>
                         <span className="ml-2 text-xs text-muted-foreground">
                           {s.categoryName ?? 'Uncategorised'}
                         </span>
                       </div>
-                      <span className="shrink-0 text-right text-xs">
+                      <span className="text-xs sm:shrink-0 sm:text-right">
                         {s.neverSold ? (
                           <span className="font-medium text-amber-600 dark:text-amber-400">Never sold</span>
                         ) : (
@@ -416,8 +429,8 @@ export default async function SalesPage({
           <CardContent><ServerTable servers={data.servers} /></CardContent>
         </Card>
       ) : (
-        <MissingPanel title="Who was pouring" capability="hasServer" />
+        <MissingPanel title="Who was pouring" capability="hasServer" provider={org.pos_provider} />
       )}
-    </main>
+    </div>
   );
 }

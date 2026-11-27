@@ -50,6 +50,8 @@ function Button({
     <ButtonPrimitive
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
+      // a render prop is almost always a Link, which is not a native <button>
+      nativeButton={props.render ? false : undefined}
       {...props}
     />
   )

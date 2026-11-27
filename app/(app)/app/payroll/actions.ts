@@ -1,5 +1,7 @@
 'use server';
 
+import { canManagePayroll } from '@/lib/permissions';
+import { carveOutKeptTips, nightForSharing, type Keeper } from '@/lib/payroll/night-split';
 import { revalidatePath } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
@@ -54,6 +56,8 @@ export interface Employee {
   role: string | null;
   hourly_rate: number | null;
   tip_mode: TipMode;
+  /** NULL or absent means active. Set when the employee is archived. */
+  archived_at?: string | null;
   /** 'hourly' means paid a wage instead of a tip cut. Barbacks only, in practice. */
   pay_type?: BarbackPayType | null;
   /** NULL is unclassified: a question nobody has answered, not a 1099. */
@@ -134,25 +138,52 @@ export async function saveEmployee(payload: SaveEmployeePayload): Promise<Employ
   return data;
 }
 
-export async function deleteEmployee(employeeId: string): Promise<void> {
+/**
+ * Archive or restore an employee. There is deliberately no delete: removing the
+ * row cascades to payouts, adjustments, shifts and direct-deposit accounts, and
+ * the POS sync would re-create the person by name anyway. Archived staff drop off
+ * the roster, the setup alerts and the add-to-shift list; payroll, tax and
+ * withholding still see them for any period in which they have history.
+ */
+async function setEmployeeArchived(employeeId: string, archived: boolean): Promise<void> {
   const supabase = await createClient();
-  const { org } = await getCurrentOrg();
+  const { org, role } = await getCurrentOrg();
 
   if (!org?.id) {
     throw new Error('Organization not found');
   }
+  if (!canManagePayroll(role)) {
+    throw new Error('Only an owner or manager can archive or restore staff.');
+  }
 
-  const { error } = await supabase
+  const { data: changed, error } = await supabase
     .from('employees')
-    .delete()
+    .update({ archived_at: archived ? new Date().toISOString() : null })
     .eq('id', employeeId)
-    .eq('organization_id', org.id);
+    .eq('organization_id', org.id)
+    .select('id');
 
   if (error) {
-    throw new Error(`Failed to delete employee: ${error.message}`);
+    if (/archived_at/.test(error.message)) {
+      throw new Error('Archiving needs a database update that has not been applied yet (employees.archived_at).');
+    }
+    throw new Error(`Failed to ${archived ? 'archive' : 'restore'} employee: ${error.message}`);
+  }
+  // Row-level security can refuse an update by matching zero rows without an error.
+  if (!changed || changed.length === 0) {
+    throw new Error('Could not change this employee. They may already be gone, or you may not have permission.');
   }
 
   revalidatePath('/app/payroll');
+  revalidatePath('/app/payroll/employees');
+}
+
+export async function archiveEmployee(employeeId: string): Promise<void> {
+  return setEmployeeArchived(employeeId, true);
+}
+
+export async function restoreEmployee(employeeId: string): Promise<void> {
+  return setEmployeeArchived(employeeId, false);
 }
 
 export async function bulkSetTipMode(
@@ -772,6 +803,15 @@ export async function computePayrollForOrg(
       addTip(tipsByEmployeeByDate, employeeId, date, amount);
     };
 
+    // Employees who keep their own tips rather than sharing the pool. What they
+    // keep comes out of the night BEFORE the pool is worked out (see
+    // lib/payroll/night-split.ts): the Z total already contains it.
+    const keepers: Keeper[] = payrollEmployees.flatMap((e) =>
+      e.tip_mode === 'individual' || e.tip_mode === 'sales_pct'
+        ? [{ employeeId: e.id, name: e.name, mode: e.tip_mode }]
+        : [],
+    );
+
     for (const report of zReports || []) {
       // Removals come off BEFORE the barback cut and the bartender split, so a
       // court-ordered payout shrinks the night for everybody proportionally
@@ -782,6 +822,23 @@ export async function computePayrollForOrg(
       );
       const dailyTips = removal.tipsAfterRemoval;
       if (dailyTips <= 0) continue;
+
+      // Individual and sales_pct employees keep their tips; the barback cut, the
+      // opener bonus and the pool all work from what is left. Crediting them on
+      // top of a pool built from the full total over-allocated the night.
+      const night = carveOutKeptTips({
+        dailyTips,
+        serverTips: serverTipsByDate.get(report.report_date) || [],
+        keepers,
+      });
+      for (const [employeeId, amount] of night.kept) {
+        addTips(employeeId, report.report_date, amount);
+      }
+      if (night.overAllocated) {
+        // Bad server rows asked for more than the night held; they were scaled to
+        // fit. Not yet shown in the UI, so say so where it can be found.
+        console.error(`[payroll] ${orgId} ${report.report_date}: kept tips exceeded the night's tips and were scaled down`);
+      }
 
       const dayShifts = shiftsByDate.get(report.report_date) || [];
 
@@ -795,7 +852,7 @@ export async function computePayrollForOrg(
       // so they hold a slot in the split but do not claim it — see
       // splitBarbackTips for why the slot is not simply removed.
       const barbackSplit = splitBarbackTips({
-        dailyTips,
+        dailyTips: night.remainder,
         barbackFraction: barbackFrac,
         method: barbackSplitMethod,
         tiers: barbackTiers,
@@ -850,27 +907,6 @@ export async function computePayrollForOrg(
           const tip = (hrs / poolHoursToday) * shareablePool;
           addTips(s.employee_id, report.report_date, tip);
         });
-      }
-
-      // Individual and sales_pct tips from server breakdown
-      const dayServerTips = serverTipsByDate.get(report.report_date) || [];
-      if (dayServerTips.length > 0) {
-        const totalDaySales = dayServerTips.reduce((sum, s) => sum + s.totalSales, 0);
-
-        for (const serverEntry of dayServerTips) {
-          // Match server name to an employee (case-insensitive)
-          const emp = payrollEmployees.find(
-            (e) => e.name.toLowerCase() === serverEntry.name
-          );
-          if (!emp) continue;
-
-          if (emp.tip_mode === 'individual') {
-            addTips(emp.id, report.report_date, serverEntry.tipsPaidOut);
-          } else if (emp.tip_mode === 'sales_pct' && totalDaySales > 0) {
-            const tipShare = (serverEntry.totalSales / totalDaySales) * dailyTips;
-            addTips(emp.id, report.report_date, tipShare);
-          }
-        }
       }
     }
 
@@ -1018,6 +1054,19 @@ export interface DaySplitData {
   /** How the barback cut is divided. Sent so this screen cannot diverge. */
   barbackSplitMethod: BarbackSplitMethod;
   totalTips: number;
+  /**
+   * What individual-mode and sales_pct employees keep out of totalTips, from the
+   * same carveOutKeptTips the pay run uses. The pool is shared from
+   * totalTips - keptTips; sharing the full total made this screen promise
+   * bartenders more than the pay run pays them.
+   */
+  keptTips: number;
+  /** Unattributed tip removals taken off the night first, as the pay run does. totalTips stays the Z total. */
+  removedTips: number;
+  /** Staff-kept tips exceeded the night and were scaled down. */
+  overAllocated: boolean;
+  /** employeeId -> what they keep tonight, for showing beside their name. */
+  keptByEmployee: Record<string, number>;
   totalSales: number;
   employees: DaySplitEmployee[];
   /**
@@ -1070,6 +1119,49 @@ export async function getDaySplitData(date: string): Promise<DaySplitData | null
 
   if (!shifts || shifts.length === 0) return null;
 
+  // Tips that individual and sales_pct staff keep come out before the pool is
+  // shared, exactly as in the pay run (lib/payroll/night-split.ts).
+  const { data: serverRows } = await supabase
+    .from('z_report_server_tips')
+    .select('employee_name, total_sales, tips_paid_out')
+    .eq('organization_id', org.id)
+    .eq('report_date', date);
+  const { data: keeperRows } = await supabase
+    .from('employees')
+    .select('id, name, tip_mode')
+    .eq('organization_id', org.id)
+    .in('tip_mode', ['individual', 'sales_pct']);
+  const zTotalTips = ((day?.cash_tips as number) ?? 0) + ((day?.cc_tips as number) ?? 0);
+  const { data: removalRows } = await supabase
+    .from('payroll_adjustments')
+    .select('employee_id, amount, reason')
+    .eq('organization_id', org.id)
+    .eq('kind', 'tip_removal')
+    .eq('shift_date', date);
+  const carve = nightForSharing({
+    zTotalTips,
+    removals: (removalRows ?? []).map((r) => ({
+      amount: Number(r.amount) || 0,
+      employeeId: (r.employee_id as string | null) ?? null,
+      reason: (r.reason as string) ?? '',
+    })),
+    serverTips: (serverRows ?? [])
+      .filter((r) => !DAY_SPLIT_EXCLUDED.has(String(r.employee_name).toLowerCase().trim()))
+      .map((r) => ({
+        name: r.employee_name as string,
+        totalSales: Number(r.total_sales) || 0,
+        tipsPaidOut: Number(r.tips_paid_out) || 0,
+      })),
+    keepers: (keeperRows ?? [])
+      .filter((e) => !DAY_SPLIT_EXCLUDED.has(String(e.name).toLowerCase().trim()))
+      .map((e) => ({
+        employeeId: e.id as string,
+        name: e.name as string,
+        mode: e.tip_mode as 'individual' | 'sales_pct',
+      })),
+  });
+  const keptTips = carve.keptTotal;
+
   // Merge multiple shifts per employee and attach employee info
   const empMap = new Map<string, DaySplitEmployee>();
   for (const shift of shifts) {
@@ -1110,7 +1202,11 @@ export async function getDaySplitData(date: string): Promise<DaySplitData | null
 
   return {
     date,
-    totalTips: ((day?.cash_tips as number) ?? 0) + ((day?.cc_tips as number) ?? 0),
+    totalTips: zTotalTips,
+    keptTips,
+    removedTips: carve.removed,
+    overAllocated: carve.overAllocated,
+    keptByEmployee: Object.fromEntries(carve.kept),
     totalSales: (day?.total_sales as number) ?? 0,
     employees,
     openerBonus: openerBonusFromSettings(org.bar_settings ?? {}),
