@@ -17,7 +17,7 @@ const STEPS = [
   {
     icon: Mail,
     title: 'We read it today',
-    body: 'Your request goes straight to the team — not a queue or an autoresponder.',
+    body: 'Your request goes straight to the team, not a queue or an autoresponder.',
   },
   {
     icon: Clock,
@@ -44,7 +44,7 @@ export default function ThankYouPage() {
           </div>
 
           <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight">
-            Thanks — we&rsquo;ve got it.
+            Thanks, we&rsquo;ve got it.
           </h1>
           <p className="text-muted-foreground mt-4 leading-relaxed">
             Someone from {SITE_NAME} will be in touch within one business day. If it is

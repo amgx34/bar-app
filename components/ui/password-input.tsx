@@ -33,7 +33,7 @@ export function PasswordInput({
         {...props}
         type={visible ? 'text' : 'password'}
         // Room for the button, so a long password never runs underneath it.
-        className={cn('pr-10', className)}
+        className={cn('pr-11', className)}
       />
       <button
         type="button"
@@ -49,7 +49,7 @@ export function PasswordInput({
         // by click, touch, and screen-reader navigation.
         tabIndex={-1}
         className={cn(
-          'absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-lg',
+          'absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg',
           'text-muted-foreground hover:text-foreground',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           'transition-colors duration-200 cursor-pointer',

@@ -65,7 +65,7 @@ export function InventoryHeader({
         style={{
           // 400px, not 200: on a phone these filters wrap onto several rows and a
           // 200px cap silently clipped the action buttons off the bottom.
-          maxHeight: panelOpen ? '400px' : '0px',
+          maxHeight: panelOpen ? '640px' : '0px',
           opacity: panelOpen ? 1 : 0,
           transition: 'max-height 0.35s ease, opacity 0.25s ease',
         }}
@@ -73,11 +73,11 @@ export function InventoryHeader({
         <div className="px-5 py-3 flex flex-wrap gap-3 items-center bg-background">
           {/* Search */}
           <div className="relative flex-1 min-w-[180px]">
-            <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-muted-foreground pointer-events-none" />
+            <Search className="h-4 w-4 absolute left-2.5 top-3.5 text-muted-foreground pointer-events-none" />
             <Input
               aria-label="Search items"
               placeholder="Search items…"
-              className="pl-8 h-9 bg-card border-border/60 focus-visible:ring-primary/40"
+              className="pl-8 h-11 bg-card border-border/60 focus-visible:ring-primary/40"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && updateParams({ q: q || null })}
@@ -91,7 +91,7 @@ export function InventoryHeader({
             value={currentCategory || 'all'}
             onValueChange={(v) => updateParams({ category: v === 'all' ? null : v })}
           >
-            <SelectTrigger className="w-[160px] h-9 bg-card border-border/60">
+            <SelectTrigger className="w-[160px] h-11 data-[size=default]:h-11 bg-card border-border/60">
               <span className="truncate text-sm">
                 {!currentCategory || currentCategory === 'all'
                   ? 'All categories'
@@ -115,7 +115,7 @@ export function InventoryHeader({
                 aria-pressed={currentStock === value}
                 onClick={() => updateParams({ stock: value === 'all' ? null : value })}
                 className={cn(
-                  'min-h-9 px-3 py-1 rounded-full text-xs font-medium border transition-all duration-200',
+                  'min-h-11 min-w-11 px-3 py-1 rounded-full text-xs font-medium border transition-all duration-200',
                   currentStock === value || (value === 'all' && currentStock === 'all')
                     ? 'bg-primary border-primary text-primary-foreground'
                     : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
@@ -138,14 +138,14 @@ export function InventoryHeader({
                 variant="outline"
                 size="sm"
                 onClick={() => setCategoriesOpen(true)}
-                className="h-9 border-border/60"
+                className="h-11 border-border/60"
               >
                 <Settings2 className="h-3.5 w-3.5 mr-1.5" />
                 Categories
               </Button>
             )}
             {canAdjustStock(role) && (
-              <Button variant="outline" size="sm" className="h-9 border-border/60" render={<Link href="/app/inventory/count" />}>
+              <Button variant="outline" size="sm" className="h-11 border-border/60" render={<Link href="/app/inventory/count" />}>
                 Count stock
               </Button>
             )}
@@ -155,7 +155,7 @@ export function InventoryHeader({
                   variant="outline"
                   size="sm"
                   onClick={() => setImportOpen(true)}
-                  className="h-9 border-border/60 text-primary hover:text-primary"
+                  className="h-11 border-border/60 text-primary hover:text-primary"
                 >
                   <Sparkles className="h-3.5 w-3.5 mr-1.5" />
                   AI Import
@@ -163,7 +163,7 @@ export function InventoryHeader({
                 <Button
                   size="sm"
                   onClick={() => setAddOpen(true)}
-                  className="h-9"
+                  className="h-11"
                 >
                   <Plus className="h-3.5 w-3.5 mr-1.5" />
                   Add item
@@ -174,7 +174,7 @@ export function InventoryHeader({
               variant="ghost"
               size="sm"
               onClick={() => updateParams({ include_inactive: includeInactive ? null : '1' })}
-              className="h-9 text-muted-foreground hover:text-foreground"
+              className="h-11 text-muted-foreground hover:text-foreground"
             >
               {includeInactive ? 'Hide inactive' : 'Show inactive'}
             </Button>
@@ -185,7 +185,7 @@ export function InventoryHeader({
       {/* Slide toggle */}
       <button
         onClick={() => setPanelOpen(!panelOpen)}
-        className="w-full flex items-center justify-center gap-3 py-1.5 bg-card hover:bg-muted/40 transition-colors group"
+        className="w-full min-h-11 flex items-center justify-center gap-3 py-1.5 bg-card hover:bg-muted/40 transition-colors group"
         aria-label={panelOpen ? 'Collapse filters' : 'Expand filters'}
       >
         <div className="h-px w-10 bg-border group-hover:bg-primary/50 transition-colors" />

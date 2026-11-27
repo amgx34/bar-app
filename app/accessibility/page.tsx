@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SUPPORT_EMAIL } from '@/lib/support';
 import Link from 'next/link';
 import { LegalPage } from '@/app/_components/legal-page';
 import { SITE_NAME } from '@/lib/site';
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 const UPDATED = '2026-08-17';
-const CONTACT_EMAIL = 'railsystemspos@gmail.com';
+const CONTACT_EMAIL = SUPPORT_EMAIL;
 
 export default function AccessibilityPage() {
   return (

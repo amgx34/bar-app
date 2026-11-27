@@ -187,13 +187,13 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
           <SummaryKpi
             icon={<DollarSign className="h-4 w-4" />}
             label="Wages incl. overtime"
-            value={noDetail ? '—' : fmtMoney(totals.regularPay + totals.overtimePay)}
+            value={noDetail ? 'n/a' : fmtMoney(totals.regularPay + totals.overtimePay)}
             color="text-amber-600"
           />
           <SummaryKpi
             icon={<DollarSign className="h-4 w-4" />}
             label="Tips"
-            value={noDetail ? '—' : fmtMoney(totals.tips)}
+            value={noDetail ? 'n/a' : fmtMoney(totals.tips)}
             color="text-amber-600"
           />
           <SummaryKpi
@@ -262,7 +262,7 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
                       <div>
                         <p className="font-semibold text-sm">{entry.employeeName}</p>
                         <p className="text-xs text-muted-foreground capitalize">
-                          {entry.role ?? '—'}{hasDetail && entry.hourlyRate != null ? ` · $${entry.hourlyRate.toFixed(2)}/hr` : ''}
+                          {entry.role ?? 'No role'}{hasDetail && entry.hourlyRate != null ? ` · $${entry.hourlyRate.toFixed(2)}/hr` : ''}
                         </p>
                       </div>
                     </div>
@@ -286,14 +286,14 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
                     />
                     <PayCell
                       label="Overtime"
-                      sub={entry.overtimeHours > 0 ? `${entry.overtimeHours.toFixed(1)} hrs` : '—'}
-                      value={entry.overtimePay > 0 ? fmtMoney(entry.overtimePay) : '—'}
+                      sub={entry.overtimeHours > 0 ? `${entry.overtimeHours.toFixed(1)} hrs` : 'n/a'}
+                      value={entry.overtimePay > 0 ? fmtMoney(entry.overtimePay) : 'n/a'}
                       dim={entry.overtimePay === 0}
                     />
                     <PayCell
                       label="Tips"
-                      sub={entry.tipAmount > 0 ? 'distributed' : '—'}
-                      value={entry.tipAmount > 0 ? fmtMoney(entry.tipAmount) : '—'}
+                      sub={entry.tipAmount > 0 ? 'distributed' : 'n/a'}
+                      value={entry.tipAmount > 0 ? fmtMoney(entry.tipAmount) : 'n/a'}
                       dim={entry.tipAmount === 0}
                     />
                     <PayCell
@@ -313,7 +313,7 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
                     <div className="px-5 py-2 bg-amber-50 dark:bg-amber-950/40 border-t border-amber-200">
                       <p className="text-[11px] text-amber-700 dark:text-amber-300 flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3" />
-                        Missing role or hourly rate — pay may be $0
+                        Missing role or hourly rate, so pay may be $0
                       </p>
                     </div>
                   )}
@@ -439,7 +439,7 @@ function WithholdingNotice({ state }: { state: Awaited<ReturnType<typeof compute
   }
   return (
     <p className="text-xs text-muted-foreground">
-      Tax shown is calculated but not yet deducted — payouts still pay gross.
+      Tax shown is calculated but not yet deducted, so payouts still pay gross.
     </p>
   );
 }

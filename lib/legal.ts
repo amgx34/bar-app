@@ -1,3 +1,5 @@
+import { SUPPORT_EMAIL } from './support';
+
 /**
  * Versioning for the published policies.
  *
@@ -29,7 +31,7 @@ export const EULA_VERSION = '2026-08-19';
 export const EULA_UPDATED = '2026-08-19';
 
 /** Where policy questions go. */
-export const LEGAL_CONTACT_EMAIL = 'railsystemspos@gmail.com';
+export const LEGAL_CONTACT_EMAIL = SUPPORT_EMAIL;
 
 /**
  * Governing law for the Terms and the agent EULA.

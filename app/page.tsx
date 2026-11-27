@@ -36,7 +36,7 @@ const FEATURES = [
 // The "problem" beat the design system's pattern calls for before the solution.
 const PROBLEMS = [
   { icon: ClipboardX,    title: 'Still counting on a clipboard?', desc: 'Counts get copied into a spreadsheet days later, by which point the number is already wrong.' },
-  { icon: Calculator,    title: 'Tip math happens at 3 a.m.',     desc: 'Pooled tips, barback cuts, and opener bonuses get worked out by hand — and get disputed the next shift.' },
+  { icon: Calculator,    title: 'Tip math happens at 3 a.m.',     desc: 'Pooled tips, barback cuts, and opener bonuses get worked out by hand, then get disputed the next shift.' },
   { icon: AlertTriangle, title: 'Shrinkage shows up too late',    desc: 'Over-pours and waste only surface at the end of the month, long after you could have acted on them.' },
 ];
 
@@ -88,11 +88,11 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'Does Rail use AI on my data?',
-    a: 'Only to read files you import that are not in a recognised format. In that case the file’s text — which can include employee names, hours and tips — is sent to a third-party model to extract the figures. It is never used to train a model. Our privacy policy sets out exactly what is sent and when.',
+    a: 'Only to read files you import that are not in a recognised format. In that case the file’s text, which can include employee names, hours and tips, is sent to a third-party model to extract the figures. It is never used to train a model. Our privacy policy sets out exactly what is sent and when.',
   },
   {
     q: 'What does it cost?',
-    a: 'Pricing depends on the size of your operation, so there is no public price list. Request a demo and we will quote you on the call — no obligation and no long-term contract.',
+    a: 'Pricing depends on the size of your operation, so there is no public price list. Request a demo and we will quote you on the call, with no obligation and no long-term contract.',
   },
   {
     q: 'What happens to my data if I stop using Rail?',
@@ -287,7 +287,7 @@ export default function HomePage() {
                 </h1>
                 <p className="text-base sm:text-lg text-sidebar-foreground/75 leading-relaxed mb-8 max-w-xl">
                   Real-time inventory, automated payroll, tip tracking, and supplier
-                  management — built specifically for bar operators.
+                  management, built specifically for bar operators.
                 </p>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <a
@@ -303,7 +303,7 @@ export default function HomePage() {
                 </div>
                 <p className="mt-4 text-xs text-sidebar-foreground/55 flex items-center gap-1.5">
                   <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  Demo uses realistic sample data — no credit card required
+                  Demo uses realistic sample data. No credit card required
                 </p>
                 {/* Marks where the hero CTA leaves the viewport; the sticky
                     mobile bar reveals itself past this point. */}
@@ -337,7 +337,7 @@ export default function HomePage() {
                   </div>
                   <div className="mt-2 rounded-lg bg-sidebar/70 border border-sidebar-border p-3">
                     <p className="font-heading text-[0.625rem] uppercase tracking-widest text-sidebar-foreground/45 mb-2">
-                      Pours vs. par — last 7 nights
+                      Pours vs. par, last 7 nights
                     </p>
                     <div className="flex items-end gap-1.5 h-16">
                       {[48, 62, 55, 78, 71, 92, 84].map((h, i) => (
@@ -486,7 +486,7 @@ export default function HomePage() {
           <div aria-hidden className="absolute inset-0 grid-texture text-primary-foreground opacity-30" />
           <div className="relative z-10 max-w-4xl mx-auto px-6 text-center space-y-6">
             <h2 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight">
-              See Rail in action — right now
+              See Rail in action right now
             </h2>
             <p className="text-primary-foreground/80 max-w-xl mx-auto">
               Launch a fully pre-loaded demo bar in seconds. No signup, no credit card,
@@ -519,7 +519,7 @@ export default function HomePage() {
                     Ready to take back control of your bar?
                   </h2>
                   <p className="text-muted-foreground mt-4 leading-relaxed">
-                    Fill out the form and a real person replies&nbsp;&mdash;{' '}
+                    Fill out the form and a real person replies:{' '}
                     <strong className="text-foreground">within one business day</strong>, and
                     usually the same afternoon. No call centre, no drip sequence.
                   </p>
@@ -540,7 +540,7 @@ export default function HomePage() {
                 <div className="rounded-xl border border-border bg-card p-5 space-y-2">
                   <p className="font-heading font-semibold text-sm">Can&rsquo;t wait? Try the demo now.</p>
                   <p className="text-muted-foreground text-xs leading-relaxed">
-                    Explore a live demo bar with realistic data — no form needed.
+                    Explore a live demo bar with realistic data. No form needed.
                   </p>
                   <div className="pt-1.5"><DemoButton size="sm" /></div>
                   {/* The demo signs you straight in, so this is where the terms

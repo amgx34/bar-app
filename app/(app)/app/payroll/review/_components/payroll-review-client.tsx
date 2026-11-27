@@ -53,7 +53,7 @@ export function PayrollReviewClient({ entries, startDate, endDate, periodLabel, 
     rows.push(['TOTAL', '', '', totals.reg.toFixed(2), totals.ot.toFixed(2), totals.tot.toFixed(2), totals.rp.toFixed(2), totals.op.toFixed(2), totals.tp.toFixed(2), totals.tc.toFixed(2)]);
 
     const meta = [
-      [`Rail Payroll Export — ${orgName}`],
+      [`Rail Payroll Export: ${orgName}`],
       [`Period: ${periodLabel}`],
       [`Generated: ${new Date().toLocaleString()}`],
       [],
@@ -72,7 +72,7 @@ export function PayrollReviewClient({ entries, startDate, endDate, periodLabel, 
     a.download = `payroll-${startDate}-to-${endDate}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('Payroll exported — share with your payroll provider or accountant.');
+    toast.success('Payroll exported. Share with your payroll provider or accountant.');
   }
 
   async function downloadNacha() {
@@ -94,7 +94,7 @@ export function PayrollReviewClient({ entries, startDate, endDate, periodLabel, 
 
     const skipped = res.headers.get('X-Skipped-Employees');
     const total   = res.headers.get('X-NACHA-Total');
-    toast.success(`NACHA file downloaded — $${total} across ${res.headers.get('X-NACHA-Entries')} entries.`);
+    toast.success(`NACHA file downloaded: $${total} across ${res.headers.get('X-NACHA-Entries')} entries.`);
     if (skipped) toast.warning(`Skipped (no DD on file): ${skipped}`, { duration: 8000 });
   }
 

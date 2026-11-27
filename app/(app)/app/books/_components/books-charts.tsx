@@ -29,6 +29,9 @@ const tooltipStyle = {
 // If the palette ever moves back to HSL triplets, these must change together.
 const tickStyle = { fontSize: 11, fill: 'var(--muted-foreground)' };
 
+// Series colours fail text contrast; the swatch carries the colour, the label does not need to.
+const legendText = (v: string) => <span style={{ color: 'var(--foreground)' }}>{v}</span>;
+
 export function MonthlyChart({ data }: { data: MonthlyFinancials[] }) {
   return (
     <div className="w-full h-64">
@@ -44,7 +47,7 @@ export function MonthlyChart({ data }: { data: MonthlyFinancials[] }) {
               return [`$${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}`, name];
             }}
           />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
+          <Legend wrapperStyle={{ fontSize: 12 }} formatter={legendText} />
           <Bar dataKey="revenue"     name="Revenue"      fill="var(--primary)" radius={[3,3,0,0]} maxBarSize={36} />
           <Bar dataKey="cogs"        name="COGS"         fill="#f59e0b"              radius={[3,3,0,0]} maxBarSize={36} />
           <Bar dataKey="labor"       name="Labor"        fill="#e11d48"              radius={[3,3,0,0]} maxBarSize={36} />
@@ -72,7 +75,7 @@ export function MarginChart({ data }: { data: MonthlyFinancials[] }) {
             contentStyle={tooltipStyle}
             formatter={(value, name) => [`${(value as number).toFixed(1)}%`, name]}
           />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
+          <Legend wrapperStyle={{ fontSize: 12 }} formatter={legendText} />
           <Line type="monotone" dataKey="Gross Margin %" stroke="var(--primary)" strokeWidth={2} dot={{ r: 3, fill: 'var(--primary)', strokeWidth: 0 }} />
           <Line type="monotone" dataKey="Labor %"        stroke="#e11d48"              strokeWidth={2} dot={{ r: 3, fill: '#e11d48',              strokeWidth: 0 }} />
         </LineChart>

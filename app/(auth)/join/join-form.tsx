@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/card';
 
 const FIELD =
-  'bg-white/10 border-white/20 text-white placeholder:text-white/60 focus-visible:ring-white/30';
+  'h-11 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus-visible:ring-white/70';
 
 /**
  * Staff sign-up.
@@ -123,7 +123,7 @@ export function JoinForm() {
 
           <Button
             type="submit"
-            className="w-full bg-white text-gray-900 hover:bg-white/90"
+            className="h-11 w-full bg-white text-gray-900 hover:bg-white/90"
             disabled={loading}
           >
             {loading ? (

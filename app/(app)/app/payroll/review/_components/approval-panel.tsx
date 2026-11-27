@@ -33,8 +33,8 @@ function StaleDiff({ diff, approved }: { diff: RunDiff; approved?: boolean }) {
           <div key={c.employeeId} className="text-xs flex items-baseline justify-between gap-3">
             <span className="font-medium">{c.employeeName}</span>
             <span className="text-muted-foreground tabular-nums text-right">
-              {c.kind === 'added'   && `added — ${c.hoursAfter}h, ${money(c.payAfter ?? 0)}`}
-              {c.kind === 'removed' && `removed — was ${c.hoursBefore}h, ${money(c.payBefore ?? 0)}`}
+              {c.kind === 'added'   && `added: ${c.hoursAfter}h, ${money(c.payAfter ?? 0)}`}
+              {c.kind === 'removed' && `removed, was ${c.hoursBefore}h, ${money(c.payBefore ?? 0)}`}
               {c.kind === 'changed' && (
                 `${c.hoursBefore}h → ${c.hoursAfter}h · ${money(c.payBefore ?? 0)} → ${money(c.payAfter ?? 0)}`
               )}

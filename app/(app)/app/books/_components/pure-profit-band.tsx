@@ -103,7 +103,7 @@ export function PureProfitBand({
           >
             {/* Null, not 0%. "0% margin" reads as a trading result; no revenue
                 means there was nothing to have a margin on. */}
-            {pureProfitPct === null ? '—' : `${pureProfitPct.toFixed(1)}%`}
+            {pureProfitPct === null ? 'n/a' : `${pureProfitPct.toFixed(1)}%`}
           </p>
           <p className="text-xs text-muted-foreground">
             {pureProfitPct === null ? 'no revenue in period' : 'of net revenue'}

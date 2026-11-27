@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { getCurrentOrg } from '@/lib/org';
 import { Leaf, ExternalLink, ArrowRight, Shield, Zap, Package } from 'lucide-react';
 import Link from 'next/link';
+import { SUPPORT_EMAIL } from '@/lib/support';
 import { startCloverConnect } from './actions';
 
 export const metadata: Metadata = { title: 'Connect Clover' };
@@ -22,7 +23,7 @@ export default async function CloverConnectPage() {
 
   return (
     <main className="relative min-h-dvh flex items-center justify-center p-6 overflow-hidden bg-sidebar text-sidebar-foreground">
-      <div className="absolute inset-0 bg-gradient-to-br from-sidebar-accent via-sidebar to-background dark:to-black" />
+      <div className="absolute inset-0 bg-gradient-to-br from-sidebar-accent via-sidebar to-sidebar" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(74,222,128,0.06),transparent_60%)]" />
 
       <div className="relative z-10 w-full max-w-lg space-y-6">
@@ -37,7 +38,7 @@ export default async function CloverConnectPage() {
             <div className="h-2 w-2 rounded-full bg-green-400" />
           </div>
           <h1 className="text-2xl font-bold text-white">Connect Clover</h1>
-          <p className="text-white/40 text-sm">You&apos;ll be redirected to Clover to authorize access</p>
+          <p className="text-white/70 text-sm">You&apos;ll be redirected to Clover to authorize access</p>
         </div>
 
         {/* Connection card */}
@@ -48,17 +49,17 @@ export default async function CloverConnectPage() {
             </div>
             <div>
               <p className="font-semibold text-white">Clover POS</p>
-              <p className="text-xs text-green-400">OAuth 2.0 — secure authorization</p>
+              <p className="text-xs text-green-400">Secure sign-in through Clover</p>
             </div>
           </div>
 
-          <p className="text-sm text-white/60 leading-relaxed">
-            Rail will request read access to your Clover merchant account. You&apos;ll approve this on Clover&apos;s site — Rail never stores your Clover password.
+          <p className="text-sm text-white/75 leading-relaxed">
+            Rail will request read access to your Clover merchant account. You&apos;ll approve this on Clover&apos;s site. Rail never stores your Clover password.
           </p>
 
           {/* What Rail can access */}
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-white/40 uppercase tracking-widest">Rail will be able to</p>
+            <p className="text-xs font-semibold text-white/70 uppercase tracking-widest">Rail will be able to</p>
             <ul className="space-y-2">
               {[
                 { icon: Package, text: 'Read your item catalog' },
@@ -66,7 +67,7 @@ export default async function CloverConnectPage() {
                 { icon: Package, text: 'Read employees and shifts, when your account allows it' },
                 { icon: Shield, text: 'Never write to or modify your Clover data' },
               ].map(({ icon: Icon, text }) => (
-                <li key={text} className="flex items-center gap-2.5 text-sm text-white/55">
+                <li key={text} className="flex items-center gap-2.5 text-sm text-white/75">
                   <Icon className="h-4 w-4 text-green-400 shrink-0" />
                   {text}
                 </li>
@@ -84,8 +85,8 @@ export default async function CloverConnectPage() {
             <form action={startCloverConnect} className="space-y-4">
               {!sandbox && (
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-semibold text-white/40 uppercase tracking-widest">Clover region</span>
-                  <select name="region" defaultValue={cfg.clover_region ?? 'na'} className="w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-white">
+                  <span className="text-xs font-semibold text-white/70 uppercase tracking-widest">Clover region</span>
+                  <select name="region" defaultValue={cfg.clover_region ?? 'na'} className="w-full h-11 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-white">
                     <option value="na">United States and Canada</option>
                     <option value="eu">Europe</option>
                     <option value="la">Latin America</option>
@@ -93,31 +94,33 @@ export default async function CloverConnectPage() {
                 </label>
               )}
               <label className="block space-y-1.5">
-                <span className="text-xs font-semibold text-white/40 uppercase tracking-widest">Business day ends at (hour)</span>
+                <span className="text-xs font-semibold text-white/70 uppercase tracking-widest">Business day ends at (hour)</span>
                 <input name="cutoff_hour" type="number" min={0} max={12} defaultValue={cfg.cutoff_hour ?? 4}
-                  className="w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-white" />
-                <span className="block text-xs text-white/35">
+                  className="w-full h-11 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-white" />
+                <span className="block text-xs text-white/70">
                   Clover has no business day. Sales before this hour count toward the night before. 4 suits most bars.
                 </span>
               </label>
               <label className="block space-y-1.5">
-                <span className="text-xs font-semibold text-white/40 uppercase tracking-widest">Time zone</span>
-                <select name="timezone" defaultValue={cfg.timezone ?? ''} className="w-full h-10 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-white">
+                <span className="text-xs font-semibold text-white/70 uppercase tracking-widest">Time zone</span>
+                <select name="timezone" defaultValue={cfg.timezone ?? ''} className="w-full h-11 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-white">
                   <option value="">Use the one Clover reports</option>
                   {TIME_ZONES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
                 </select>
-                <span className="block text-xs text-white/35">
+                <span className="block text-xs text-white/70">
                   Only used if Clover does not report your zone. Without one Rail cannot tell which night a sale belongs to.
                 </span>
               </label>
-              <button type="submit" className="flex items-center justify-center gap-2 w-full h-12 rounded-xl bg-green-500 hover:bg-green-400 text-white font-semibold transition-colors text-sm">
+              <button type="submit" className="flex items-center justify-center gap-2 w-full h-12 rounded-xl bg-green-700 hover:bg-green-800 text-white font-semibold transition-colors text-sm">
                 <ExternalLink className="h-4 w-4" />
                 Authorize with Clover
               </button>
             </form>
           ) : (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
-              <strong>CLOVER_CLIENT_ID</strong>, <strong>CLOVER_REDIRECT_URI</strong> and <strong>OAUTH_STATE_SECRET</strong> must be set in your environment before connecting.
+              Connecting Clover is not switched on yet. Email{' '}
+              <a className="break-all underline" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>{' '}
+              and we will turn it on for your bar.
             </div>
           )}
         </div>
@@ -126,9 +129,9 @@ export default async function CloverConnectPage() {
         <div className="text-center">
           <Link
             href="/app/dashboard"
-            className="text-xs text-white/30 hover:text-white/60 transition-colors inline-flex items-center gap-1"
+            className="text-xs min-h-11 text-white/80 hover:text-white underline underline-offset-2 transition-colors inline-flex items-center gap-1"
           >
-            Skip for now — connect later in Settings
+            Skip for now, connect later in Settings
             <ArrowRight className="h-3 w-3" />
           </Link>
         </div>

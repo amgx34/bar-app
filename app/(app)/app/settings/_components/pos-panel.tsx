@@ -71,7 +71,7 @@ function TwoTouchPanel({
     try {
       const creds = await save2TouchConfig(senderEmail);
       setAgentCreds(creds);
-      toast.success('2TouchPOS configured — copy the pairing code below for the installer');
+      toast.success('2TouchPOS configured. Copy the pairing code below for the installer');
       onConnected();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Save failed');
@@ -110,12 +110,12 @@ function TwoTouchPanel({
 
   return (
     <div className="rounded-xl border bg-card p-5 space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Monitor className="h-4 w-4 text-blue-700 dark:text-blue-300" />
         <h3 className="text-sm font-semibold">2TouchPOS</h3>
         <span className="text-xs text-muted-foreground">Email-based · auto-sync every 15 min</span>
         {isConnected && (
-          <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10 ml-auto">Active</Badge>
+          <Badge variant="outline" className="text-emerald-800 dark:text-emerald-300 border-emerald-500/30 bg-emerald-500/10 ml-auto">Active</Badge>
         )}
       </div>
 
@@ -138,7 +138,7 @@ function TwoTouchPanel({
             value={senderEmail}
             onChange={(e) => setSenderEmail(e.target.value)}
             placeholder="e.g. noreply@2touchpos.com or reports@yourbar.com"
-            className="h-8 text-sm"
+            className="h-11 text-sm"
             autoComplete="off"
           />
           <Button size="sm" onClick={handleSave} disabled={saving} className="shrink-0 gap-1.5">
@@ -157,7 +157,7 @@ function TwoTouchPanel({
         <div className="rounded-md border bg-muted/30 p-3 space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-foreground">
-              Pairing code — the agent installer asks for this
+              Pairing code: the agent installer asks for this
             </p>
             <button
               onClick={copyPairingCode}
@@ -171,7 +171,7 @@ function TwoTouchPanel({
           </p>
           <p className="text-[10px] text-muted-foreground">
             On the POS server, double-click <span className="font-mono">rail-setup.exe</span> and paste this
-            when it asks. The code carries this bar&apos;s unique token — never share it with another bar.
+            when it asks. The code carries this bar&apos;s unique token. Never share it with another bar.
           </p>
         </div>
       )}
@@ -277,11 +277,11 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
     if (flashConnected) toast.success('Clover connected successfully!');
     if (flashError) {
       const messages: Record<string, string> = {
-        clover_missing_params:  'OAuth response was incomplete — try again',
+        clover_missing_params:  'OAuth response was incomplete. Try again',
         clover_unauthorized:    'You do not have permission to connect a POS',
-        clover_token_failed:    'Clover rejected the authorization — try again',
+        clover_token_failed:    'Clover rejected the authorization. Try again',
         clover_invalid_token:   'Clover returned an invalid token',
-        clover_save_failed:     'Connected but failed to save — contact support',
+        clover_save_failed:     'Connected but failed to save. Contact support',
         clover_timezone:        'Connected, but Clover did not report your time zone. Authorize again and pick one.',
       };
       toast.error(messages[flashError] ?? `Connection error: ${flashError}`);
@@ -294,7 +294,7 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
     setSyncingInv(true);
     try {
       const res = await syncCloverInventory();
-      toast.success(`Inventory synced — ${res.created} created, ${res.updated} updated${res.skipped ? `, ${res.skipped} skipped` : ''}`);
+      toast.success(`Inventory synced: ${res.created} created, ${res.updated} updated${res.skipped ? `, ${res.skipped} skipped` : ''}`);
     } catch (err) { toast.error(err instanceof Error ? err.message : 'Sync failed'); }
     finally { setSyncingInv(false); }
   }
@@ -303,7 +303,7 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
     setSyncingSales(true);
     try {
       const res = await syncCloverSales(3);
-      toast.success(`Sales synced — ${res.upserted} day${res.upserted !== 1 ? 's' : ''} updated`);
+      toast.success(`Sales synced: ${res.upserted} day${res.upserted !== 1 ? 's' : ''} updated`);
     } catch (err) { toast.error(err instanceof Error ? err.message : 'Sync failed'); }
     finally { setSyncingSales(false); router.refresh(); }
   }
@@ -314,7 +314,7 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
     setSyncingSales(true);
     try {
       const res = await syncToastSales(3);
-      toast.success(`Sales synced — ${res.upserted} day${res.upserted !== 1 ? 's' : ''} updated`);
+      toast.success(`Sales synced: ${res.upserted} day${res.upserted !== 1 ? 's' : ''} updated`);
     } catch (err) { toast.error(err instanceof Error ? err.message : 'Sync failed'); }
     finally { setSyncingSales(false); router.refresh(); }
   }
@@ -323,7 +323,7 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
     setSyncingInv(true);
     try {
       const res = await syncToastInventory();
-      toast.success(`Menu synced — ${res.created} created, ${res.updated} updated${res.skipped ? `, ${res.skipped} skipped` : ''}`);
+      toast.success(`Menu synced: ${res.created} created, ${res.updated} updated${res.skipped ? `, ${res.skipped} skipped` : ''}`);
     } catch (err) { toast.error(err instanceof Error ? err.message : 'Sync failed'); }
     finally { setSyncingInv(false); }
   }
@@ -371,12 +371,12 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
                       {isConnected ? (
                         <><CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> Connected &amp; ready to sync</>
                       ) : (
-                        <><AlertTriangle className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" /> Selected — authorization required</>
+                        <><AlertTriangle className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" /> Selected, authorization required</>
                       )}
                     </p>
                   </div>
                   {isConnected && (
-                    <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10">
+                    <Badge variant="outline" className="text-emerald-800 dark:text-emerald-300 border-emerald-500/30 bg-emerald-500/10">
                       Active
                     </Badge>
                   )}
@@ -395,10 +395,10 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
       {/* ── Clover section ──────────────────────────────────────────────────── */}
       {canManage && (provider === 'clover' || !isConnected) && (
         <div className="rounded-xl border bg-card p-5 space-y-4">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Leaf className="h-4 w-4 text-green-700 dark:text-green-300" />
             <h3 className="text-sm font-semibold">Clover</h3>
-            <span className="text-xs text-muted-foreground">OAuth 2.0 — secure redirect</span>
+            <span className="text-xs text-muted-foreground">Secure sign-in through Clover</span>
           </div>
 
           {!isCloverConnected ? (
@@ -410,15 +410,18 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
                     : 'You\u2019ll be redirected to Clover to approve access. Rail never stores your Clover password.'}
                 </p>
                 <a href={cloverAuthUrl}>
-                  <Button size="sm" className="gap-2 bg-green-500 hover:bg-green-600 text-white">
+                  <Button size="sm" className="h-11 gap-2 bg-green-700 hover:bg-green-800 text-white">
                     <ExternalLink className="h-3.5 w-3.5" /> Authorize with Clover
                   </Button>
                 </a>
               </div>
             ) : (
-              <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                Connecting Clover is not switched on yet. Email <a className="underline" href={`mailto:${LEGAL_CONTACT_EMAIL}`}>{LEGAL_CONTACT_EMAIL}</a> and we will turn it on for your bar.
+              <p className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-300">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                {/* One span, or each text run and the link become separate flex columns on a phone. */}
+                <span className="min-w-0">
+                  Connecting Clover is not switched on yet. Email <a className="break-all underline" href={`mailto:${LEGAL_CONTACT_EMAIL}`}>{LEGAL_CONTACT_EMAIL}</a> and we will turn it on for your bar.
+                </span>
               </p>
             )
           ) : (
@@ -452,7 +455,7 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
       {/* ── Toast section ───────────────────────────────────────────────────── */}
       {canManage && (provider === 'toast' || !isConnected) && (
         <div className="rounded-xl border bg-card p-5 space-y-4">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Flame className="h-4 w-4 text-orange-700 dark:text-orange-300" />
             <h3 className="text-sm font-semibold">Toast</h3>
             <span className="text-xs text-muted-foreground">Toast API credentials</span>

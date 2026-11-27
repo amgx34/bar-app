@@ -105,7 +105,7 @@ export function ExpensesPanel({
               Operating expenses
             </CardTitle>
             <CardDescription>
-              Costs that never touch inventory — DJs, repairs, licences, utilities.
+              Costs that never touch inventory: DJs, repairs, licences, utilities.
               These come off below gross profit, so they never distort pour cost.
             </CardDescription>
           </div>
@@ -220,8 +220,8 @@ export function ExpensesPanel({
 
         {expenses.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Nothing recorded for this period. Anything you pay for that is not stock —
-            entertainment, repairs, licences — belongs here.
+            Nothing recorded for this period. Anything you pay for that is not stock,
+            entertainment, repairs, licences, belongs here.
           </p>
         ) : (
           <>

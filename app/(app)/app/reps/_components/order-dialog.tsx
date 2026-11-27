@@ -185,18 +185,18 @@ export function OrderDialog({ open, onOpenChange, rep, prefillItems, onSent }: P
               <Label className="text-xs uppercase tracking-widest text-muted-foreground">Order Details</Label>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">PO Number</Label>
-                  <Input {...register('po_number')} placeholder="Auto-generated if blank" className="h-9" />
+                  <Label htmlFor="order-po" className="text-xs">PO Number</Label>
+                  <Input id="order-po" {...register('po_number')} placeholder="Auto-generated if blank" className="h-11" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Requested Delivery Date</Label>
-                  <input type="date" {...register('delivery_date')}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" />
+                  <Label htmlFor="order-date" className="text-xs">Requested Delivery Date</Label>
+                  <input id="order-date" type="date" {...register('delivery_date')}
+                    className="w-full h-11 rounded-md border border-input bg-background px-3 text-sm" />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Notes to rep</Label>
-                <Textarea {...register('notes')} rows={2} placeholder="Special instructions, delivery window, etc." />
+                <Label htmlFor="order-notes" className="text-xs">Notes to rep</Label>
+                <Textarea id="order-notes" {...register('notes')} rows={2} placeholder="Special instructions, delivery window, etc." />
               </div>
             </div>
 
@@ -205,7 +205,7 @@ export function OrderDialog({ open, onOpenChange, rep, prefillItems, onSent }: P
               <Label className="text-xs uppercase tracking-widest text-muted-foreground">Send via</Label>
               <div className="flex flex-wrap gap-3">
                 <Controller name="send_email" control={control} render={({ field }) => (
-                  <label className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 cursor-pointer transition-colors ${field.value ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'} ${!rep.email ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                  <label className={`flex min-h-11 items-center gap-2 rounded-lg border px-4 py-2.5 cursor-pointer transition-colors ${field.value ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'} ${!rep.email ? 'opacity-40 cursor-not-allowed' : ''}`}>
                     <input type="checkbox" checked={field.value} onChange={field.onChange} disabled={!rep.email} className="rounded" />
                     <span className="text-sm font-medium">Email</span>
                     {rep.email
@@ -214,7 +214,7 @@ export function OrderDialog({ open, onOpenChange, rep, prefillItems, onSent }: P
                   </label>
                 )} />
                 <Controller name="send_sms" control={control} render={({ field }) => (
-                  <label className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 cursor-pointer transition-colors ${field.value ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'} ${!rep.phone ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                  <label className={`flex min-h-11 items-center gap-2 rounded-lg border px-4 py-2.5 cursor-pointer transition-colors ${field.value ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'} ${!rep.phone ? 'opacity-40 cursor-not-allowed' : ''}`}>
                     <input type="checkbox" checked={field.value} onChange={field.onChange} disabled={!rep.phone} className="rounded" />
                     <span className="text-sm font-medium">SMS</span>
                     {rep.phone

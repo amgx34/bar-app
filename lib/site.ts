@@ -6,6 +6,7 @@
  * VERCEL_PROJECT_PRODUCTION_URL is the fallback so preview deployments emit
  * their own absolute URLs instead of pointing canonical tags at production.
  */
+import { SUPPORT_EMAIL } from './support';
 
 function resolveSiteUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim();
@@ -37,7 +38,7 @@ export const SITE_TAGLINE = 'Bar Management Platform';
  * markup below stands on its own and is accurate either way.
  */
 export const BUSINESS = {
-  email: 'railsystemspos@gmail.com',
+  email: SUPPORT_EMAIL,
   telephone: null as string | null,
   streetAddress: null as string | null,
   addressLocality: null as string | null,

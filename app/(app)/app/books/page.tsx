@@ -102,7 +102,7 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
       // healthy month still owes this, and burying it inside the statement is
       // how bars end up spending money they were only holding.
       label: 'Sales Tax Collected',
-      value: data.taxConfigured ? fmtMoney(data.salesTax ?? 0) : '—',
+      value: data.taxConfigured ? fmtMoney(data.salesTax ?? 0) : 'n/a',
       sub: data.taxConfigured
         ? `held for the state · ${data.salesTaxRatePct}% rate`
         : 'set your rate in Settings → General',
@@ -117,7 +117,7 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
       // not a grade — a dive bar and a cocktail bar sit in different parts of it
       // legitimately.
       label: 'Pour Cost',
-      value: data.pourCostPct === null ? '—' : `${data.pourCostPct.toFixed(1)}%`,
+      value: data.pourCostPct === null ? 'n/a' : `${data.pourCostPct.toFixed(1)}%`,
       sub: data.pourCostPct === null
         ? 'no revenue in this period'
         : `${fmtMoney(data.beverageCogs)} beverage · target under ${BENCHMARKS.pourCost.good}%`,
@@ -132,7 +132,7 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
     {
       label: 'COGS',
       value: fmtMoney(data.cogs),
-      sub:   data.revenue > 0 ? `${fmtPct((data.cogs / data.revenue) * 100)} of revenue` : '—',
+      sub:   data.revenue > 0 ? `${fmtPct((data.cogs / data.revenue) * 100)} of revenue` : 'n/a',
       icon:  TrendingDown,
       color: 'text-amber-600',
     },
@@ -357,7 +357,7 @@ export default async function BooksPage({ searchParams }: { searchParams: Search
                 Pure Profit is after <strong>every</strong> cost on this page.
                 That now includes operating supplies ({fmtMoney(data.supplies)})
                 and operating expenses ({fmtMoney(data.operatingExpenses)}), which
-                this total used to list above but never subtract — so it reads{' '}
+                this total used to list above but never subtract, so it reads{' '}
                 <strong>{fmtMoney(previouslyOmitted)} lower</strong> than it did
                 before. Your trade has not changed; the arithmetic has.
               </p>

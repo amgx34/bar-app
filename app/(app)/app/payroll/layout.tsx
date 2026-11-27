@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { SectionTabs } from '../_components/section-tabs';
 import { RunPayrollLink, RunPayrollLinkFallback } from './_components/run-payroll-link';
+import { PayrollHeading } from './_components/payroll-heading';
 import { OpenRunBanner } from './_components/open-run-banner';
 
 /**
@@ -20,7 +21,7 @@ export default function PayrollLayout({ children }: { children: React.ReactNode 
     <div className="flex min-w-0 flex-1 flex-col">
       <div className="flex flex-wrap items-start justify-between gap-4 px-5 pt-6 pb-4 sm:px-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Payroll</h1>
+          <PayrollHeading />
           <p className="text-sm text-muted-foreground">
             Calculate wages, tips, and manage staff pay
           </p>

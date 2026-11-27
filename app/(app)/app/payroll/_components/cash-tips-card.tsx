@@ -127,7 +127,7 @@ export function CashTipsCard({
               Card sales
             </dt>
             <dd className="mt-0.5 font-medium tabular-nums">
-              {current.cardSales === null ? '—' : money(current.cardSales)}
+              {current.cardSales === null ? 'n/a' : money(current.cardSales)}
             </dd>
           </div>
           <div>
@@ -154,9 +154,10 @@ export function CashTipsCard({
                 value={amount}
                 onChange={(e) => { setAmount(e.target.value); setJustSaved(false); }}
                 disabled={loading || isPending}
+                className="h-11"
               />
             </div>
-            <Button onClick={save} disabled={loading || isPending}>
+            <Button onClick={save} disabled={loading || isPending} className="h-11">
               {isPending ? 'Saving…' : 'Log cash tips'}
             </Button>
           </div>
@@ -180,9 +181,9 @@ export function CashTipsCard({
         </>
       ) : (
         <p className="text-sm">
-          {loading ? '—' : money(current?.cashTips ?? 0)}
+          {loading ? 'Loading' : money(current?.cashTips ?? 0)}
           <span className="ml-2 text-xs text-muted-foreground">
-            recorded — ask a manager to change it
+            recorded. Ask a manager to change it
           </span>
         </p>
       )}
@@ -234,7 +235,7 @@ export function CashTipsButton({
         // Unlogged is styled as a prompt rather than a neutral control: a night
         // with no cash entered produces a split that is quietly wrong, so it
         // should not look finished.
-        className={`inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors ${
+        className={`inline-flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors ${
           logged
             ? 'border-border hover:bg-muted'
             : 'border-amber-500/50 bg-amber-500/10 text-amber-800 hover:bg-amber-500/20 dark:text-amber-200'

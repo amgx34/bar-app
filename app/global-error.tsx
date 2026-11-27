@@ -1,6 +1,7 @@
 'use client';
 
 import { LEGAL_CONTACT_EMAIL } from '@/lib/legal';
+import { errorHome } from '@/lib/nav/error-home';
 
 // Replaces the root layout, so globals.css and Tailwind are not loaded: styles are inline.
 export default function GlobalError({
@@ -10,6 +11,8 @@ export default function GlobalError({
   error: Error & { digest?: string };
   unstable_retry: () => void;
 }) {
+  // No router hooks here: the router may be what broke.
+  const home = errorHome(typeof window === 'undefined' ? '' : window.location.pathname);
   return (
     <html lang="en">
       <body>
@@ -36,11 +39,11 @@ export default function GlobalError({
         <main>
           <div role="alert">
             <h1>Something went wrong on our end</h1>
-            <p>The app did not load. Nothing you entered has been lost. Try again, and if it keeps happening, go back to your dashboard.</p>
+            <p>The app did not load. Nothing you entered has been lost. Try again, and if it keeps happening, use the other button to start over.</p>
             <div className="row">
               <button type="button" className="btn primary" onClick={() => unstable_retry()}>Try again</button>
               {/* plain anchor: the router may be what broke */}
-              <a className="btn secondary" href="/app/dashboard">Back to dashboard</a>
+              <a className="btn secondary" href={home.href}>{home.label}</a>
             </div>
             <p>Still stuck? Email <a href={`mailto:${LEGAL_CONTACT_EMAIL}`}>{LEGAL_CONTACT_EMAIL}</a>.</p>
             {error.digest && <small>Reference code: {error.digest}</small>}

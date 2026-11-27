@@ -57,7 +57,7 @@ export default function Form1099({ availableYears, employees, orgName }: Props) 
     const body = `
       ${DISCLAIMER_HTML}
       <h1>1099-NEC NONEMPLOYEE COMPENSATION</h1>
-      <p class="subtitle">Tax Year ${year} — VOID if paid as W-2 employee</p>
+      <p class="subtitle">Tax Year ${year}. VOID if paid as W-2 employee</p>
 
       <div class="section">
         <div class="grid2">
@@ -117,13 +117,13 @@ export default function Form1099({ availableYears, employees, orgName }: Props) 
 
       <div class="footnote">
         <strong>Important:</strong> A 1099-NEC is only required if this worker is truly a <em>nonemployee</em> (independent contractor).
-        If this person is a regular employee, a W-2 is required instead — not a 1099-NEC.
+        If this person is a regular employee, a W-2 is required instead of a 1099-NEC.
         The IRS threshold is $600 total payments per tax year. Amount shown: ${fmtMoney(total)} (wages ${fmtMoney(entry.regularPay + entry.overtimePay)} + tips ${fmtMoney(entry.tipAmount)}).
         <br><br>Rail does not determine worker classification. Consult a tax professional to confirm whether W-2 or 1099 applies.
         This is NOT a valid IRS form. Do not file without professional review.
       </div>`;
 
-    openPrint(`1099-NEC ${year} — ${entry.employeeName}`, body);
+    openPrint(`1099-NEC ${year}: ${entry.employeeName}`, body);
   }
 
   const allChecked = entries ? entries.length > 0 && selected.size === entries.length : false;

@@ -29,7 +29,7 @@ export default function JoinPage() {
 
         <Link
           href="/login"
-          className="flex items-center gap-1.5 text-xs text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors duration-200"
+          className="flex min-h-11 items-center gap-1.5 text-xs text-sidebar-foreground/80 hover:text-sidebar-foreground transition-colors duration-200"
         >
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
           Already have a login?

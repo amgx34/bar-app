@@ -12,7 +12,6 @@ import { AppSidebar } from '@/app/(app)/app/_components/app-sidebar';
 import { ownMemberships } from '@/lib/api/org-scope';
 import { AppHeader } from '@/app/(app)/app/_components/app-header';
 import { BottomNav } from '@/app/(app)/app/_components/bottom-nav';
-import { MobileFab } from '@/app/(app)/app/_components/mobile-fab';
 import { RouteFocus } from '@/app/(app)/app/_components/route-focus';
 import { getOrgAccess, getOrgBilling } from '@/lib/billing/store';
 import type { PosConfigShape } from '@/lib/pos/sync-health';
@@ -142,7 +141,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       {/* Mobile-only navigation — fixed position, outside sidebar context */}
       <BottomNav />
-      <MobileFab />
       <RouteFocus />
     </>
   );

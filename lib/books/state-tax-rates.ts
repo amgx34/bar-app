@@ -49,9 +49,9 @@ export const STATE_BASE_RATES: Record<string, number> = {
  */
 export const ALCOHOL_TAX_NOTES: Record<string, string> = {
   TN: 'Tennessee charges a separate liquor-by-the-drink tax (commonly 15%) on top of sales tax for on-premise alcohol.',
-  TX: 'Texas taxes mixed beverages separately — a mixed beverage sales tax plus a gross receipts tax the bar pays itself.',
+  TX: 'Texas taxes mixed beverages separately: a mixed beverage sales tax plus a gross receipts tax the bar pays itself.',
   WA: 'Washington adds a spirits sales tax and a per-litre spirits liter tax on top of retail sales tax.',
-  AK: 'Alaska has no state sales tax, but many boroughs and cities levy their own — including on alcohol.',
+  AK: 'Alaska has no state sales tax, but many boroughs and cities levy their own, including on alcohol.',
   DE: 'Delaware has no sales tax, but does levy a gross receipts tax on businesses.',
   MT: 'Montana has no general sales tax; some resort areas levy a local option tax that can apply to alcohol.',
   NH: 'New Hampshire has no sales tax but levies a meals and rooms tax that applies to alcohol served on-premise.',

@@ -35,7 +35,7 @@ export function ToastRequirements() {
         Rail only reads from Toast and never changes anything in it. The secret is encrypted before it is stored and is
         never shown again. Sales refresh once a night and when you press Sync, not every few minutes.
       </p>
-      <p className="leading-relaxed rounded border border-amber-500/30 bg-amber-500/10 p-2 text-amber-700 dark:text-amber-300">
+      <p className="leading-relaxed rounded border border-amber-500/30 bg-amber-500/10 p-2 text-amber-800 dark:text-amber-300">
         This connection has not yet been tested against a live Toast restaurant. After the first sync, compare three
         printed Z reports with Rail&apos;s totals before relying on them.
       </p>
@@ -82,20 +82,20 @@ export function ToastConnectForm({ onConnected, reconnect = false }: { onConnect
         <div className="space-y-1">
           <Label className="text-xs" htmlFor="toast-client-id">Client ID</Label>
           <Input id="toast-client-id" value={clientId} onChange={(e) => setClientId(e.target.value)}
-            className="h-8 text-sm font-mono" autoComplete="off" spellCheck={false} />
+            className="h-11 text-sm font-mono" autoComplete="off" spellCheck={false} />
         </div>
         <div className="space-y-1">
           <Label className="text-xs" htmlFor="toast-client-secret">Client secret</Label>
           <Input id="toast-client-secret" type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)}
-            className="h-8 text-sm font-mono" autoComplete="new-password" spellCheck={false} />
+            className="h-11 text-sm font-mono" autoComplete="new-password" spellCheck={false} />
         </div>
         <div className="space-y-1">
           <Label className="text-xs" htmlFor="toast-guid">Restaurant GUID</Label>
           <Input id="toast-guid" value={restaurantGuid} onChange={(e) => setRestaurantGuid(e.target.value)}
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" className="h-8 text-sm font-mono" autoComplete="off" spellCheck={false} />
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" className="h-11 text-sm font-mono" autoComplete="off" spellCheck={false} />
         </div>
         {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}
-        <Button type="submit" size="sm" disabled={loading || !clientId || !clientSecret || !restaurantGuid} className="gap-2 bg-orange-500 hover:bg-orange-600 text-white">
+        <Button type="submit" disabled={loading || !clientId || !clientSecret || !restaurantGuid} className="h-11 gap-2 bg-orange-700 hover:bg-orange-800 text-white">
           {loading
             ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking with Toast…</>
             : <>{reconnect ? <KeyRound className="h-3.5 w-3.5" /> : <CheckCircle className="h-3.5 w-3.5" />} {reconnect ? 'Reconnect Toast' : 'Connect Toast'}</>}

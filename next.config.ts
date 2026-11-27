@@ -73,6 +73,9 @@ const nextConfig: NextConfig = {
   // Trims the header that advertises the framework and version.
   poweredByHeader: false,
 
+  // Inlined so client error screens show the same support address as the server.
+  env: { SUPPORT_EMAIL: process.env.SUPPORT_EMAIL ?? '' },
+
   // Retired routes forward here, not from page files: a bare redirect() in a
   // page threw "Rendered more hooks" in Next's client router in dev.
   async redirects() {

@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og';
 import { SITE_NAME, SITE_TAGLINE } from '@/lib/site';
 
 // Applies to `/` and, by inheritance, every route that doesn't define its own.
-export const alt = `${SITE_NAME} — ${SITE_TAGLINE}`;
+export const alt = `${SITE_NAME}: ${SITE_TAGLINE}`;
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 

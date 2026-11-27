@@ -18,10 +18,8 @@ import { MOBILE_PRIMARY, mobileOverflow, isActive } from './nav-config';
  * narrow to hit, which is why the fifth slot buys everything else rather than
  * one more destination.
  *
- * Layering uses the named scale in globals.css rather than raw z-40/z-50. The
- * floating action button sits at z-fab (45), above the bar itself, so a drawer
- * at a hand-picked z-50 still had the FAB punching through it and covering a
- * destination. z-nav-top puts both backdrop and sheet above it.
+ * Layering uses the named scale in globals.css rather than raw z-40/z-50.
+ * z-nav-top puts both backdrop and sheet above any other floating control.
  */
 export function BottomNav() {
   const pathname = usePathname();

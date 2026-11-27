@@ -368,7 +368,7 @@ export default function DaySplitTab({
           aria-label="Night"
           value={date}
           onChange={(e) => e.target.value && setDate(e.target.value)}
-          className="ml-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+          className="ml-2 min-h-11 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
         />
 
         {/* Sits on the date row rather than in a block above the numbers: it is

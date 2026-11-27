@@ -37,11 +37,9 @@ export function PeriodToggle<T extends string>({
             key={key}
             href={hrefs[key]}
             aria-current={active ? 'page' : undefined}
-            // min-h-8 rather than padding alone: this sits on the same row as
-            // the date arrows, which are 32px, and a shorter control next to
-            // them reads as a different kind of thing.
+            // 44px touch target.
             className={cn(
-              'flex min-h-8 items-center rounded-md px-3 text-sm font-medium transition-colors',
+              'flex min-h-11 min-w-11 items-center justify-center rounded-md px-3 text-sm font-medium transition-colors',
               active
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground',

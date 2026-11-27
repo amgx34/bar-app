@@ -88,7 +88,7 @@ export function describeOpenRun(run: OpenRun | null, role: Role): OpenRunNotice 
   if (run.status === 'changes_requested') {
     const canFix = role === 'owner' || role === 'manager';
     return {
-      headline: `${period} was sent back — ${scale}`,
+      headline: `${period} was sent back: ${scale}`,
       note:     run.reviewNote,
       cta:      canFix ? 'Fix and resubmit' : null,
       tone:     'returned',
@@ -98,7 +98,7 @@ export function describeOpenRun(run: OpenRun | null, role: Role): OpenRunNotice 
 
   if (role === 'owner') {
     return {
-      headline: `${period} is awaiting your approval — ${scale}`,
+      headline: `${period} is awaiting your approval: ${scale}`,
       note:     null,
       cta:      'Review and approve',
       tone:     'waiting',
@@ -107,7 +107,7 @@ export function describeOpenRun(run: OpenRun | null, role: Role): OpenRunNotice 
   }
 
   return {
-    headline: `${period} is submitted and with the owner — ${scale}`,
+    headline: `${period} is submitted and with the owner: ${scale}`,
     note:     null,
     // No verb: a manager cannot approve, and an accountant can do neither.
     // Offering an action nobody can complete is how a banner teaches people to

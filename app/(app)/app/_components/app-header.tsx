@@ -32,7 +32,7 @@ export function AppHeader({ email, posProvider, orgName, orgSlug, org, membershi
   const hasPOS = !!posProvider;
 
   return (
-    <header className="sticky top-0 z-nav flex h-14 items-center border-b border-border/60 bg-card/95 backdrop-blur-sm px-3 sm:px-6 gap-1.5 sm:gap-3">
+    <header className="sticky top-0 z-nav flex h-14 items-center border-b border-border/60 bg-card/95 backdrop-blur-sm px-2 sm:px-6 gap-1 sm:gap-3">
       <SidebarTrigger className="shrink-0" />
 
       <span className="font-bold text-base sm:text-lg tracking-[0.2em] text-primary uppercase select-none">

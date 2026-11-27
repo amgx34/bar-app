@@ -78,6 +78,7 @@ export default async function SalesPage({
     return (
       <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
         <TonightClock cutoffHour={cutoffHour} active />
+        <h1 className="text-2xl font-bold">Tonight</h1>
         <p className="text-sm text-muted-foreground">Loading tonight&rsquo;s numbers…</p>
       </div>
     );

@@ -24,7 +24,7 @@ export const COST_TYPE_LABEL: Record<CostType, string> = {
 export const COST_TYPE_HELP: Record<CostType, string> = {
   beverage_cogs: 'Counts toward pour cost. Spirits, beer, wine, mixers.',
   food_cogs: 'Counts toward food cost, tracked separately from pour cost.',
-  supplies: 'Real costs that are not poured — napkins, straws, cups. Subtracted after gross profit so they cannot distort pour cost.',
+  supplies: 'Real costs that are not poured, such as napkins, straws and cups. Subtracted after gross profit so they cannot distort pour cost.',
   excluded: 'Ignored by the P&L entirely. Use for equipment or anything counted but never sold.',
 };
 

@@ -502,6 +502,9 @@ until one has (`docs/go-to-market/claims-register.md`, A20 to A22). Owner steps:
 `CLOVER_CLIENT_ID`, `CLOVER_CLIENT_SECRET`, `CLOVER_REDIRECT_URI`, `OAUTH_STATE_SECRET`,
 `CLOVER_SANDBOX`. Plus `CRON_SECRET` on Vercel. Optional for Clover: `CLOVER_API_REGION`,
 `CLOVER_WEBHOOK_KEY`.
+Optional: `SUPPORT_EMAIL`, the one support address shown to users (`lib/support.ts`; falls back to the
+existing address). `next.config.ts` inlines it at build time, so redeploy after changing it. Demo request
+notifications (`app/actions/contact.ts`) are delivered separately and do not read it.
 Optional for Toast: `TOAST_API_HOST` (the host Toast issues; defaults to production),
 `TOAST_AMOUNTS_IN_CENTS=true` (only if a sandbox shows cents, not dollars).
 
