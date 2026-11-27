@@ -1,4 +1,7 @@
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
+import { blockedAccess } from '@/lib/billing/paywall';
+import { LEGAL_CONTACT_EMAIL } from '@/lib/legal';
 import { after } from 'next/server';
 import { runProviderSync } from '@/lib/pos/sync-run';
 import { isStaleOnView } from '@/lib/pos/sync-cooldown';
@@ -53,6 +56,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const access = await getOrgAccess(org);
   const hasCustomer = !access.allowed && role === 'owner' ? !!(await getOrgBilling(org.id))?.stripe_customer_id : false;
 
+  const showPage = access.allowed || blockedAccess((await headers()).get('x-path-query') ?? '', role) === 'pass';
+
   return (
     <>
       {/* Keyboard users would otherwise tab the whole sidebar and header on
@@ -99,13 +104,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 itself a flex item and inherits the same `min-width: auto`, so
                 wrapping flex-in-flex changed nothing. */}
             <div className="w-full min-w-0 flex-1">
-              {access.allowed ? children : (
+              {showPage ? children : (
                 <div className="mx-auto max-w-lg p-6 space-y-4">
                   <h1 className="text-2xl font-bold">Subscription needed</h1>
                   <p className="text-muted-foreground">
                     {role === 'owner'
                       ? 'This bar has no active Rail subscription. Your data is safe and will be here when you subscribe.'
                       : 'This bar has no active Rail subscription. Ask the owner to renew it.'}
+                  </p>
+                  {role === 'owner' && (
+                    <p className="text-sm">
+                      You can still <a className="underline" href="/app/settings?tab=data">export your data or close your bar</a> and{' '}
+                      <a className="underline" href="/app/settings?tab=billing">see billing</a>.
+                    </p>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    Questions? Email <a className="underline" href={`mailto:${LEGAL_CONTACT_EMAIL}`}>{LEGAL_CONTACT_EMAIL}</a>.
                   </p>
                   {role === 'owner' && (
                     hasCustomer ? (

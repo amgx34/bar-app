@@ -16,6 +16,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { assessSyncHealth, describeAge, type PosConfigShape } from '@/lib/pos/sync-health';
+import { LEGAL_CONTACT_EMAIL } from '@/lib/legal';
 import { friendlySyncError } from '@/lib/pos/sync-errors';
 import {
   syncCloverInventory, syncCloverSales,
@@ -98,7 +99,7 @@ function TwoTouchPanel({
       const res = await triggerTwoTouchPoll();
       setLastResult(res);
       if (res.processed > 0) {
-        toast.success(`Processed ${res.processed} email${res.processed > 1 ? 's' : ''} — ${res.zReports} Z reports, ${res.empReports} shift reports`);
+        toast.success(`Processed ${res.processed} email${res.processed > 1 ? 's' : ''} - ${res.zReports} Z reports, ${res.empReports} shift reports`);
       } else {
         toast.info('No new 2Touch emails found in inbox');
       }
@@ -122,12 +123,10 @@ function TwoTouchPanel({
       <div className="rounded-md bg-blue-500/5 border border-blue-500/20 p-3 space-y-1.5 text-xs text-muted-foreground">
         <p className="font-semibold text-foreground">How 2Touch integration works:</p>
         <ol className="list-decimal list-inside space-y-1 leading-relaxed">
-          <li>In 2Touch Cloud, configure nightly Z reports to email to{' '}
-            <span className="font-mono font-semibold text-primary">{process.env.NEXT_PUBLIC_GMAIL_USER ?? 'your configured Gmail'}</span>
-          </li>
-          <li>Rail checks that inbox every <strong>15 minutes</strong> via Vercel Cron</li>
+          <li>In 2Touch Cloud, set nightly Z reports to email to the Rail reports address. We will send you that address when we set up your bar: <a className="underline" href={`mailto:${LEGAL_CONTACT_EMAIL}`}>{LEGAL_CONTACT_EMAIL}</a></li>
+          <li>Rail checks for new reports regularly and adds them for you</li>
           <li>New report emails are parsed by AI and inserted into your Dashboard &amp; Payroll automatically</li>
-          <li>Each email is processed exactly once — duplicates are skipped</li>
+          <li>Each email is processed exactly once, so duplicates are skipped</li>
         </ol>
       </div>
 
@@ -419,7 +418,7 @@ export function POSPanel({ role, posProvider, posConfig, cloverAuthUrl, flashCon
             ) : (
               <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
                 <AlertTriangle className="h-3.5 w-3.5" />
-                CLOVER_CLIENT_ID, CLOVER_CLIENT_SECRET, CLOVER_REDIRECT_URI and OAUTH_STATE_SECRET must be set in the server environment
+                Connecting Clover is not switched on yet. Email <a className="underline" href={`mailto:${LEGAL_CONTACT_EMAIL}`}>{LEGAL_CONTACT_EMAIL}</a> and we will turn it on for your bar.
               </p>
             )
           ) : (

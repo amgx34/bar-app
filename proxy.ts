@@ -4,7 +4,10 @@ import { isGatedPath } from '@/lib/auth/gated-path';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  // Lets the app layout tell which page a blocked bar is asking for (see lib/billing/paywall.ts).
+  const forwarded = new Headers(request.headers);
+  forwarded.set('x-path-query', request.nextUrl.pathname + request.nextUrl.search);
+  let response = NextResponse.next({ request: { headers: forwarded } });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,7 +17,7 @@ export async function proxy(request: NextRequest) {
         getAll: () => request.cookies.getAll(),
         setAll: (cookiesToSet) => {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
+          response = NextResponse.next({ request: { headers: forwarded } });
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );

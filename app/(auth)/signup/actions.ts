@@ -9,7 +9,7 @@ import { SIGNUP_OPEN } from '@/lib/auth/signup-open';
 import { getAuthUser, getCurrentOrg } from '@/lib/org';
 import { DEMO_EMAIL_SUFFIX } from '@/lib/demo/constants';
 import { pickDemoPrefill } from '@/lib/demo/prefill';
-import { isBotRequest } from '@/lib/auth/bot-check';
+import { BOT_BLOCKED_MESSAGE, isBotRequest } from '@/lib/auth/bot-check';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -34,7 +34,7 @@ export async function signUpOwner(
   // A filled hidden field is a script: same screen as a real sign-up, no account.
   if (honeypot) return signupAnswer('honeypot');
   // Same words as a real throttle, so a bot learns nothing about why.
-  if (await isBotRequest()) return signupAnswer('throttled', { retryAfterSeconds: 60 });
+  if (await isBotRequest()) return { ok: false, message: BOT_BLOCKED_MESSAGE };
 
   const addr = String(email ?? '').trim().toLowerCase();
   if (!EMAIL.test(addr) || addr.length > 254) return signupAnswer('invalid_email');

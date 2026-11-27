@@ -127,6 +127,7 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
             endDate={endDate}
             periodLabel={periodLabel}
             orgName={org.name}
+            approved={isApproved}
             exportOnly
           />
         </div>
@@ -335,6 +336,7 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
             endDate={endDate}
             periodLabel={periodLabel}
             orgName={org.name}
+            approved={isApproved}
           />
         )}
 

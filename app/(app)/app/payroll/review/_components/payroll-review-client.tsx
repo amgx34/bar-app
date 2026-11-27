@@ -5,16 +5,19 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import type { PayrollEntry } from '../../actions';
 
+const NACHA_NEEDS_APPROVAL = 'The bank file unlocks once an owner approves this pay run.';
+
 interface Props {
   entries:      PayrollEntry[];
   startDate:    string;
   endDate:      string;
   periodLabel:  string;
   orgName:      string;
+  approved:     boolean; // the bank file is refused until the run is approved; say so instead of inviting the click
   exportOnly?:  boolean; // true = render only the export button (used in sticky header)
 }
 
-export function PayrollReviewClient({ entries, startDate, endDate, periodLabel, orgName, exportOnly }: Props) {
+export function PayrollReviewClient({ entries, startDate, endDate, periodLabel, orgName, approved, exportOnly }: Props) {
   function downloadCsv() {
     const header = [
       'Employee', 'Role', 'Rate ($/hr)',
@@ -97,25 +100,31 @@ export function PayrollReviewClient({ entries, startDate, endDate, periodLabel, 
 
   if (exportOnly) {
     return (
-      <div className="flex gap-2 shrink-0">
-        <Button size="sm" variant="outline" onClick={downloadCsv} className="gap-1.5">
-          <Download className="h-3.5 w-3.5" /> CSV
-        </Button>
-        <Button size="sm" variant="outline" onClick={downloadNacha} className="gap-1.5 text-primary border-primary/40 hover:bg-primary/5">
-          <Download className="h-3.5 w-3.5" /> NACHA File
-        </Button>
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={downloadCsv} className="min-h-11 gap-1.5 sm:min-h-0">
+            <Download className="h-3.5 w-3.5" /> CSV
+          </Button>
+          <Button size="sm" variant="outline" onClick={downloadNacha} disabled={!approved} aria-describedby={approved ? undefined : 'nacha-reason-hdr'} className="min-h-11 gap-1.5 text-primary border-primary/40 hover:bg-primary/5 sm:min-h-0">
+            <Download className="h-3.5 w-3.5" /> NACHA File
+          </Button>
+        </div>
+        {!approved && <p id="nacha-reason-hdr" className="text-xs text-muted-foreground">{NACHA_NEEDS_APPROVAL}</p>}
       </div>
     );
   }
 
   return (
-    <div className="flex flex-wrap gap-3">
-      <Button variant="outline" onClick={downloadCsv} className="gap-2">
-        <Download className="h-4 w-4" /> Export CSV
-      </Button>
-      <Button variant="outline" onClick={downloadNacha} className="gap-2 text-primary border-primary/40 hover:bg-primary/5">
-        <Download className="h-4 w-4" /> Download NACHA File
-      </Button>
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-3">
+        <Button variant="outline" onClick={downloadCsv} className="min-h-11 gap-2">
+          <Download className="h-4 w-4" /> Export CSV
+        </Button>
+        <Button variant="outline" onClick={downloadNacha} disabled={!approved} aria-describedby={approved ? undefined : 'nacha-reason'} className="min-h-11 gap-2 text-primary border-primary/40 hover:bg-primary/5">
+          <Download className="h-4 w-4" /> Download NACHA File
+        </Button>
+      </div>
+      {!approved && <p id="nacha-reason" className="text-sm text-muted-foreground">{NACHA_NEEDS_APPROVAL}</p>}
     </div>
   );
 }
