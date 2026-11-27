@@ -15,7 +15,7 @@ export type CloseBarState = { error?: string };
 export async function closeBar(_prev: CloseBarState, formData: FormData): Promise<CloseBarState> {
   const { org, role } = await getCurrentOrg();
   if (role !== 'owner') return { error: 'Only the owner can close this bar.' };
-  if (isDemoOrg(org.slug)) return { error: 'Sample bars are removed automatically after 24 hours.' };
+  if (isDemoOrg(org.slug)) return { error: 'This is a sample bar, so it cannot be deleted.' };
   if (!deletionEnabled()) return { error: `Closing a bar is not switched on yet. Email us at ${LEGAL_CONTACT_EMAIL} and we will do it for you.` };
   if (!confirmationMatches(String(formData.get('confirm') ?? ''), org.name)) {
     return { error: 'The name you typed does not match. Nothing was deleted.' };

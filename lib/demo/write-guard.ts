@@ -18,6 +18,10 @@ const DEFAULT_DEMO_EMAIL = 'shared-visitor@demo.example';
 export const isUniversalDemoEmail = (email?: string | null) =>
   !!email && email.toLowerCase() === (process.env.DEMO_USER_EMAIL || DEFAULT_DEMO_EMAIL).toLowerCase();
 
+/** Either kind of demo account: the shared sample visitor, or an old per-visitor one. */
+export const isDemoEmail = (email?: string | null) =>
+  isUniversalDemoEmail(email) || !!email?.toLowerCase().endsWith('@rail.demo');
+
 /** proxy.ts: API writes by the demo user are refused, except entering the demo. Sign out is a server action, not an API route. */
 export const blocksDemoApiWrite = (method: string, path: string) =>
   method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS' && path.startsWith('/api/') && path !== '/api/demo';

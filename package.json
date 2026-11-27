@@ -14,6 +14,7 @@
     "test:watch": "node scripts/dev/run-vitest.mjs",
     "audit:scope": "node scripts/audit-admin-scope.mjs",
     "demo:seed": "node --no-warnings scripts/demo/seed.ts",
+    "demo:retire": "node --no-warnings scripts/demo/retire-old-demos.ts",
     "audit:tokens": "node --no-warnings scripts/design/check-tokens.ts"
   },
   "dependencies": {

@@ -1,54 +1,26 @@
 /**
  * POST /api/demo
  *
- * Creates a fresh demo user + org, seeds realistic inventory data, signs in as
- * that user (setting session cookies), and returns the URL to land on.
+ * Signs the visitor in to the shared, read-only sample bars. Nothing is created
+ * per visit: the demo user and its three bars are seeded once (and refreshed
+ * daily) by lib/demo/universal-seed.ts, so entering is one sign-in.
  *
- * Deliberately POST, not GET. Provisioning an auth user, an organisation and a
- * seeded dataset is about as state-changing as a request gets, and as a GET it
- * fired on link previews, prefetches and crawlers — robots.txt is advisory and
- * does not stop any of them.
- *
- * Expired demos are swept by GET /api/cron/2touch, not here: the purge paged
- * through every auth user in the project, so the cost of one visitor's request
- * grew with the size of the user table.
+ * Deliberately POST, not GET: it sets a session cookie, and a GET fires on link
+ * previews, prefetches and crawlers.
  */
-import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
-import { seedDemoOrg } from '@/lib/demo/seed';
-import { DEMO_PROFILES, profileSlug } from '@/lib/demo/profiles';
-import { DEMO_EMAIL_SUFFIX, DEMO_SLUG_PREFIX } from '@/lib/demo/constants';
-import { recordTermsAcceptanceForUser } from '@/lib/terms';
+import { UNIVERSAL_EMAIL } from '@/lib/demo/universal';
+import { isDemoEmail, isUniversalDemoEmail } from '@/lib/demo/write-guard';
 import { checkRateLimit, clientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { BOT_BLOCKED_MESSAGE, isBotRequest } from '@/lib/auth/bot-check';
 import { NextRequest, NextResponse } from 'next/server';
-import { randomUUID } from 'crypto';
-
-// Seeds three orgs serially (createUser + 3x seedDemoOrg + sign-in); the platform default is too tight for a cold start.
-export const maxDuration = 60;
-
-export const DEMO_TTL_HOURS = 24;
-export { DEMO_EMAIL_SUFFIX, DEMO_SLUG_PREFIX } from '@/lib/demo/constants';
-
-/**
- * Ceiling on demo orgs alive at once. The per-IP limit alone does not bound
- * total cost — a botnet spreads across addresses — so this caps the blast
- * radius on the database regardless of where requests come from.
- */
-const MAX_LIVE_DEMO_ORGS = 750; // 250 visitors x 3 bars each; was 250 when a visitor got one org
-
-function fail(reason: string, status: number) {
-  return NextResponse.json({ error: reason }, { status });
-}
 
 export async function POST(req: NextRequest) {
   if (await isBotRequest()) {
     return NextResponse.json({ error: BOT_BLOCKED_MESSAGE }, { status: 429 });
   }
 
-  // ── 0. Bound the abuse ────────────────────────────────────────────────────
-  const ip = clientIp(req.headers);
-  const limit = await checkRateLimit(RATE_LIMITS.demoCreate, ip);
+  const limit = await checkRateLimit(RATE_LIMITS.demoCreate, clientIp(req.headers));
   if (!limit.allowed) {
     return NextResponse.json(
       { error: 'Too many demo sessions from this address. Try again later.' },
@@ -57,108 +29,38 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // ── Never take over a real session ───────────────────────────────────────
-    //
-    // signInWithPassword below REPLACES whatever session cookie is present. An
-    // operator already signed in to their own bar who clicked "Try Demo" was
-    // therefore silently signed out of it and into a throwaway demo user — one
-    // the 24-hour purge then deletes. From their seat their account and the
-    // demo had merged.
-    //
-    // Anyone already signed in has no use for a demo, so send them to their own
-    // dashboard and provision nothing.
-    const existing = await createClient();
-    const { data: { user: signedIn } } = await existing.auth.getUser();
-
-    if (signedIn && !signedIn.email?.endsWith(DEMO_EMAIL_SUFFIX)) {
-      return NextResponse.json({
-        redirectTo: '/app/dashboard',
-        alreadySignedIn: true,
-      });
-    }
-
-    const admin = createAdminClient();
-
-    // Counting orgs by slug prefix is one indexed query; counting auth users
-    // would page through the whole project.
-    const { count, error: countErr } = await admin
-      .from('organizations')
-      .select('id', { count: 'exact', head: true })
-      .like('slug', `${DEMO_SLUG_PREFIX}%`);
-
-    if (!countErr && (count ?? 0) + DEMO_PROFILES.length > MAX_LIVE_DEMO_ORGS) {
-      console.warn(`[demo] refused: ${count} live demo orgs >= cap ${MAX_LIVE_DEMO_ORGS}`);
-      return fail('Demo capacity is full right now. Please try again shortly.', 503);
-    }
-
-    // ── 1. Create a fresh demo user ──────────────────────────────────────────
-    const ts        = Date.now().toString(36);
-    const demoEmail = `demo-${ts}-${randomUUID().slice(0, 8)}${DEMO_EMAIL_SUFFIX}`;
-    const demoPass  = randomUUID();
-
-    const { data: { user }, error: createErr } = await admin.auth.admin.createUser({
-      email:         demoEmail,
-      password:      demoPass,
-      email_confirm: true,
-    });
-
-    if (createErr || !user) {
-      console.error('Demo user creation failed:', createErr?.message);
-      return fail('Demo is unavailable right now.', 503);
-    }
-
-    // ── 2. Seed demo org + data ──────────────────────────────────────────────
-    // Three bars per visitor. Slugs are fixed up front so a failure part way can
-    // delete exactly what was attempted, including an org whose seed threw
-    // before returning its id. Orgs cascade their children and memberships.
-    const stamp = Date.now().toString(36);
-    const slugs = DEMO_PROFILES.map((p) => profileSlug(p, stamp));
-    let demoOrgId: string;
-    try {
-      const ids: string[] = [];
-      for (let i = 0; i < DEMO_PROFILES.length; i++) {
-        ids.push(await seedDemoOrg(admin, user.id, slugs[i], DEMO_PROFILES[i]));
-      }
-      demoOrgId = ids[0];
-    } catch (seedErr) {
-      // admin-scope-ok: these are the demo orgs this very request just created,
-      // identified by the unique slugs minted above; not tenant data.
-      await admin.from('organizations').delete().in('slug', slugs);
-      await admin.auth.admin.deleteUser(user.id);
-      throw seedErr;
-    }
-
-    // Recorded here rather than left to the /app consent gate, which would put
-    // a wall in front of the demo the moment someone clicked "try it". The demo
-    // form states that continuing accepts the terms, so this is the record of
-    // that — and it is a real record, not a bypass.
-    await recordTermsAcceptanceForUser(user.id, demoOrgId);
-
-    // ── 3. Sign in so the session cookie is set ───────────────────────────────
+    // Signing in below REPLACES the session cookie, so someone already signed in
+    // to their own bar is sent to it instead of being signed out of it. Someone
+    // already in the sample bar needs no second sign-in; an old per-visitor demo
+    // session moves to the shared bar.
     const supabase = await createClient();
-    const { error: signInErr } = await supabase.auth.signInWithPassword({
-      email:    demoEmail,
-      password: demoPass,
-    });
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && !isDemoEmail(user.email)) {
+      return NextResponse.json({ redirectTo: '/app/dashboard', alreadySignedIn: true });
+    }
+    if (isUniversalDemoEmail(user?.email)) return NextResponse.json({ redirectTo: '/app/dashboard' });
 
-    if (signInErr) {
-      console.error('Demo sign-in failed:', signInErr.message);
-      return fail('Demo is unavailable right now.', 503);
+    const password = process.env.DEMO_USER_PASSWORD;
+    if (!password) {
+      console.error('[demo] DEMO_USER_PASSWORD is not set; run the demo seed first.');
+      return NextResponse.json({ error: 'The sample bar is unavailable right now.' }, { status: 503 });
     }
 
-    // The client navigates; returning a URL keeps this a POST end to end.
+    const { error } = await supabase.auth.signInWithPassword({
+      email: UNIVERSAL_EMAIL, password,
+    });
+    if (error) {
+      console.error('[demo] sign-in failed:', error.message);
+      return NextResponse.json({ error: 'The sample bar is unavailable right now.' }, { status: 503 });
+    }
     return NextResponse.json({ redirectTo: '/app/dashboard' });
-
   } catch (err) {
-    console.error('Demo creation error:', err);
-    return fail('Demo is unavailable right now.', 503);
+    console.error('[demo] error:', err);
+    return NextResponse.json({ error: 'The sample bar is unavailable right now.' }, { status: 503 });
   }
 }
 
-/**
- * The route used to be a GET. Anything still linking to it — an old bookmark,
- * a cached page — gets sent to the marketing page rather than a bare 405.
- */
+/** Old links and bookmarks to this route get the marketing page, not a bare 405. */
 export async function GET(req: NextRequest) {
   return NextResponse.redirect(new URL('/?demo=use-button', new URL(req.url).origin));
 }

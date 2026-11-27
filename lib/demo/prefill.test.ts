@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { pickDemoPrefill } from './prefill';
-import { demoTimeLeft } from './time-left';
 
 describe('pickDemoPrefill', () => {
   it('carries pay, tip, pour and tax settings', () => {
@@ -20,23 +19,5 @@ describe('pickDemoPrefill', () => {
   });
   it('tolerates a missing or non-object settings value', () => {
     for (const v of [null, undefined, 'x', []]) expect(pickDemoPrefill(v)).toEqual({});
-  });
-});
-
-describe('demoTimeLeft', () => {
-  const created = '2026-11-25T00:00:00Z';
-  it('is quiet with more than 2 hours left', () => {
-    expect(demoTimeLeft(created, new Date('2026-11-25T10:00:00Z'))).toEqual({ expired: false, urgent: false, label: '14 hours' });
-  });
-  it('is urgent under 2 hours and counts minutes', () => {
-    expect(demoTimeLeft(created, new Date('2026-11-25T22:30:00Z'))).toEqual({ expired: false, urgent: true, label: '1 hour 30 minutes' });
-    expect(demoTimeLeft(created, new Date('2026-11-25T23:50:00Z'))).toEqual({ expired: false, urgent: true, label: '10 minutes' });
-  });
-  it('is expired at and after 24 hours', () => {
-    expect(demoTimeLeft(created, new Date('2026-11-26T00:00:00Z'))?.expired).toBe(true);
-  });
-  it('treats an unreadable date as no clock at all', () => {
-    expect(demoTimeLeft('nope', new Date())).toBeNull();
-    expect(demoTimeLeft(undefined, new Date())).toBeNull();
   });
 });

@@ -361,9 +361,9 @@ export default function HomePage() {
           <p className="text-xs text-muted-foreground max-w-3xl mx-auto">
             {/* Explicit {' '}: the space after </strong> is swallowed when the
                 sentence wraps to the next source line, rendering "accountscontain". */}
-            <strong className="text-accent-text">Demo accounts</strong>{' '}
-            contain pre-loaded sample data for &ldquo;The Tipsy Tavern&rdquo; — no real
-            bar data is used or stored. Demo sessions may be cleared periodically.
+            <strong className="text-accent-text">The demo</strong>{' '}
+            is a shared sample bar with made-up data. No real bar data is used, and nothing
+            you click in it is saved.
           </p>
         </div>
 

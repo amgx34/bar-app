@@ -24,8 +24,8 @@ export type RateLimitRule = {
 
 /** Tuned per surface: cost of the operation vs. what a real person does. */
 export const RATE_LIMITS = {
-  /** Each hit provisions an auth user, an org, and a seeded dataset. */
-  demoCreate:   { name: 'demo',          limit: 3,  windowSeconds: 60 * 60 },
+  /** One sign-in to the shared sample bar; cheap, so a classroom behind one address fits. */
+  demoCreate:   { name: 'demo',          limit: 300, windowSeconds: 60 * 60 },
   /** Writes a row and sends mail to a human inbox. */
   contactForm:  { name: 'contact',       limit: 5,  windowSeconds: 60 * 60 },
   /** Generous enough for typos, tight enough to make guessing useless. */

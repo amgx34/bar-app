@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { SIGNUP_OPEN } from '@/lib/auth/signup-open';
-import { DEMO_EMAIL_SUFFIX } from '@/lib/demo/constants';
+import { isDemoEmail } from '@/lib/demo/write-guard';
 import { SignupForm, SignupClosed } from './signup-form';
 
 export const metadata: Metadata = {
@@ -16,10 +16,10 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
   // A real signed-in user has nothing to sign up for; a demo visitor may.
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (user && !user.email?.endsWith(DEMO_EMAIL_SUFFIX)) redirect('/app/dashboard');
+  if (user && !isDemoEmail(user.email)) redirect('/app/dashboard');
 
   // Only a live demo session earns the carry-over line; the action re-checks it.
-  const carry = (await searchParams).from === 'demo' && !!user?.email?.endsWith(DEMO_EMAIL_SUFFIX);
+  const carry = (await searchParams).from === 'demo' && isDemoEmail(user?.email);
 
   return (
     <main className="relative min-h-dvh grid place-items-center p-6 overflow-hidden bg-sidebar text-sidebar-foreground">

@@ -1,6 +1,6 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { selectExpiredDemoOrgs } from './expired';
+import { selectExpiredDemoOrgs, selectExpiredDemoUsers } from './expired';
 import { DEMO_EMAIL_SUFFIX, DEMO_SLUG_PREFIX } from './constants';
 
 /**
@@ -38,11 +38,7 @@ export async function purgeExpiredDemoUsers(): Promise<PurgeResult> {
     }
     if (!data?.users?.length) break;
 
-    for (const u of data.users) {
-      if (u.email?.endsWith(DEMO_EMAIL_SUFFIX) && u.created_at < cutoff) {
-        expiredIds.push(u.id);
-      }
-    }
+    expiredIds.push(...selectExpiredDemoUsers(data.users, DEMO_EMAIL_SUFFIX, cutoff));
 
     if (data.users.length < 100) break; // last page
     page++;

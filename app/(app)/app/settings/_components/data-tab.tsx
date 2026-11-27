@@ -72,7 +72,7 @@ export function DataTab({ orgName, isOwner, isDemo, deletionOpen }: {
       <section className="space-y-3 rounded-lg border border-destructive/40 p-4" aria-labelledby="close-h">
         <h2 id="close-h" className="text-xl font-semibold">Close this bar</h2>
         {isDemo ? (
-          <p className="text-sm text-muted-foreground">This is sample data. It is deleted automatically after 24 hours.</p>
+          <p className="text-sm text-muted-foreground">This is a sample bar, so it cannot be closed.</p>
         ) : (
           <>
             <div className="space-y-2 text-sm">

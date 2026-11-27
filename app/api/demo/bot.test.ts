@@ -6,8 +6,6 @@ vi.mock('server-only', () => ({}));
 vi.mock('botid/server', () => ({ checkBotId: vi.fn(async () => ({ isBot: true })) }));
 vi.mock('@/lib/supabase/server', () => ({ createClient }));
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient }));
-vi.mock('@/lib/demo/seed', () => ({ seedDemoOrg: vi.fn() }));
-vi.mock('@/lib/terms', () => ({ recordTermsAcceptanceForUser: vi.fn() }));
 
 describe('POST /api/demo with a bot verdict', () => {
   it('answers 429 and provisions nothing', async () => {

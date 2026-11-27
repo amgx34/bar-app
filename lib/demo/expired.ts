@@ -13,6 +13,8 @@
  * the existing orphans on its first run and cannot create new ones.
  */
 
+import { UNIVERSAL_EMAIL, UNIVERSAL_SLUG_PREFIX } from './universal.ts';
+
 export type PurgeableOrg = {
   id:         string;
   slug:       string | null;
@@ -25,6 +27,17 @@ export function selectExpiredDemoOrgs(
   cutoffIso: string,
 ): string[] {
   return orgs
-    .filter((o) => o.slug?.startsWith(slugPrefix) && o.created_at < cutoffIso)
+    // The permanent sample bars are excluded by name, so a changed prefix can never reach them.
+    .filter((o) => o.slug?.startsWith(slugPrefix) && !o.slug.startsWith(UNIVERSAL_SLUG_PREFIX) && o.created_at < cutoffIso)
     .map((o) => o.id);
+}
+
+export function selectExpiredDemoUsers(
+  users: readonly { id: string; email?: string | null; created_at: string }[],
+  emailSuffix: string,
+  cutoffIso: string,
+): string[] {
+  return users
+    .filter((u) => u.email?.endsWith(emailSuffix) && u.email.toLowerCase() !== UNIVERSAL_EMAIL && u.created_at < cutoffIso)
+    .map((u) => u.id);
 }

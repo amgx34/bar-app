@@ -5,7 +5,7 @@ Say one sentence per screen, then stop talking and let them touch it.
 
 ## Before you start (checklist)
 
-- [ ] Open the demo FRESH, within an hour of the meeting. A demo lasts 24 hours and then shows "This demo has ended"; an older one also reports "last night" as days ago. Use the Try the demo button on the landing page (do not reuse an old tab).
+- [ ] Use the Try the demo button on the landing page. It opens the shared sample bar at once; nothing anyone clicks there is saved. Check "Last night" on the dashboard shows yesterday (the sample data is moved up to today by a daily job, or `npm run demo:seed` on dev).
 - [ ] Dev server running (`npm run dev`, localhost:3000) or the deployed URL. Check it loads on the phone's Wi-Fi.
 - [ ] Phone (390 wide) and laptop both signed into the same demo. Start on the phone, it is the screen they will use.
 - [ ] Set both to light mode. Notifications silenced. Browser zoom 100%.
@@ -47,4 +47,4 @@ Say one sentence per screen, then stop talking and let them touch it.
 
 ## If something looks wrong
 
-Say "that is sample data." Refresh once. If the page says "This demo has ended", open a new demo.
+Say "that is sample data." Refresh once.

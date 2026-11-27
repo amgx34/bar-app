@@ -15,8 +15,8 @@ export function DemoButton({ size = 'default', className = '' }: Props) {
   async function handleClick() {
     setLoading(true);
     try {
-      // POST, not a navigation: the route provisions a user, an org and a
-      // seeded dataset, so it must not be reachable by prefetch or crawl.
+      // POST, not a navigation: it sets a session cookie, so it must not be
+      // reachable by prefetch or crawl.
       const res = await fetch('/api/demo', { method: 'POST' });
       const body = await res.json().catch(() => null);
 
@@ -61,12 +61,12 @@ export function DemoButton({ size = 'default', className = '' }: Props) {
       {loading ? (
         <>
           <Loader2 className="h-4 w-4 animate-spin" />
-          Setting up demo…
+          Opening the sample bar…
         </>
       ) : (
         <>
           <PlayCircle className="h-4 w-4" />
-          Try Demo Account
+          Try the demo
         </>
       )}
     </button>

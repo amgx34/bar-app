@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { DEMO_SLUG_PREFIX } from '@/lib/demo/constants';
+import { DEMO_SLUG_PREFIX, UNIVERSAL_SLUG_PREFIX } from '@/lib/demo/constants';
 import { accessFor, accessFromLookup, type Access, type BillingRow } from './access';
 import { enforcementOn } from './stripe';
 
@@ -27,7 +27,7 @@ export async function getOrgBilling(orgId: string): Promise<OrgBillingRow | null
   return (await getOrgBillingLookup(orgId)).row;
 }
 
-export const isDemoOrg = (slug: string | null | undefined) => !!slug?.startsWith(DEMO_SLUG_PREFIX);
+export const isDemoOrg = (slug: string | null | undefined) => !!slug && (slug.startsWith(DEMO_SLUG_PREFIX) || slug.startsWith(UNIVERSAL_SLUG_PREFIX));
 
 /** Never throws: any failure reads as "allowed", so billing can never lock a bar out by accident. */
 export async function getOrgAccess(org: { id: string; slug: string }): Promise<Access> {

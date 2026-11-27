@@ -7,7 +7,7 @@ import { checkPassword } from '@/lib/auth/password';
 import { signupAnswer, type SignupAnswer } from '@/lib/auth/signup-result';
 import { SIGNUP_OPEN } from '@/lib/auth/signup-open';
 import { getAuthUser, getCurrentOrg } from '@/lib/org';
-import { DEMO_EMAIL_SUFFIX } from '@/lib/demo/constants';
+import { isDemoEmail } from '@/lib/demo/write-guard';
 import { pickDemoPrefill } from '@/lib/demo/prefill';
 import { BOT_BLOCKED_MESSAGE, isBotRequest } from '@/lib/auth/bot-check';
 
@@ -50,7 +50,7 @@ export async function signUpOwner(
   if (fromDemo) {
     try {
       const u = await getAuthUser();
-      if (u?.email?.endsWith(DEMO_EMAIL_SUFFIX)) prefill = pickDemoPrefill((await getCurrentOrg()).org.bar_settings);
+      if (isDemoEmail(u?.email)) prefill = pickDemoPrefill((await getCurrentOrg()).org.bar_settings);
     } catch { /* no carry-over is better than no sign-up */ }
   }
 

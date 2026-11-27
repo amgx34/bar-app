@@ -12,7 +12,8 @@ import {
   CATEGORIES, REPS, EMPLOYEES_SEED, ITEMS, NIGHTS, USAGE_LOGS, type ItemSeed,
 } from './seed.ts';
 
-export const UNIVERSAL_SLUG_PREFIX = 'rail-demo-';
+import { UNIVERSAL_SLUG_PREFIX } from './constants.ts';
+export { UNIVERSAL_SLUG_PREFIX };
 export const UNIVERSAL_EMAIL = 'shared-visitor@demo.example';
 export const universalSlug = (key: string) => `${UNIVERSAL_SLUG_PREFIX}${key}`;
 

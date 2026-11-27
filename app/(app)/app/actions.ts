@@ -5,10 +5,13 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { CURRENT_ORG_COOKIE } from '@/lib/org';
+import { isUniversalDemoEmail } from '@/lib/demo/write-guard';
 
 export async function signOut() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  const { data: { user } } = await supabase.auth.getUser();
+  // Every visitor shares one sample account, and the default scope ends all of its sessions.
+  await supabase.auth.signOut(isUniversalDemoEmail(user?.email) ? { scope: 'local' } : undefined);
   redirect('/login');
 }
 export async function switchOrg(orgId: string) {

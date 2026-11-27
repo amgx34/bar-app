@@ -72,7 +72,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset>
-          {isDemoOrg(org.slug) && <DemoBanner createdAt={user?.created_at} />}
+          {isDemoOrg(org.slug) && <DemoBanner />}
           <AppHeader
             email={user?.email ?? ''}
             posProvider={org.pos_provider}
