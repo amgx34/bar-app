@@ -51,6 +51,19 @@ export function NightView({
     // The tie-out needs only the Z row, not hourly data, so it stays outside this gate.
     return (
       <>
+        {data.night?.totalSales != null && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Sales for the night</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                The day total from the close-out report. It is a daily total, not hour by hour.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold tabular-nums">{money(data.night.totalSales)}</p>
+            </CardContent>
+          </Card>
+        )}
         <MissingPanel title="When the money came in" capability="hasHourly" provider={provider} />
         {tieOutDate && <TieOutCard date={tieOutDate} live={live} />}
       </>

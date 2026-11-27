@@ -6,7 +6,7 @@ Rail reads Toast (sales, tips, cash and card split, items sold, hourly and per-s
 
 ## 1. Apply the migration (dev first, then live)
 
-Same migration as Clover: `supabase/migrations/20261125000000_pos_credentials.sql`. Not applied anywhere yet. The app works without it through the encrypted fallback in `pos_config`, which has no compare-and-swap and no sync lease. Apply it before a real bar connects.
+Same migration as Clover: `supabase/migrations/20261125000050_pos_credentials.sql`. Not applied anywhere yet. The app works without it through the encrypted fallback in `pos_config`, which has no compare-and-swap and no sync lease. Apply it before a real bar connects.
 
 ## 2. Get Toast API access (this is the hard part)
 

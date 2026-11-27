@@ -6,7 +6,7 @@ Rail reads Clover (sales, tips, cash and card split, items sold, hourly and per-
 
 ## 1. Apply the migration (dev first, then live)
 
-`supabase/migrations/20261125000000_pos_credentials.sql` creates the encrypted credentials table. Nobody has applied it. Apply it to the dev project, check a connect and a sync, then apply it to live. Until it is applied the app still works: tokens are stored encrypted in `pos_config.credentials_enc`, without compare-and-swap. That path is a fallback. Clover refresh tokens are single use, so two overlapping syncs can strand a connection on it. Apply the migration before a real bar connects.
+`supabase/migrations/20261125000050_pos_credentials.sql` creates the encrypted credentials table. Nobody has applied it. Apply it to the dev project, check a connect and a sync, then apply it to live. Until it is applied the app still works: tokens are stored encrypted in `pos_config.credentials_enc`, without compare-and-swap. That path is a fallback. Clover refresh tokens are single use, so two overlapping syncs can strand a connection on it. Apply the migration before a real bar connects.
 
 ## 2. Clover developer account and app
 

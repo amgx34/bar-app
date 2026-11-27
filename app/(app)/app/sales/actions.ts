@@ -274,6 +274,8 @@ export async function getSalesData(
  * whole Z-report path is careful about (see AGENTS.md).
  */
 export type NightLedger = {
+  /** The Z report's day total. Null when the Z row carries none. */
+  totalSales: number | null;
   cashSales: number | null;
   cardSales: number | null;
   /** Cash and card tips added together. Null when no Z row exists at all. */
@@ -456,6 +458,7 @@ export async function getPeriodSalesData(
         ));
 
         return {
+          totalSales:  z.total_sales === null ? null : Number(z.total_sales),
           cashSales:   z.cash_sales === null ? null : Number(z.cash_sales),
           cardSales:   z.card_sales === null ? null : Number(z.card_sales),
           tips,

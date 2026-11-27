@@ -50,7 +50,7 @@ It does not write `pos_config`. The caller does, with the existing chain: `recor
 
 ## 4. Credentials, tokens, refresh
 
-### Table (migration `supabase/migrations/20261125000000_pos_credentials.sql`)
+### Table (migration `supabase/migrations/20261125000050_pos_credentials.sql`)
 
 ```sql
 create table if not exists pos_credentials (
@@ -139,7 +139,7 @@ Two traps recorded so the code does not repeat them. Clover's current `syncClove
 
 ## 10. Migrations
 
-1. `20261125000000_pos_credentials.sql`: the table above. Applied by a human; nothing here applies it.
+1. `20261125000050_pos_credentials.sql`: the table above. Applied by a human; nothing here applies it.
 2. No other schema change. Cutoff, timezone, region and ids live in `pos_config`; the applier writes only existing tables. If a later step wants a `pos_sync_runs` history table it is a separate, optional migration.
 
 The app is correct before step 1 of the SQL is applied through the fallback in section 4, and correct after. A test runs `loadCredentials` against a fake that returns a "relation does not exist" error and asserts the fallback.
@@ -182,7 +182,7 @@ Four ordered steps. Each lands green on `npx tsc --noEmit`, `npm run lint`, `npm
 6. `app/api/2touch/ingest/route.ts`: reduced to auth, `recordAgentVersion`, `applyNormalized`, `recordSyncOutcome`. Characterization suite must pass unmodified.
 7. `lib/pos/pos-config.ts`: add `applyProviderSettings(cfg, patch)` and make `applySyncOutcome` provider-neutral, with ordering tests in `pos-config.test.ts` (new cases only).
 8. `lib/pos/sync-health.ts` and `sync-health.test.ts`: `isConnected`, per-provider cadence, `needs-reauth` (new tests; existing 2Touch tests untouched).
-9. `lib/pos/providers/types.ts` (`PosAdapter`), `lib/pos/sync-run.ts` (`runProviderSync`, lease, outcome write), `lib/pos/credentials.ts` + `credentials.test.ts` (encrypt round trip, CAS conflict, table-missing fallback), `supabase/migrations/20261125000000_pos_credentials.sql`.
+9. `lib/pos/providers/types.ts` (`PosAdapter`), `lib/pos/sync-run.ts` (`runProviderSync`, lease, outcome write), `lib/pos/credentials.ts` + `credentials.test.ts` (encrypt round trip, CAS conflict, table-missing fallback), `supabase/migrations/20261125000050_pos_credentials.sql`.
 
 Exit: 2Touch behavior pinned and identical; nothing yet calls the new providers.
 

@@ -71,7 +71,7 @@ Scores are single-auditor estimates, not two-reviewer averages. Pass bar for mon
 
 **B. Migrations (written, not applied; code works without them), in this order**
 1. `20261125000000_employees_archived_at.sql` (archive; apply to dev first, then live, then test archive and restore)
-2. `20261125000000_pos_credentials.sql`
+2. `20261125000050_pos_credentials.sql`
 3. `20261125000100_org_billing.sql`
 4. `20261125000200_add_counted_cash.sql`
 5. `20261125000300_inventory_apply_count.sql`
