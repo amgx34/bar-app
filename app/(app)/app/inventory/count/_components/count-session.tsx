@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { saveCount } from '../actions';
+import { ItemImage } from '../../_components/item-image';
 
 export type CountItem = { id: string; name: string; unit: string; expected: number; category: string };
 
@@ -167,8 +168,9 @@ export function CountSession({ orgId, items }: { orgId: string; items: CountItem
                 </p>
               )}
               <div className="flex items-center gap-3 border-b border-border/40 px-4 py-3">
+                <ItemImage name={i.name} category={i.category} />
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 font-medium">{i.name}</p>
+                  <p className="break-words font-medium">{i.name}</p>
                   <p className="text-xs text-muted-foreground">
                     Expected: {i.expected} {i.unit}
                     {diff !== null && diff !== 0 && (

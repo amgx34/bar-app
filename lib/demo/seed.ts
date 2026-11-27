@@ -75,6 +75,22 @@ export const ITEMS: ItemSeed[] = [
   // ── Supplies ─────────────────────────────────────────────────────────────
   { name:'Cocktail Straws (box/500)',          category:'Supplies', unit:'box',  current_stock:4, par_level:6, cost_price:8.99,  sale_price:null, sku:null, bottle_size_ml:null, pour_size_oz:null, rep_name:'Rachel Torres' },
   { name:'Bar Napkins (case)',                  category:'Supplies', unit:'case', current_stock:3, par_level:5, cost_price:12.99, sale_price:null, sku:null, bottle_size_ml:null, pour_size_oz:null, rep_name:'Rachel Torres' },
+  // ── More of the back bar ─────────────────────────────────────────────────
+  { name:'Hennessy VS Cognac 750ml', category:'Spirits', unit:'bottle', current_stock:2, par_level:2, cost_price:34.99, sale_price:null, sku:null, bottle_size_ml:750, pour_size_oz:1.5, rep_name:'Marcus Johnson' },
+  { name:'Kahlúa Coffee Liqueur 750ml', category:'Spirits', unit:'bottle', current_stock:3, par_level:3, cost_price:19.99, sale_price:null, sku:null, bottle_size_ml:750, pour_size_oz:1.5, rep_name:'Rachel Torres' },
+  { name:'La Marca Prosecco 750ml', category:'Wine', unit:'bottle', current_stock:6, par_level:6, cost_price:12.49, sale_price:null, sku:null, bottle_size_ml:750, pour_size_oz:null, rep_name:'Marcus Johnson' },
+  { name:'Lagunitas IPA Keg (1/2 bbl)', category:'Beer & Seltzers', unit:'keg', current_stock:2, par_level:2, cost_price:159.00, sale_price:null, sku:null, bottle_size_ml:null, pour_size_oz:null, rep_name:'Dave Kim' },
+  { name:'House Pilsner Draft', category:'Beer & Seltzers', unit:'keg', current_stock:2, par_level:2, cost_price:119.00, sale_price:null, sku:null, bottle_size_ml:null, pour_size_oz:null, rep_name:'Dave Kim' },
+  { name:'Angry Orchard Cider (case/24)', category:'Beer & Seltzers', unit:'case', current_stock:3, par_level:3, cost_price:31.49, sale_price:null, sku:null, bottle_size_ml:null, pour_size_oz:null, rep_name:'Dave Kim' },
+  { name:'Sour Mix', category:'Mixers & Non-Alcoholic', unit:'liter', current_stock:4, par_level:4, cost_price:3.49, sale_price:null, sku:null, bottle_size_ml:null, pour_size_oz:null, rep_name:'Rachel Torres' },
+  { name:'Angostura Bitters', category:'Mixers & Non-Alcoholic', unit:'bottle', current_stock:3, par_level:3, cost_price:11.99, sale_price:null, sku:null, bottle_size_ml:null, pour_size_oz:null, rep_name:'Rachel Torres' },
+  { name:'Cocktail Cherries (jar)', category:'Mixers & Non-Alcoholic', unit:'each', current_stock:4, par_level:4, cost_price:7.99, sale_price:null, sku:null, bottle_size_ml:null, pour_size_oz:null, rep_name:'Rachel Torres' },
+  { name:'Fresh Limes (case)', category:'Mixers & Non-Alcoholic', unit:'case', current_stock:2, par_level:2, cost_price:24.00, sale_price:null, sku:null, bottle_size_ml:null, pour_size_oz:null, rep_name:'Rachel Torres' },
+  { name:'Ice (20 lb bag)', category:'Supplies', unit:'each', current_stock:10, par_level:10, cost_price:3.50, sale_price:null, sku:null, bottle_size_ml:null, pour_size_oz:null, rep_name:'Rachel Torres' },
+  { name:'Salted Peanuts (box)', category:'Supplies', unit:'box', current_stock:3, par_level:3, cost_price:16.00, sale_price:null, sku:null, bottle_size_ml:null, pour_size_oz:null, rep_name:'Rachel Torres' },
+  { name:'Frozen Chicken Wings (case)', category:'Supplies', unit:'case', current_stock:2, par_level:2, cost_price:48.00, sale_price:null, sku:null, bottle_size_ml:null, pour_size_oz:null, rep_name:'Rachel Torres' },
+  { name:'Plastic Cups 16oz (case)', category:'Supplies', unit:'case', current_stock:4, par_level:4, cost_price:38.00, sale_price:null, sku:null, bottle_size_ml:null, pour_size_oz:null, rep_name:'Rachel Torres' },
+  { name:'Sanitizer Tablets (box)', category:'Supplies', unit:'box', current_stock:2, par_level:2, cost_price:14.50, sale_price:null, sku:null, bottle_size_ml:null, pour_size_oz:null, rep_name:'Rachel Torres' },
 ];
 
 // ── Nightly data (12 nights over 2 weeks) ─────────────────────────────────

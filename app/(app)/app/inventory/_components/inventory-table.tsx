@@ -20,6 +20,7 @@ import {
   canAdjustStock,
   type Role,
 } from '@/lib/permissions';
+import { ItemImage } from './item-image';
 import { ItemFormDialog } from './item-form-dialog';
 import { StockAdjustDialog } from './stock-adjust-dialog';
 import { DeactivateDialog } from './deactivate-dialog';
@@ -175,7 +176,8 @@ export function InventoryTable({ items, categories, reps, role, isFiltered, sear
               }`}
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
+                <ItemImage name={item.name} category={item.inventory_categories?.name} />
+                <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{item.name}</span>
                     {!item.is_active && (
@@ -242,6 +244,9 @@ export function InventoryTable({ items, categories, reps, role, isFiltered, sear
               return (
                 <TableRow key={item.id} className={!item.is_active ? 'opacity-50' : ''}>
                   <TableCell className="font-medium">
+                    <div className="flex items-center gap-3">
+                    <ItemImage name={item.name} category={item.inventory_categories?.name} />
+                    <div>
                     <div className="flex items-center gap-2">
                       {item.name}
                       {!item.is_active && (
@@ -254,6 +259,8 @@ export function InventoryTable({ items, categories, reps, role, isFiltered, sear
                     {item.reps && (
                       <div className="text-xs text-muted-foreground">{item.reps.name}</div>
                     )}
+                    </div>
+                    </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {item.inventory_categories?.name ?? '—'}

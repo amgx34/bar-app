@@ -21,6 +21,7 @@ import {
   getWeighReport,
   getPourAnalysis,
 } from '../actions';
+import { ItemImage } from '../../_components/item-image';
 import type {
   WeighReport,
   WeighReportDetail,
@@ -270,13 +271,18 @@ function ReportDetail({
             <tbody>
               {report.items.map((item) => (
                 <tr key={item.id} className="border-b last:border-0">
-                  <td className="py-2 font-medium max-w-[180px] truncate" title={item.item_name}>
-                    {item.item_name}
-                    {item.bottle_size_ml && (
-                      <span className="text-xs text-muted-foreground ml-1">
-                        {item.bottle_size_ml}ml
+                  <td className="py-2 pr-2 font-medium" title={item.item_name}>
+                    <div className="flex items-center gap-2">
+                      <ItemImage name={item.item_name} />
+                      <span className="max-w-[180px] truncate">
+                        {item.item_name}
+                        {item.bottle_size_ml && (
+                          <span className="text-xs text-muted-foreground ml-1">
+                            {item.bottle_size_ml}ml
+                          </span>
+                        )}
                       </span>
-                    )}
+                    </div>
                   </td>
                   <td className="py-2 text-right tabular-nums">{item.opening_level?.toFixed(1) ?? '—'}</td>
                   <td className="py-2 text-right tabular-nums">{item.closing_level?.toFixed(1) ?? '—'}</td>
@@ -404,7 +410,12 @@ function PourAnalysisPanel() {
                   : 0;
                 return (
                   <tr key={idx} className="border-t">
-                    <td className="px-3 py-2 font-medium">{item.item_name}</td>
+                    <td className="px-3 py-2 font-medium">
+                      <div className="flex items-center gap-2">
+                        <ItemImage name={item.item_name} />
+                        {item.item_name}
+                      </div>
+                    </td>
                     <td className="px-3 py-2 text-right text-muted-foreground tabular-nums">
                       {item.bottle_size_ml ? `${item.bottle_size_ml}ml` : '—'}
                     </td>
