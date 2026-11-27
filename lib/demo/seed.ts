@@ -5,13 +5,13 @@
  *   usage logs (deliveries, spillage, comps, staff drinks, recounts)
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { DEMO_PROFILES, shapeNights, type DemoProfile } from './profiles';
+import { DEMO_PROFILES, shapeNights, type DemoProfile } from './profiles.ts';
 
 // ── Static seed tables ─────────────────────────────────────────────────────
 
 // Classified from the start, so the demo shows a correct pour cost rather than
 // one inflated by its own bar supplies.
-const CATEGORIES: { name: string; cost_type: string }[] = [
+export const CATEGORIES: { name: string; cost_type: string }[] = [
   { name: 'Spirits',                cost_type: 'beverage_cogs' },
   { name: 'Beer & Seltzers',        cost_type: 'beverage_cogs' },
   { name: 'Wine',                   cost_type: 'beverage_cogs' },
@@ -19,13 +19,13 @@ const CATEGORIES: { name: string; cost_type: string }[] = [
   { name: 'Supplies',               cost_type: 'supplies' },
 ];
 
-const REPS = [
+export const REPS = [
   { name: 'Marcus Johnson', company: 'Southern Wine & Spirits',         phone: '+15555550101', email: 'marcus@sws-demo.com' },
   { name: 'Rachel Torres',  company: 'Republic National Distributing',  phone: '+15555550102', email: 'rachel@rnd-demo.com' },
   { name: 'Dave Kim',       company: 'Craft Brew Distributors',         phone: '+15555550103', email: 'dave@cbd-demo.com' },
 ];
 
-const EMPLOYEES_SEED = [
+export const EMPLOYEES_SEED = [
   // tip_mode: 'pool' shares the nightly pool by hours
   // Danny is 'individual' — his per-server tips are tracked directly (32% → flagged)
   { name: 'Wes Berns',    role: 'bartender', hourly_rate: 15.00, tip_mode: 'pool'       },
@@ -37,14 +37,14 @@ const EMPLOYEES_SEED = [
   { name: 'Lisa Taylor',  role: 'manager',   hourly_rate: 18.00, tip_mode: 'no_tip'     },
 ];
 
-type ItemSeed = {
+export type ItemSeed = {
   name: string; category: string; unit: string;
   current_stock: number; par_level: number;
   cost_price: number | null; sale_price: number | null; sku: string | null;
   bottle_size_ml: number | null; pour_size_oz: number | null; rep_name: string;
 };
 
-const ITEMS: ItemSeed[] = [
+export const ITEMS: ItemSeed[] = [
   // ── Spirits ──────────────────────────────────────────────────────────────
   { name: "Tito's Handmade Vodka 750ml",     category:'Spirits', unit:'bottle', current_stock:8,  par_level:12, cost_price:20.99, sale_price:null, sku:'TIT-750', bottle_size_ml:750,  pour_size_oz:1.5, rep_name:'Marcus Johnson' },
   { name:'Grey Goose Vodka 750ml',           category:'Spirits', unit:'bottle', current_stock:3,  par_level:6,  cost_price:29.99, sale_price:null, sku:'GG-750',  bottle_size_ml:750,  pour_size_oz:1.5, rep_name:'Marcus Johnson' },
@@ -86,7 +86,7 @@ const ITEMS: ItemSeed[] = [
 
 type ServerEntry = { name: string; sales: number; tips: number };
 type ShiftEntry  = { name: string; reg: number; ot: number };
-type NightConfig = {
+export type NightConfig = {
   offset: number;      // days ago
   sales:  number;
   ccTips: number;
@@ -94,7 +94,7 @@ type NightConfig = {
   shifts:  ShiftEntry[];
 };
 
-const NIGHTS: NightConfig[] = [
+export const NIGHTS: NightConfig[] = [
   // ── Week 1 ──────────────────────────────────────────────────────────────
   { offset:14, sales:2800, ccTips:504,
     servers:[{name:'Wes Berns',sales:1400,tips:252},{name:'Kayla Chen',sales:1400,tips:252}],
@@ -152,9 +152,9 @@ const NIGHTS: NightConfig[] = [
 
 // ── Usage logs — deliveries + loss report ─────────────────────────────────
 
-type LogSeed = { item: string; qty: number; reason: string; note: string };
+export type LogSeed = { item: string; qty: number; reason: string; note: string };
 
-const USAGE_LOGS: LogSeed[] = [
+export const USAGE_LOGS: LogSeed[] = [
   // ── Deliveries (incoming stock) ──────────────────────────────────────────
   { item:"Tito's Handmade Vodka 750ml",    qty:6,   reason:'delivery',    note:'Mon delivery — Southern Wine & Spirits — PO #SW-2847' },
   { item:"Jack Daniel's Tennessee Whiskey",qty:4,   reason:'delivery',    note:'Tue delivery — Republic National — PO #RN-1103' },

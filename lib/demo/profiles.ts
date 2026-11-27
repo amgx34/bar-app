@@ -5,7 +5,7 @@
  * Each slug carries DEMO_SLUG_PREFIX: the purge sweeps by prefix and age, so a
  * bar without it would never be reclaimed.
  */
-import { DEMO_SLUG_PREFIX } from './constants';
+import { DEMO_SLUG_PREFIX } from './constants.ts';
 
 export type DemoProfile = {
   key: string;

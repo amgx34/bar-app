@@ -9,7 +9,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { poll2TouchEmails } from '@/lib/2touch/poll-emails';
 import { purgeExpiredDemoUsers } from '@/lib/demo/purge';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { refreshUniversalDemo } from '@/lib/demo/universal-seed';
+import { createAdminClient, createSeedAdminClient } from '@/lib/supabase/admin';
 import { runDailyNotifications } from '@/lib/notifications/run-daily';
 import { runDailyProviderSync } from '@/lib/pos/run-daily-providers';
 
@@ -34,6 +35,18 @@ export async function GET(req: NextRequest) {
   const posProviders = await runDailyProviderSync().catch((e) => ({
     scanned: 0, synced: 0, failed: 0, skipped: 0, deferred: 0, errors: [String(e)],
   }));
+
+  // The shared sample bars get their dates moved up to today, before the purge.
+  // Hard 20s limit so a slow database cannot eat the rest of this job's budget.
+  let demoTimer: ReturnType<typeof setTimeout> | undefined;
+  const demoRefresh = await Promise.race([
+    refreshUniversalDemo(createSeedAdminClient(), { password: process.env.DEMO_USER_PASSWORD })
+      .then((r) => ({ bars: r.bars.length, error: null as string | null })),
+    new Promise<never>((_, no) => { demoTimer = setTimeout(() => no(new Error('timed out after 20s')), 20_000); }),
+  ]).catch((e) => {
+    console.warn('[cron/2touch] universal demo refresh failed (non-fatal):', e);
+    return { bars: 0, error: String(e) };
+  }).finally(() => clearTimeout(demoTimer));
 
   // Housekeeping rides along on the one scheduled invocation the Hobby plan
   // allows. Both are isolated so a failure in either still lets the other run.
@@ -85,7 +98,7 @@ export async function GET(req: NextRequest) {
     }
   })();
 
-  const result = { emails, posProviders, demoPurge, rateLimitRowsSwept, jsonbPruned, notifications };
+  const result = { emails, posProviders, demoRefresh, demoPurge, rateLimitRowsSwept, jsonbPruned, notifications };
   console.log('[cron/2touch]', result);
   return NextResponse.json(result);
 }

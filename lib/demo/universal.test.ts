@@ -168,7 +168,7 @@ describe('buildBar', () => {
   it('employees: one W-2 and one 1099, no bank details anywhere', () => {
     const e = bars[0].bar.employees;
     expect(e.some((x) => x.tax_classification === 'w2')).toBe(true);
-    expect(e.some((x) => x.tax_classification === '1099')).toBe(true);
+    expect(e.some((x) => x.tax_classification === 'contractor_1099')).toBe(true);
     expect(JSON.stringify(bars)).not.toMatch(/routing|account_number/i);
   });
 });
