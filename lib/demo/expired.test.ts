@@ -55,3 +55,21 @@ describe('selectExpiredDemoOrgs', () => {
     expect(selectExpiredDemoOrgs(orgs, PREFIX, CUTOFF)).toHaveLength(35);
   });
 });
+
+describe('the permanent sample bars are never swept', () => {
+  it('skips rail-demo orgs even when an empty prefix would match everything', () => {
+    const orgs = [org('u', 'rail-demo-tavern', '2020-01-01T00:00:00Z'), org('old', `${PREFIX}x`, '2020-01-01T00:00:00Z')];
+    expect(selectExpiredDemoOrgs(orgs, '', CUTOFF)).toEqual(['old']);
+  });
+
+  it('skips the shared visitor even if its address looked old enough', async () => {
+    const { selectExpiredDemoUsers } = await import('./expired');
+    const users = [
+      { id: 'shared', email: 'shared-visitor@demo.example', created_at: '2020-01-01T00:00:00Z' },
+      { id: 'old', email: 'demo-x@rail.demo', created_at: '2020-01-01T00:00:00Z' },
+      { id: 'new', email: 'demo-y@rail.demo', created_at: '2026-09-02T00:00:00Z' },
+    ];
+    expect(selectExpiredDemoUsers(users, '@rail.demo', CUTOFF)).toEqual(['old']);
+    expect(selectExpiredDemoUsers(users, '', CUTOFF)).toEqual(['old']);
+  });
+});
