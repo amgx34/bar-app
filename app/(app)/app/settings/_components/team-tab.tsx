@@ -215,6 +215,7 @@ export function TeamTab({
               {canManage && !m.is_self ? (
                 <>
                   <Select
+                    label={`Role for ${m.email}`}
                     value={m.role}
                     onValueChange={(v) => handleRoleChange(m.user_id, v as Role)}
                     disabled={busyId === m.user_id}
@@ -264,7 +265,7 @@ export function TeamTab({
             </div>
             <div className="space-y-1.5">
               <Label>Role</Label>
-              <Select value={role} onValueChange={(v) => setRole(v as Role)}>
+              <Select label="Role" value={role} onValueChange={(v) => setRole(v as Role)}>
                 <SelectTrigger><span className="text-sm">{roleLabel(role)}</span></SelectTrigger>
                 <SelectContent>
                   {ROLES.map((r) => (

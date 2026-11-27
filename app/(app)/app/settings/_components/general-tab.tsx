@@ -106,7 +106,7 @@ export function GeneralTab({ orgName, role, settings }: Props) {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label>Venue Type</Label>
-            <Select value={form.bar_type} onValueChange={(v) => setForm({ ...form, bar_type: v ?? 'bar' })} disabled={!canEdit}>
+            <Select label="Venue type" value={form.bar_type} onValueChange={(v) => setForm({ ...form, bar_type: v ?? 'bar' })} disabled={!canEdit}>
               <SelectTrigger>
                 <span className="text-sm">{BAR_TYPES.find(b => b.value === form.bar_type)?.label ?? 'Bar / Tavern'}</span>
               </SelectTrigger>
@@ -136,7 +136,7 @@ export function GeneralTab({ orgName, role, settings }: Props) {
           </div>
           <div className="space-y-1.5">
             <Label>State</Label>
-            <Select value={form.bar_state || 'none'} onValueChange={(v) => setForm({ ...form, bar_state: !v || v === 'none' ? '' : v })} disabled={!canEdit}>
+            <Select label="State" value={form.bar_state || 'none'} onValueChange={(v) => setForm({ ...form, bar_state: !v || v === 'none' ? '' : v })} disabled={!canEdit}>
               <SelectTrigger>
                 <span className="text-sm">{form.bar_state || 'Select state'}</span>
               </SelectTrigger>

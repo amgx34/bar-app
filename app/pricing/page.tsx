@@ -20,7 +20,7 @@ const PLANS = [
 export default function PricingPage() {
   return (
     <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 text-foreground">
-      <Link href="/" className="text-sm underline underline-offset-2">Back to {SITE_NAME}</Link>
+      <Link href="/" className="inline-flex min-h-6 items-center text-sm underline underline-offset-2">Back to {SITE_NAME}</Link>
       <h1 className="mt-6 text-3xl font-bold tracking-tight">Pricing</h1>
       <p className="mt-2 text-muted-foreground">One flat price per bar, per month. Month to month. Pay by card or Link through Stripe.</p>
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -33,8 +33,9 @@ export default function PricingPage() {
         ))}
       </div>
       <p className="mt-6 text-sm text-muted-foreground">
-        {SITE_NAME} does not file taxes, withhold taxes, or hold or move your money.
-        {SIGNUP_OPEN ? 'Sign up, then subscribe from Settings, Billing.' : 'Rail is invite only right now. Request access and we will set up your bar.'} You can cancel any time from Settings, Billing.
+        {SITE_NAME} does not file taxes, withhold taxes, or hold or move your money.{' '}
+        {SIGNUP_OPEN ? 'Sign up, then subscribe from Settings, Billing.' : 'Rail is invite only right now. Request access and we will set up your bar.'}{' '}
+        {SIGNUP_OPEN ? 'You can cancel any time from the same place.' : 'Once you are set up, you can cancel any time from Settings, Billing.'}
       </p>
       <div className="mt-6 flex flex-wrap gap-3">
         {SIGNUP_OPEN ? (
@@ -45,10 +46,10 @@ export default function PricingPage() {
         ) : (
           <>
             <Link href="/login" className="inline-flex min-h-11 items-center rounded-lg bg-primary px-5 font-medium text-primary-foreground">Sign in</Link>
-            <Link href="/#contact" className="inline-flex min-h-11 items-center rounded-lg border px-5 font-medium">Request access</Link>
+            <Link href="/#contact" className="inline-flex min-h-11 items-center rounded-lg border px-5 font-medium">Request access or book a demo</Link>
           </>
         )}
-        <Link href="/#contact" className="inline-flex min-h-11 items-center rounded-lg border px-5 font-medium">Book a demo</Link>
+        {SIGNUP_OPEN && <Link href="/#contact" className="inline-flex min-h-11 items-center rounded-lg border px-5 font-medium">Book a demo</Link>}
       </div>
     </main>
   );

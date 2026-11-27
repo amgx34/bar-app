@@ -192,7 +192,7 @@ export default function W2Generator({ availableYears, employees, orgName }: Prop
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Tax Year</Label>
-            <Select value={String(year)} onValueChange={(v) => { setYear(Number(v)); setEntries(null); }}>
+            <Select label="Tax year" value={String(year)} onValueChange={(v) => { setYear(Number(v)); setEntries(null); }}>
               <SelectTrigger className="h-9">{year}</SelectTrigger>
               <SelectContent>
                 {availableYears.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
@@ -213,7 +213,7 @@ export default function W2Generator({ availableYears, employees, orgName }: Prop
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">State</Label>
-            <Select value={state} onValueChange={(v) => setState(v ?? '')}>
+            <Select label="State" value={state} onValueChange={(v) => setState(v ?? '')}>
               <SelectTrigger className="h-9">
                 <span className="truncate text-sm">{state ? US_STATES.find(s => s.code === state)?.name : 'Select state'}</span>
               </SelectTrigger>
@@ -228,7 +228,7 @@ export default function W2Generator({ availableYears, employees, orgName }: Prop
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Employee</Label>
-            <Select value={selectedEmpId} onValueChange={(v) => setSelectedEmpId(v ?? 'all')}>
+            <Select label="Employee" value={selectedEmpId} onValueChange={(v) => setSelectedEmpId(v ?? 'all')}>
               <SelectTrigger className="h-9">
                 <span className="truncate text-sm">
                   {selectedEmpId === 'all' ? 'All employees' : employees.find(e => e.id === selectedEmpId)?.name ?? 'Select'}

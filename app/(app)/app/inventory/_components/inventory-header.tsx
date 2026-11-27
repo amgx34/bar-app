@@ -87,6 +87,7 @@ export function InventoryHeader({
 
           {/* Category filter */}
           <Select
+            label="Filter by category"
             value={currentCategory || 'all'}
             onValueChange={(v) => updateParams({ category: v === 'all' ? null : v })}
           >

@@ -21,8 +21,8 @@ import { dispatch } from '@/lib/notifications/deliver';
  * read by the person who signed up until that approval happens.
  */
 
-const SENT = 'Thanks — your request has been sent to your manager for approval.';
-const BAD_CODE = 'That code was not recognised.';
+const SENT = 'Thanks, your request has been sent to your manager for approval.';
+const BAD_CODE = 'That code was not recognised. If your bar has not opened staff sign-up yet, ask your manager.';
 
 export async function claimEmployeeAccount(
   email: string,

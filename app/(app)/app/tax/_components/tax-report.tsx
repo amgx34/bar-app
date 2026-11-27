@@ -185,7 +185,7 @@ export default function TaxReport({ orgName }: { orgName: string }) {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">State</Label>
-            <Select value={state} onValueChange={(v) => handleStateChange(v ?? '')}>
+            <Select label="State" value={state} onValueChange={(v) => handleStateChange(v ?? '')}>
               <SelectTrigger className="h-9">
                 <span className="truncate text-sm">{state ? US_STATES.find(s => s.code === state)?.name : 'Select state'}</span>
               </SelectTrigger>

@@ -93,7 +93,7 @@ export function LegalPage({
               [&_p]:leading-relaxed [&_p]:text-[0.9375rem]
               [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_ul]:text-[0.9375rem]
               [&_li]:leading-relaxed
-              [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2
+              [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:inline-block [&_a]:min-h-6
               [&_table]:w-full [&_table]:text-sm [&_table]:border-collapse
               [&_th]:text-left [&_th]:font-semibold [&_th]:border-b [&_th]:border-border [&_th]:py-2 [&_th]:pr-4
               [&_td]:border-b [&_td]:border-border [&_td]:py-2 [&_td]:pr-4 [&_td]:align-top
@@ -111,11 +111,11 @@ export function LegalPage({
         <div className="max-w-3xl mx-auto px-6 py-6 flex flex-wrap items-center justify-between gap-4 text-xs text-muted-foreground">
           <p>&copy; {new Date().getFullYear()} {SITE_NAME}. All rights reserved.</p>
           <nav aria-label="Legal" className="flex gap-5">
-            <Link href="/privacy" className="hover:text-primary transition-colors duration-200">Privacy</Link>
-            <Link href="/terms" className="hover:text-primary transition-colors duration-200">Terms</Link>
-            <Link href="/eula" className="hover:text-primary transition-colors duration-200">Agent Licence</Link>
-            <Link href="/accessibility" className="hover:text-primary transition-colors duration-200">Accessibility</Link>
-            <Link href="/" className="hover:text-primary transition-colors duration-200">Home</Link>
+            <Link href="/privacy" className="inline-flex min-h-6 items-center hover:text-primary transition-colors duration-200">Privacy</Link>
+            <Link href="/terms" className="inline-flex min-h-6 items-center hover:text-primary transition-colors duration-200">Terms</Link>
+            <Link href="/eula" className="inline-flex min-h-6 items-center hover:text-primary transition-colors duration-200">Agent Licence</Link>
+            <Link href="/accessibility" className="inline-flex min-h-6 items-center hover:text-primary transition-colors duration-200">Accessibility</Link>
+            <Link href="/" className="inline-flex min-h-6 items-center hover:text-primary transition-colors duration-200">Home</Link>
           </nav>
         </div>
       </footer>

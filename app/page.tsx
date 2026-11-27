@@ -548,11 +548,11 @@ export default function HomePage() {
                       The acceptance is recorded server-side in /api/demo. */}
                   <p className="text-muted-foreground text-[0.6875rem] leading-relaxed pt-1">
                     Starting a demo means you accept our{' '}
-                    <Link href="/terms" className="underline underline-offset-2 hover:text-foreground">
+                    <Link href="/terms" className="inline-block min-h-6 underline underline-offset-2 hover:text-foreground">
                       Terms
                     </Link>{' '}
                     and{' '}
-                    <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
+                    <Link href="/privacy" className="inline-block min-h-6 underline underline-offset-2 hover:text-foreground">
                       Privacy Policy
                     </Link>
                     .

@@ -109,15 +109,10 @@ export default async function PayrollReviewPage({ searchParams }: { searchParams
           <div className="flex min-w-0 items-center gap-3">
             <Link
               href={`/app/payroll?tab=payroll&startDate=${startDate}&endDate=${endDate}`}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="h-4 w-4" /> Back
             </Link>
-            <div className="h-4 w-px bg-border" />
-            <div>
-              <span className="text-sm font-semibold">Payroll Review</span>
-              <span className="text-xs text-muted-foreground ml-2">{periodLabel}</span>
-            </div>
           </div>
 
           {/* Export button — client handles CSV download */}
