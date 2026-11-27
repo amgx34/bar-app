@@ -1,39 +1,45 @@
-# Bar owner walkthrough (10 to 12 minutes)
+# Bar owner walkthrough (about 8 minutes)
+
+Updated 2026-11-27. The audit verdict was **not ready to show an owner** until pay runs, Sales Week and Month, Books and the Count "Matches" button are fixed. If you must show it, follow this shorter script. Details: `docs/superpowers/findings/2026-11-27-universal-demo-results.md`.
 
 Goal: the owner sees their own Friday night on one screen and says "I want that."
-Say one sentence per screen, then stop talking and let them touch it.
+Say one sentence per screen, then stop talking. Keep hold of the device or stay beside them; several buttons lead to wrong or confusing screens.
 
 ## Before you start (checklist)
 
-- [ ] Use the Try the demo button on the landing page. It opens the shared sample bar at once; nothing anyone clicks there is saved. Check "Last night" on the dashboard shows yesterday (the sample data is moved up to today by a daily job, or `npm run demo:seed` on dev).
-- [ ] Dev server running (`npm run dev`, localhost:3000) or the deployed URL. Check it loads on the phone's Wi-Fi.
-- [ ] Phone (390 wide) and laptop both signed into the same demo. Start on the phone, it is the screen they will use.
-- [ ] Set both to light mode. Notifications silenced. Browser zoom 100%.
-- [ ] The Sales page rewrites its address to add `?start=...&hour=...` on first load. That is by design (it reads the bar's own clock). Do not be alarmed by it.
-- [ ] "Tonight" on Sales has no number in the demo, because the sample bar has not closed yet. Use the Day tab and the arrows instead (below).
+- [ ] Use the Try the demo button on the landing page. It opens the shared sample bar at once and does not expire.
+- [ ] Check the date on "Last night". It should be yesterday, or the last open night. A daily job moves the sample data up; the dev server has no such job, so run `npm run demo:seed` (dev only) first. Corner Pour showed a date 4 days old in the audit.
+- [ ] Dev server running (`npm run dev`, localhost:3000). A deployed URL has not been tested, and refusal messages may differ there. Live also needs the owner seed steps in the results file.
+- [ ] Use the laptop. On the phone the bar name is cut to one letter and the notification panel is clipped.
+- [ ] Light mode, except Tips (dark reads better). Notifications silenced. Browser zoom 100%.
+- [ ] The Sales page adds `?start=...&hour=...` to its address on first load. That is by design.
 
 ## Script
 
 1. **Landing page.** "This is Rail. It pulls your sales, stock and payroll into one place." Click Try the demo.
-2. **Dashboard.** "Last night's sales, what is low, and what needs your attention, in one glance." Point at Last night and the Stock card.
-3. **Sales.** Tap the Day tab, then the left arrow to a busy night (around $5,800 to $7,400). "Here is the whole night's total from your close-out report." Say it is a daily total, not hour by hour. Show the drawer card: "It checks the cash drawer against what the till says should be there."
-4. **Payroll week.** "Hours and tips turn into what each person is owed." Open one employee row.
-5. **Payroll review.** "You sign off before anything is paid, and if the numbers change after, it shows you what moved." Do not press anything that pays.
-6. **Inventory list.** "Everything on the shelf and what is under par." Tap the Reorder card.
-7. **Inventory count.** "Count on your phone, it fixes the stock numbers." Enter one count only if you want to show it.
-8. **Reps.** "Each supplier rep with what to reorder from them." Do not send an order (it sends a real email).
-9. **Tips.** "Pool, individual and barback tips worked out the way you already do them."
-10. **Books.** "Cost of goods and margins, from what you actually bought and sold."
-11. **Settings.** Open it briefly. "Team, roles and your POS connection live here."
-12. **Switcher.** Tap the bar name at the top. "If you own three bars, you switch here." (Top bar, next to the Rail logo. Not re-checked on the final build, try it once before the meeting.)
+2. **Dashboard.** "Sales, what is low, and what needs your attention, in one glance." Point at Last night and the Stock card. The sample night reads well below average; say it is made-up data. Skip the setup checklist and do not press Hide for now.
+3. **Sales.** Day tab only, then the left arrow to a night with a total. "Here is the night, with hours and servers." Do not scroll to Top movers or What sold (empty), do not open Week or Month ($0.00), and do not promise the cash drawer check.
+4. **Payroll week.** It opens on today with no data. Switch to Week and step back one week. "Hours and tips turn into what each person is owed." Do not open Review.
+5. **Inventory list.** "Everything on the shelf and what is under par." Look only.
+6. **Weigh.** Open the saved report. "Weigh the open bottles and see what they are worth." Do not create one.
+7. **Reps.** "Each supplier rep with what to reorder from them." You may open the order form. Do not press Send.
+8. **Tips.** Totals only. "Pool, individual and barback tips." Leave Well Performance closed.
+9. **Switcher.** Tap the bar name at the top. "If you own three bars, you switch here." Tipsy Tavern (owner), Velvet Room Lounge (manager), Corner Pour (owner).
 
 ## Do NOT click or promise
 
-- Clover and Toast connections: built, but never tried on a real account. Say "coming, not proven yet." 2Touch is the working POS link.
-- Direct deposit: not offered. Payroll gives you the numbers and a bank file only after approval.
+- Payroll Review, either pay run, or the bank file: the sample figures show large false changes.
+- Books: the sample cost of goods is not believable.
+- Sales Week, Month, Tonight, today, or a night with no report.
+- Count: do not tap Matches (it blocks saving) or Save.
+- Read invoice, AI Import, Log a shipment.
+- Any save, delete, send or pay button. Not every refusal explains itself.
+- Settings (POS, Billing, Data export, Team, notifications, staff sign-up).
+- Add item, Inventory Analytics.
+- Clover and Toast: built, never tried on a real account. Say "coming, not proven yet." 2Touch is the working POS link.
+- Direct deposit: not offered.
 - Sign-up: closed. Do not click Make this my bar. Say "I will set your bar up with you."
-- Billing: switched off, nothing is charged. Do not quote a price.
-- Do not send an order, click Pay remaining, approve a pay run, or press Sync now.
+- Billing: switched off. Do not quote a price.
 
 ## Likely questions
 
@@ -47,4 +53,4 @@ Say one sentence per screen, then stop talking and let them touch it.
 
 ## If something looks wrong
 
-Say "that is sample data." Refresh once.
+Say "that is sample data" and move to the next step. Do not retry a save.

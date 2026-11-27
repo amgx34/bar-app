@@ -78,3 +78,7 @@ Pieces S1 to S6 and V1 are built, tested and committed; S5 is the one piece that
 ## 2026-11-26: fix pass results
 
 Fixes F1 to F5, demo prep, final gates, journey scores J1 to J14, the safe and avoid lists and outstanding owner steps are in `docs/superpowers/findings/2026-11-26-fix-pass-results.md`. Start a fresh demo before showing a bar owner; the cookie-jar demo has expired.
+
+## 2026-11-27: universal read-only demo
+
+One shared sample bar replaces per-visitor demos. Audit verdict: not ready to show an owner, and not safe to open on live until the direct-to-Supabase write path is closed. Load times, blockers, the owner's live seed and retire commands, and the safe and avoid lists are in `docs/superpowers/findings/2026-11-27-universal-demo-results.md`. Nothing was pushed, deployed or applied.
